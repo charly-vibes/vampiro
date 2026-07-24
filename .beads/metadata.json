@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "vampiro",
+  "project_id": "1ab3162f-31e8-4ae2-89af-3124c7213b91"
+}
