@@ -4,6 +4,7 @@ Wai auto-detects and integrates with external tools:
 
 ## Detected in this workspace:
 - **git** — Version control (hooks: status, handoff)
+- **openspec** — Specification management
 
 
 ## Custom plugins

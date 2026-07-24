@@ -3,19 +3,33 @@
 > This file is managed by `wai init`. Do not edit manually.
 > Changes will be overwritten on the next init.
 
+## When to Use What
+
+| Need | Tool | Example |
+|------|------|---------|
+| Record reasoning/research | wai | `wai add research "findings"` |
+| Capture design decisions | wai | `wai add design "architecture choice"` |
+| Session context transfer | wai | `wai handoff create <project>` |
+| Propose system changes | openspec | Read `openspec/AGENTS.md` |
+| Define requirements | openspec | `openspec validate --strict` |
+
+Key distinction:
+- **wai** = *why* decisions were made (reasoning, context, handoffs)
+- **openspec** = *what the system should look like* (specs, requirements, proposals)
 
 ## Starting a Session
 
 1. Run `wai sync` to ensure all agent tools and skills are correctly projected.
 2. Run `wai status` to see active projects, current phase, and suggestions.
-3. Check the phase — it tells you what kind of work is expected:
+3. Check `openspec list` for active change proposals.
+4. Check the phase — it tells you what kind of work is expected:
    - **research** → gather information, explore options
    - **design** → make architectural decisions
    - **plan** → break work into tasks
    - **implement** → write code, guided by research/plans
    - **review** → validate against plans
    - **archive** → wrap up
-4. Read existing artifacts with `wai search "<topic>"` before starting new work.
+5. Read existing artifacts with `wai search "<topic>"` before starting new work.
 
 ## Capturing Work
 
@@ -38,6 +52,8 @@ Before saying "done", run this checklist:
 
 ```
 [ ] wai handoff create <project>   # capture context for next session
+[ ] openspec tasks.md — mark completed tasks [x]
+[ ] openspec list — archive any ✓ Complete changes (`openspec archive <id> --yes`)
 [ ] wai reflect                    # update CLAUDE.md with project patterns (every ~5 sessions)
 [ ] git add <files> && git commit  # commit code + handoff
 ```
@@ -93,6 +109,13 @@ wai doctor                    # Workspace health
 wai pipeline list             # List pipelines
 wai pipeline start <n> --topic=<t>  # Start a run; set WAI_PIPELINE_RUN=<id>
 wai pipeline next             # Advance to next step
+```
+
+### openspec
+Read `openspec/AGENTS.md` for full instructions.
+```bash
+openspec list              # Active changes
+openspec list --specs      # Capabilities
 ```
 
 ## Structure
