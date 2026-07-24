@@ -1,0 +1,9 @@
+plugins = []
+
+[project]
+name = "vampiro"
+version = "2026.7.16"
+description = ""
+tool_commit = "0e16817"
+
+[llm]
