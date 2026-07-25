@@ -1,13 +1,25 @@
-## 1. Contract Tests
-- [ ] 1.1 Select/document configuration filename, format, discovery, precedence, and exact numeric exit codes (REQ-4).
-- [ ] 1.2 Add failing snapshots freezing those decisions and reserved `check`/`prove` parsing; add precedence/error and finding-envelope/exit tests.
+> Implementation is blocked until the roadmap approval gate records approval of the EARS source and this proposal.
 
-## 2. Foundation
-- [ ] 2.1 Create the stable-toolchain Cargo workspace, library boundaries, and `vampiro` binary.
-- [ ] 2.2 Implement command parsing and configuration loading only.
-- [ ] 2.3 Implement the shared finding envelope and neutral exit-code types without later analysis/gating behavior.
+## 0. Configuration and Exit Decision Gate (HITL)
+- [ ] 0.1 Compare configuration filename/format/discovery/precedence and numeric exit-code alternatives against help, precedence, invalid-config, policy-failure, and operational-failure examples; record the choice in `docs/decisions/cli-contract.md`.
+- [ ] 0.2 Record supported scope, rejected alternatives, compatibility implications, approver, and immutable review reference before implementation begins.
 
-## 3. Verification
-- [ ] 3.1 Run Cargo unit/integration/doc tests and command snapshots.
-- [ ] 3.2 Run rustfmt and Clippy under the established lint policy.
-- [ ] 3.3 Verify REQ-4 ownership, REQ-5/REQ-12 conformance references, separate `filtration_distance = sev(e)` transport, and empty successor adapters without claiming behavior.
+## 1. Executable Workspace Tracer
+- [ ] 1.1 Add failing help/version snapshots for the reserved `check` and `prove` families without claiming analysis or proof behavior.
+- [ ] 1.2 Create the stable-toolchain Cargo workspace, thin `vampiro` binary, and library boundaries needed to satisfy those snapshots.
+- [ ] 1.3 Run the focused CLI snapshot tests, `cargo test --workspace`, `cargo fmt --check`, and Clippy with warnings denied; attach the command output to the ticket.
+
+## 2. Configuration and Exit Tracer
+- [ ] 2.1 Add failing discovery/precedence/invalid-config and exact success/policy/operational exit-code tests from the approved decision (REQ-4).
+- [ ] 2.2 Implement only configuration loading, parsed command transport, and neutral exit-code types; do not add analysis or gating behavior.
+- [ ] 2.3 Run `cargo test --workspace rust_cli_foundation_2` and workspace quality commands; publish `cli-config-exit/v1` at `tests/contracts/cli/config-exit-v1.json` and record evidence in `docs/verification/add-rust-cli-foundation-2.md`.
+
+## 3. Finding Envelope Tracer
+- [ ] 3.1 Add failing construction/serialization-boundary tests requiring rule, path, exact line range, configured severity, exactly one axis, and optional independent `filtration_distance = sev(e)`.
+- [ ] 3.2 Implement the shared finding envelope and empty successor adapters without reporting, law, lifecycle, or scan behavior.
+- [ ] 3.3 Run `cargo test --workspace rust_cli_foundation_3`; publish `finding-envelope/v1` at `tests/contracts/findings/envelope-v1.json`, verify REQ-4 ownership plus REQ-5/REQ-12 references, and record evidence in `docs/verification/add-rust-cli-foundation-3.md`.
+
+## 4. Foundation Acceptance
+- [ ] 4.1 Run unit, integration, doc, and command snapshot suites plus workspace formatting and Clippy.
+- [ ] 4.2 Run `cargo test --workspace rust_cli_foundation_4` to verify successor compatibility with `cli-config-exit/v1` and `finding-envelope/v1`; record the report in `docs/verification/add-rust-cli-foundation-4.md`.
+- [ ] 4.3 Run `openspec validate add-rust-cli-foundation --strict` and confirm no analysis, serialization, proof, CI-generation, or gating behavior is claimed.

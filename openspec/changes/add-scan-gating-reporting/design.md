@@ -18,5 +18,7 @@ One normalized run result must drive every presentation and policy decision.
 - Git rename/diff ambiguity can miss seams; report scope metadata and permit explicit full scans.
 - Cache invalidation errors threaten correctness; version all inputs and test cold/warm equivalence.
 
-## Open Questions
-- Confirm supported CI providers and exact tiered-mode policy configuration during implementation.
+## Decision Gate
+- A HITL decision ticket SHALL confirm supported CI providers, provider event/ref
+  variables, and exact tiered-mode policy configuration before policy or CI
+  generation implementation.

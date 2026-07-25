@@ -17,5 +17,7 @@ Property tests and external proofs are different evidence channels over declared
 - Generated values may not cover a model meaningfully; expose generator configuration/evidence and never silently skip a member.
 - Prover translations can be unsound; version adapters and golden-test generated obligations.
 
-## Open Questions
-- Confirm Rust property-testing crate and initial prover input formats during implementation.
+## Decision Gate
+- A HITL decision ticket SHALL confirm the Rust property-testing crate, initial
+  prover input/process formats, supported versions, and timeout/resource policy
+  before runner or adapter implementation.

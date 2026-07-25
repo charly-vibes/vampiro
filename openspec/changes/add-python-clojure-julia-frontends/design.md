@@ -16,5 +16,7 @@ Each language maps syntax and conventions to the same CIR and analysis contracts
 - Dynamic constructs create opaque/unknown facts; surface them rather than guessing.
 - Combining three languages risks a large delivery; use separate test-first milestones and conformance gates.
 
-## Open Questions
-- Confirm parser choice, supported language versions, and macro/module-loading boundaries separately for Python, Clojure, and Julia.
+## Decision Gates
+- Separate HITL decision tickets SHALL confirm parser choice, supported language
+  versions, macro/module-loading boundaries, exclusions, approver, and immutable
+  review reference for Python, Clojure, and Julia before each implementation.

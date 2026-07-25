@@ -14,6 +14,7 @@ The frontend maps Rust syntax and semantic conventions into CIR, but does not de
 - Macros and type inference can hide edges/shapes; surface extraction gaps and preserve conservative classifications.
 - Parser choice affects correctness and performance; gate confirmation on representative fixtures and the 50-seam workflow.
 
-## Open Questions
-- Confirm parser stack and macro-expansion boundary during implementation.
-- Confirm which write/acquire/release idioms enter the first versioned tables.
+## Decision Gate
+- A HITL decision ticket SHALL confirm the parser stack, supported Rust
+  editions/versions, macro-expansion boundary, and initial effect, write,
+  acquire, and release idioms before extraction implementation.

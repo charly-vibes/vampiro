@@ -17,5 +17,6 @@ All checks consume CIR and declarative category data; language plugins only prov
 - Conservative extraction can reduce composition coverage; never convert uncertainty into validity.
 - Ancestor traversal can grow; memoize by edge, exception/effect layer, and boundary.
 
-## Open Questions
-- Confirm initial structural-shape hash/canonicalization details during implementation.
+## Decision Gate
+- A HITL decision ticket SHALL confirm structural-shape normalization, hashing,
+  collision handling, and version compatibility before analysis implementation.

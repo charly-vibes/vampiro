@@ -14,5 +14,7 @@ This greenfield change establishes contracts consumed by every later change.
 - Premature command details can constrain later work; keep subcommand payloads minimal and version shared envelopes.
 - Configuration drift can break automation; snapshot the parsed command/config contract.
 
-## Open Questions
-- These configuration and numeric-exit choices are explicit pre-implementation gates.
+## Decision Gate
+- A HITL decision ticket SHALL record configuration and numeric-exit choices,
+  alternatives, compatibility impact, approver, and immutable review reference
+  before implementation tickets become actionable.

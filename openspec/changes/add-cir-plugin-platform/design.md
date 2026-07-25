@@ -17,5 +17,8 @@ CIR is the sole boundary between syntax plugins and language-neutral analysis.
 - Finite closure can still grow; reject declarations exceeding configured resource limits as configuration errors, never as partial validation. Fixtures test the exhaustive algorithm but never substitute for validating each declaration.
 - Plugin ABI stability is difficult in Rust; packaging/ABI and serialization/versioning are pre-implementation decisions covered by compatibility fixtures.
 
-## Open Questions
-- Select and document plugin packaging/ABI and serialization/schema-version policy before platform implementation.
+## Decision Gate
+- A HITL decision ticket SHALL select and document plugin packaging/ABI,
+  serialization/schema-version policy, compatibility window, migration policy,
+  resource limits, approver, and immutable review reference before platform
+  implementation.

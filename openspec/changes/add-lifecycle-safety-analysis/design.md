@@ -16,5 +16,7 @@ Lifecycle checks combine persisted history, frontend facts, graph analysis, and 
 - Snapshot storage and identity schemas can lock in history; version schemas and retain migration readers.
 - Control-flow approximation can produce uncertainty; preserve unknown paths and report coverage rather than asserting safety.
 
-## Open Questions
-- Snapshot policy and migration syntax are pre-implementation decision gates; only the first write/resource idiom set remains to select during implementation.
+## Decision Gate
+- A HITL decision ticket SHALL confirm snapshot storage/schema/version,
+  retention, baseline and migration syntax, migration-reader policy, and initial
+  write/resource idiom sets before persistence or classifier implementation.
