@@ -1,0 +1,57 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  planning:
+    name: Validate specifications and issue export
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install OpenSpec
+        run: npm install --global @fission-ai/openspec@0.19.0
+
+      - name: Validate OpenSpec
+        env:
+          DO_NOT_TRACK: "1"
+        run: openspec validate --all --strict --no-interactive
+
+      - name: Validate exported issue graph
+        run: python3 scripts/check_planning.py
+
+  docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install documentation dependencies
+        run: python -m pip install --requirement requirements-docs.txt
+
+      - name: Assemble authoritative documentation
+        run: python scripts/build_docs.py
+
+      - name: Build documentation strictly
+        run: mkdocs build --strict
