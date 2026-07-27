@@ -1,0 +1,50 @@
+# Vampiro
+
+> Cross-language CLI that checks whether the pieces of a codebase actually compose: whether call boundaries line up structurally, whether module boundaries are respected, whether interchangeable implementations are actually interchangeable, and whether error/absence/retry channels are threaded through call chains instead of silently discarded.
+
+## What It Does
+
+Vampiro analyzes source without executing it and normalizes each language into a shared Composition IR (CIR). It detects four classes of seam defects:
+
+| Axis | Question |
+|---|---|
+| **composition** | Does the produced structural shape match what the caller accepts? |
+| **modularity** | Does the edge respect the target module's declared interface? |
+| **optionality** | Are structurally interchangeable implementations lawfully interchangeable? |
+| **robustness** | Are effects, retries, fallbacks, and resource obligations handled completely? |
+
+## Key Commands
+
+```
+vampiro check     # Check for seam defects (default: diff-scoped)
+vampiro scan      # Full repository scan
+```
+
+## Project Structure
+
+```
+vampiro/
+├── vampiro-ears-spec.md      # Authoritative requirements (Draft 1.1.0)
+├── book.toml                 # mdBook docs config
+├── docs/src/                 # Documentation source
+├── openspec/                 # Spec-driven development (8 active changes)
+├── scripts/                  # Build and validation scripts
+└── .wai/                     # Workflow tracking
+```
+
+## Source Layout (planned)
+
+```
+src/
+├── main.rs
+├── cir/           # Composition IR
+├── frontends/     # Language-specific parsers
+├── checks/        # Seam analysis engines
+└── output/        # Human, JSON, SARIF formatters
+```
+
+## Links
+
+- Repository: https://github.com/charly-vibes/vampiro
+- Issues: https://github.com/charly-vibes/vampiro/issues
+- Changelog: CHANGELOG.md
