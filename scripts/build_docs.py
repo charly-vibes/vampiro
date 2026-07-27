@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble the MkDocs source tree from authoritative project documents."""
+"""Assemble the mdBook source tree from authoritative project documents."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILD_DOCS = ROOT / ".build" / "docs"
+SRC = ROOT / "docs" / "src"
 
 CHANGES = {
     "add-rust-cli-foundation": "cli-foundation",
@@ -59,6 +59,29 @@ def copy_with_notice(source: Path, destination: Path, notice: str) -> None:
     destination.write_text(f"{notice}\n\n{source.read_text()}")
 
 
+def build_summary() -> str:
+    lines = [
+        "# Summary",
+        "",
+        "[Home](./index.md)",
+        "[Project Context](./project-context.md)",
+        "[EARS Specification](./specification/ears.md)",
+        "",
+        "# Roadmap",
+        "",
+        "- [Overview](./roadmap/index.md)",
+    ]
+    for change_id in CHANGES:
+        lines.append(f"  - [`{change_id}`](./roadmap/{change_id}/proposal.md)")
+        lines.append(f"    - [Capability delta](./roadmap/{change_id}/spec.md)")
+        lines.append(f"    - [Design](./roadmap/{change_id}/design.md)")
+        lines.append(f"    - [Tasks](./roadmap/{change_id}/tasks.md)")
+    lines.append("")
+    lines.append("[Contributing](./contributing.md)")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def build_roadmap_index() -> str:
     rows = []
     for change_id in CHANGES:
@@ -88,22 +111,31 @@ def build_roadmap_index() -> str:
 
 def main() -> None:
     validate_source_inventory()
-    if BUILD_DOCS.exists():
-        shutil.rmtree(BUILD_DOCS)
-    shutil.copytree(ROOT / "docs", BUILD_DOCS)
 
+    # Verify static sources exist
+    for static_file in ("index.md", "contributing.md"):
+        src = SRC / static_file
+        if not src.is_file():
+            raise FileNotFoundError(f"required static doc source is missing: {src}")
+
+    # Copy EARS specification
     copy_with_notice(
         ROOT / "vampiro-ears-spec.md",
-        BUILD_DOCS / "specification" / "ears.md",
-        '> **Document status:** Draft 1.1.0, not yet approved. The source file `vampiro-ears-spec.md` is authoritative.',
-    )
-    copy_with_notice(
-        ROOT / "openspec" / "project.md",
-        BUILD_DOCS / "project-context.md",
-        '> **Source:** Generated from `openspec/project.md` during the documentation build.',
+        SRC / "specification" / "ears.md",
+        "> **Document status:** Draft 1.1.0, not yet approved. The source file `vampiro-ears-spec.md` is authoritative.",
     )
 
-    roadmap = BUILD_DOCS / "roadmap"
+    # Copy project context
+    copy_with_notice(
+        ROOT / "openspec" / "project.md",
+        SRC / "project-context.md",
+        "> **Source:** Generated from `openspec/project.md` during the documentation build.",
+    )
+
+    # Remove old roadmap if it exists, then generate fresh
+    roadmap = SRC / "roadmap"
+    if roadmap.exists():
+        shutil.rmtree(roadmap)
     roadmap.mkdir(parents=True, exist_ok=True)
     (roadmap / "index.md").write_text(build_roadmap_index())
 
@@ -122,7 +154,10 @@ def main() -> None:
             notice,
         )
 
-    print(f"assembled documentation sources in {BUILD_DOCS.relative_to(ROOT)}")
+    # Generate SUMMARY.md
+    (SRC / "SUMMARY.md").write_text(build_summary())
+
+    print(f"assembled documentation sources in {SRC.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

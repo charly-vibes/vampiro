@@ -1,0 +1,17 @@
+[book]
+authors = ["charly vibes"]
+language = "en"
+src = "docs/src"
+title = "Vampiro"
+description = "Specification and implementation roadmap for the Vampiro composition-analysis CLI"
+
+[build]
+build-dir = "docs/book"
+
+[output.html]
+default-theme = "navy"
+git-repository-url = "https://github.com/charly-vibes/vampiro"
+edit-url-template = "https://github.com/charly-vibes/vampiro/edit/main/{path}"
+site-url = "/vampiro/"
+no-section-label = true
+additional-css = []

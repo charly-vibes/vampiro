@@ -12,18 +12,18 @@ OpenSpec proposals.
 2. Update the affected OpenSpec proposal, design, capability delta, and tasks.
 3. Run strict OpenSpec validation.
 4. Keep `.beads/issues.jsonl` synchronized with the approved task graph.
-5. Build the documentation site in strict mode.
+5. Build the documentation site.
 
 ```bash
 openspec validate --all --strict --no-interactive
 python scripts/check_planning.py
 python scripts/build_docs.py
-mkdocs build --strict
+mdbook build
 ```
 
 ## Documentation rules
 
-- Do not hand-edit generated files under `.build/docs/` or `site/`.
+- Do not hand-edit generated files under `docs/book/`.
 - Requirement IDs must remain stable and traceable.
 - Active proposal pages must not claim deployed behavior.
 - OpenSpec deltas remain under `openspec/changes/` until implementation,
@@ -32,6 +32,6 @@ mkdocs build --strict
 ## GitHub Pages
 
 Pages uses GitHub's official artifact deployment actions. Pull requests build
-the site but do not deploy it. Pushes to `main` upload the rendered `site/`
+the site but do not deploy it. Pushes to `main` upload the rendered `docs/book/`
 directory and deploy it to the protected `github-pages` environment. No
 publishing branch is created.

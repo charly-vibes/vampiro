@@ -21,13 +21,11 @@ or require a `gh-pages` branch.
 ## Local documentation build
 
 ```bash
-python -m pip install -r requirements-docs.txt
 python scripts/build_docs.py
-mkdocs build --strict
+mdbook build
 ```
 
-The generated staging tree (`.build/docs/`) and rendered site (`site/`) are
-derived artifacts and are not committed.
+The rendered site (`docs/book/`) is a derived artifact and is not committed.
 
 ## Planning validation
 
