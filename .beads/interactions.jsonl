@@ -31,3 +31,4 @@
 {"id":"int-116d365d","kind":"field_change","created_at":"2026-07-28T11:39:38.551884148Z","actor":"charly vibes","issue_id":"vampiro-0vb.3.6","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-c282dd29","kind":"field_change","created_at":"2026-07-28T11:39:39.104308777Z","actor":"charly vibes","issue_id":"vampiro-0vb.3","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
 {"id":"int-3cc8acd5","kind":"field_change","created_at":"2026-07-28T12:20:58.172148675Z","actor":"charly vibes","issue_id":"vampiro-0vb.11","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-12726e6a","kind":"field_change","created_at":"2026-07-28T13:07:47.767563181Z","actor":"charly vibes","issue_id":"vampiro-0vb.4.1","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}

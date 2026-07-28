@@ -958,6 +958,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -971,6 +972,16 @@ dependencies = [
  "syn 2.0.119",
  "tempfile",
  "vampiro-cir",
+]
+
+[[package]]
+name = "vampiro-seam-analysis"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "vampiro-cir",
+ "vampiro-rust-frontend",
 ]
 
 [[package]]

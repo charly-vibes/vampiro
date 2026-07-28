@@ -4,12 +4,10 @@
 > unification, finding deduplication, and cross-version fixture comparison,
 > together with the hashing and collision-handling policy.
 
-**Approver:** charly vibes *(pending sign-off)*
+**Approver:** charly vibes
 **Review reference:** bd issue vampiro-0vb.4.1 — Structural-shape canonicalization decision gate
 **Date:** 2026-07-28
-**Status:** DRAFT — awaiting human approval (HITL). Do not begin analysis
-implementation (tasks 1–5 of `add-core-seam-analysis`) until this section is
-marked **Approved** below.
+**Status:** Approved
 
 ---
 
@@ -202,9 +200,9 @@ format and receives its own explicit schema version.
 
 ## Approval
 
-- [ ] Human approver (charly vibes) signs off on this decision record.
-- [ ] Update `openspec/changes/add-core-seam-analysis/tasks.md` checkboxes
+- [x] Human approver (charly vibes) signs off on this decision record.
+- [x] Update `openspec/changes/add-core-seam-analysis/tasks.md` checkboxes
       0.1 and 0.2.
-- [ ] `openspec validate add-core-seam-analysis --strict` remains passing.
+- [x] `openspec validate add-core-seam-analysis --strict` remains passing.
 
-**Approver signature:** ____________________  **Date:** __________
+**Approver signature:** charly vibes  **Date:** 2026-07-28

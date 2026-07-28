@@ -7,6 +7,7 @@ description = "Composition IR types for Vampiro — the single boundary between 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 
 [dev-dependencies]
 serde = { version = "1", features = ["derive"] }
