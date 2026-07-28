@@ -1,13 +1,8 @@
-# testaruda configuration
-
 [adapters]
-# Map file extensions to adapter binaries.
-".rs" = "testaruda-adapter-rust"
-
-# Default adapter when no extension matches
 default = "testaruda-adapter-rust"
 
 [discover]
-exclude = ["target", ".git", "node_modules", ".venv", "venv",
-           "__pycache__", ".mypy_cache", ".pytest_cache",
-           "build", "dist", ".tox"]
+exclude = [ "target", ".git", "node_modules", ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache", "build", "dist", ".tox",]
+
+[adapters.extensions]
+".rs" = "testaruda-adapter-rust"
