@@ -1,0 +1,48 @@
+{
+  "version": "0.1.0",
+  "module_path": "",
+  "entries": [
+    {
+      "name": "public_fn",
+      "original_path": "public_fn",
+      "is_wildcard": false,
+      "visibility": "pub",
+      "span": {
+        "file": "lib.rs",
+        "start_line": 1,
+        "start_column": 1,
+        "end_line": 1,
+        "end_column": 8
+      },
+      "doc_hidden": false
+    },
+    {
+      "name": "crate_fn",
+      "original_path": "crate_fn",
+      "is_wildcard": false,
+      "visibility": "pub(crate)",
+      "span": {
+        "file": "lib.rs",
+        "start_line": 2,
+        "start_column": 1,
+        "end_line": 2,
+        "end_column": 11
+      },
+      "doc_hidden": false
+    },
+    {
+      "name": "private_fn",
+      "original_path": "private_fn",
+      "is_wildcard": false,
+      "visibility": "private",
+      "span": {
+        "file": "lib.rs",
+        "start_line": 3,
+        "start_column": 1,
+        "end_line": 3,
+        "end_column": 3
+      },
+      "doc_hidden": false
+    }
+  ]
+}

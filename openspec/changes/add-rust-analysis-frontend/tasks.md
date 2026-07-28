@@ -14,9 +14,11 @@
 > **Verification (2026-07-28):** All 20 Rust frontend tests pass. 3 fixtures at `tests/fixtures/add-rust-analysis-frontend/1/`. `RustFrontend` implemented in `crates/vampiro-rust-frontend/`. Full details in `docs/verification/add-rust-analysis-frontend-1.md`.
 
 ## 2. Visibility and Facade Tracer
-- [ ] 2.1 Add failing fixtures for module ancestry, every `pub` form, `pub use`, crate-root facades, hidden/internal conventions, macros beyond coverage, and unsupported constructs (REQ-V1–V2).
-- [ ] 2.2 Implement independently versioned Rust visibility/effect idiom tables and facade metadata, emitting explicit unknowns rather than guesses.
-- [ ] 2.3 Run focused visibility/facade conformance and core-consumer compatibility tests; publish table versions and fixture evidence.
+- [x] 2.1 Add failing fixtures for module ancestry, every `pub` form, `pub use`, crate-root facades, hidden/internal conventions, macros beyond coverage, and unsupported constructs (REQ-V1–V2).
+- [x] 2.2 Implement independently versioned Rust visibility/effect idiom tables (v0.1.0) and facade metadata, emitting explicit unknowns rather than guesses.
+- [x] 2.3 Run focused visibility/facade conformance and core-consumer compatibility tests; publish table versions and fixture evidence.
+
+> **Verification (2026-07-28):** 28 visibility/facade tests pass. Visibility idiom table v0.1.0. Fixtures at `tests/fixtures/add-rust-analysis-frontend/2/`. Full details in `docs/verification/add-rust-analysis-frontend-2.md`.
 
 ## 3. Law Runner-Input Tracer
 - [ ] 3.1 Add failing extraction fixtures for implementation clusters, proof/law tags, serializable values, generator references, and construct-specific unsupported evidence.

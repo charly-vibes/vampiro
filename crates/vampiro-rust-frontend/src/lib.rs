@@ -10,8 +10,11 @@
 //! - Effect wrappers (Result, Option, async, Iterator) → `EffectChannel`
 //! - Unwrap operations (?, unwrap, expect, panic unwrap) → `EffectResolution` + `UnwrapEvidence`
 //! - Unrecognized patterns → `EffectChannel::Unknown` / `Shape::Opaque`
+//! - Visibility levels → `Visibility` enum (independently versioned table)
+//! - Re-exports → `FacadeDecl` entries with original paths
 
 mod extract;
+pub mod visibility;
 
 use std::path::Path;
 use vampiro_cir::{CirError, CirGraph, Frontend};
@@ -30,8 +33,8 @@ impl Frontend for RustFrontend {
     fn extract(&self, source: &str, path: &Path) -> Result<CirGraph, CirError> {
         let syntax = syn::parse_file(source)
             .map_err(|e| CirError::Extraction(format!("failed to parse Rust source: {e}")))?;
-        let graph = extract::extract_graph(&syntax, path);
-        Ok(graph)
+        let result = extract::extract_graph(&syntax, path);
+        Ok(result.graph)
     }
 }
 
