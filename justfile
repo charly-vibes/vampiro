@@ -131,12 +131,12 @@ clean:
     cargo clean
 
 # Check without building (faster feedback)
-check:
+cargo-check:
     cargo check
 
-# Dogfood: run vampiro check on all own source files (for pre-push / CI)
+# Dogfood: run vampiro check on own source workspace
 dogfood:
-    scripts/dogfood-all.sh
+    cargo run -- check --path crates/
 
 # Update dependencies
 update:

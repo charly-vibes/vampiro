@@ -50,7 +50,7 @@ pre-push:
         - Commit message MUST contain "WIP" or "wip"
         - You MUST fix tests before merging
     dogfood:
-      run: just dogfood
+      run: cargo run -- check --path crates/ 2>/dev/null
       fail_text: |
         Dogfood scan found issues. Push blocked.
 

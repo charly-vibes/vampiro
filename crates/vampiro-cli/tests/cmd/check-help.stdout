@@ -1,8 +1,8 @@
 Analyze source files for composition, modularity, and robustness breaks
 
-Usage: vampiro check [OPTIONS] --path <PATH>
+Usage: vampiro check [OPTIONS]
 
 Options:
-  -p, --path <PATH>  Path to the Rust source file to analyze
+  -p, --path <PATH>  Path(s) to Rust source file(s) or directories to scan
   -j, --json         Output findings as JSON
   -h, --help         Print help
