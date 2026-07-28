@@ -25,6 +25,6 @@
 - [x] 4.3 Run focused import, canonical-byte, malformed-input, and reachability tests; publish the evidence schema/version and fixture path without coupling Vampiro to one companion implementation.
 
 ## 5. Trust-Boundary Acceptance
-- [ ] 5.1 Run all four tracer suites, Rust E2E positives/negatives, normalized finding/diagnostic compatibility, workspace tests, formatting, and Clippy with warnings denied.
-- [ ] 5.2 Verify exact REQ-B1–REQ-B6 traceability, no collision between trust and argument provenance, and no trusted/unreachable default from unknown or missing evidence.
-- [ ] 5.3 Run `openspec validate add-trust-boundary-analysis --strict` and record contract versions, fixture paths, commands, and passing evidence location.
+- [x] 5.1 Run all four tracer suites, Rust E2E positives/negatives, normalized finding/diagnostic compatibility, workspace tests, formatting, and Clippy with warnings denied.
+- [x] 5.2 Verify exact REQ-B1–REQ-B6 traceability, no collision between trust and argument provenance, and no trusted/unreachable default from unknown or missing evidence.
+- [x] 5.3 Run `openspec validate add-trust-boundary-analysis --strict` and record contract versions, fixture paths, commands, and passing evidence location.
