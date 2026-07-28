@@ -1,0 +1,6 @@
+Reserved for analysis commands
+
+Usage: vampiro check
+
+Options:
+  -h, --help  Print help

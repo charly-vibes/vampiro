@@ -1,0 +1,12 @@
+A program analysis tool for verifying compliance with laws and policies
+
+Usage: vampiro [COMMAND]
+
+Commands:
+  check  Reserved for analysis commands
+  prove  Reserved for proof commands
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version

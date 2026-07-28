@@ -1,0 +1,37 @@
+{
+  "version": "v1",
+  "change": "add-rust-cli-foundation",
+  "tracer": "cli-config-exit",
+  "contract": {
+    "config": {
+      "filename": "config.toml",
+      "format": "toml",
+      "discovery": {
+        "project_local": "./.vampiro/config.toml",
+        "xdg": "$XDG_CONFIG_HOME/vampiro/config.toml or ~/.config/vampiro/config.toml"
+      },
+      "precedence": [
+        "CLI flags (highest)",
+        "Project-local config",
+        "XDG config",
+        "Built-in defaults (fallback)"
+      ],
+      "keys": {
+        "scan-threads": "Optional<u32> — number of scanning threads"
+      }
+    },
+    "exit-codes": {
+      "0": "Success — checks passed, or help/version displayed",
+      "1": "Invalid config — file not found, unreadable, or malformed",
+      "2": "Usage error — unknown flag, command, or missing argument",
+      "3": "Policy failure — check found violations above threshold",
+      "4": "Internal error — I/O failure, panic, unexpected runtime error"
+    },
+    "key-convention": "kebab-case"
+  },
+  "verification": {
+    "tests-passed": 8,
+    "test-filter": "rust_cli_foundation_2",
+    "evidence": "docs/verification/add-rust-cli-foundation-2.md"
+  }
+}

@@ -1,0 +1,22 @@
+[package]
+name = "vampiro"
+version = "0.1.0"
+edition = "2021"
+description = "A program analysis tool for verifying compliance with laws and policies"
+
+[[bin]]
+name = "vampiro"
+path = "src/main.rs"
+
+[lib]
+name = "vampiro_cli"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1.3"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+trycmd = "0.15"
