@@ -134,6 +134,10 @@ clean:
 check:
     cargo check
 
+# Dogfood: run vampiro check on all own source files (for pre-push / CI)
+dogfood:
+    scripts/dogfood-all.sh
+
 # Update dependencies
 update:
     cargo update

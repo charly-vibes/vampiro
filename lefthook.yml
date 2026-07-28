@@ -49,3 +49,11 @@ pre-push:
         Warning: --no-verify requires justification:
         - Commit message MUST contain "WIP" or "wip"
         - You MUST fix tests before merging
+    dogfood:
+      run: just dogfood
+      fail_text: |
+        Dogfood scan found issues. Push blocked.
+
+        To bypass (WIP only): git push --no-verify
+
+        See docs/verification/dogfood-1.md for triage guide.
