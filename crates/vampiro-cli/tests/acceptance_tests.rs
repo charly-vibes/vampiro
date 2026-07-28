@@ -60,12 +60,12 @@ fn rust_cli_foundation_4_verification_docs_exist() {
 fn rust_cli_foundation_4_no_analysis_or_gating_behavior() {
     // Verify no analysis, proof, CI-generation, or gating types are present
     // This is a compile-time check that the finding module is purely structural
-    let _ = vampiro_cli::finding::Finding::new(
-        "check",
+    let _ = vampiro_cli::finding::Finding::composition_mismatch(
         std::path::PathBuf::from("test.rs"),
         1..=1,
-        vampiro_cli::finding::Severity::Note,
-        vampiro_cli::finding::Axis::Style,
+        vampiro_cir::Shape::Scalar,
+        vampiro_cir::Shape::Union(vec![vampiro_cir::Shape::Scalar, vampiro_cir::Shape::Opaque]),
+        vec![vampiro_cir::Shape::Opaque],
     );
     let _ = vampiro_cli::exit_code::ExitCode::Success;
     let _ = vampiro_cli::config::Config::default();

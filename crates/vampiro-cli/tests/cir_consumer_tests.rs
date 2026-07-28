@@ -199,18 +199,18 @@ fn consumer_uses_frontend_trait() {
 #[test]
 fn consumer_uses_cli_finding_contract() {
     // A consumer should be able to use the CLI finding contract alongside CIR.
-    let finding = Finding::new(
-        "cir-plugin-violation",
+    let finding = Finding::composition_mismatch(
         PathBuf::from("src/lib.rs"),
         10..=15,
-        Severity::Error,
-        Axis::Safety,
+        Shape::Scalar,
+        Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+        vec![Shape::Opaque],
     );
 
-    assert_eq!(finding.rule, "cir-plugin-violation");
-    assert_eq!(finding.severity, Severity::Error);
-    assert_eq!(finding.axis, Axis::Safety);
-    assert_eq!(finding.filtration_distance, Some(3));
+    assert_eq!(finding.rule, "REQ-7");
+    assert_eq!(finding.severity, Severity::Medium);
+    assert_eq!(finding.axis, Axis::Composition);
+    assert_eq!(finding.classification, "composition-break");
 
     // Serialize and deserialize
     let json = serde_json::to_string(&finding).unwrap();
