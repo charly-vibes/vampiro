@@ -130,6 +130,7 @@ impl BoundaryLeakAnalyzer {
     /// node that unsafely trusts its input. This identification is currently
     /// not used in `analyze` — smart constructor recognition requires
     /// explicit configuration or conformance-idom matching (future addition).
+    #[allow(dead_code)]
     fn identify_smart_constructors(&self, graph: &CirGraph) -> HashSet<vampiro_cir::StableId> {
         let mut constructors = HashSet::new();
 

@@ -15,9 +15,9 @@
 - [x] 2.3 Run focused positive/negative tests plus normalized-result compatibility; verify constructor flow and `unknown` produce no false boundary-leak finding and remain visible in diagnostics.
 
 ## 3. Validation-Duplication Tracer
-- [ ] 3.1 Add failing CIR round-trip, Rust extraction/conformance, declaration/idiom, and E2E fixtures for validation observations, equivalent repeated validation, the recognized constructor itself, merely similar syntax, and unrelated constraints (REQ-B4).
-- [ ] 3.2 Implement the approved validation-identity configuration/idioms, Rust validation-observation extraction, CIR fact, and language-neutral analysis, emitting exactly one default-`LOW` modularity `validation-duplication` finding per duplicate-check location with REQ-24 deduplication and identity, constructor, refined-shape, origin, and source-span evidence.
-- [ ] 3.3 Run focused Rust E2E and finding-schema tests; verify syntactic similarity without equivalence evidence emits no finding.
+- [x] 3.1 Add failing CIR round-trip, Rust extraction/conformance, declaration/idiom, and E2E fixtures for validation observations, equivalent repeated validation, the recognized constructor itself, merely similar syntax, and unrelated constraints (REQ-B4).
+- [x] 3.2 Implement the approved validation-identity configuration/idioms, Rust validation-observation extraction, CIR fact, and language-neutral analysis, emitting exactly one default-`LOW` modularity `validation-duplication` finding per duplicate-check location with REQ-24 deduplication and identity, constructor, refined-shape, origin, and source-span evidence.
+- [x] 3.3 Run focused Rust E2E and finding-schema tests; verify syntactic similarity without equivalence evidence emits no finding.
 
 ## 4. Refinement-Confirmation Tracer
 - [ ] 4.1 Add failing configuration, import, normalized-result, and consumer fixtures for non-empty unique classes with current complete passing evidence and absent, malformed, unsupported-version, stale-revision, constructor-identity/hash-mismatched, empty/duplicate/incomplete/unknown classes, or failing evidence (REQ-B5).

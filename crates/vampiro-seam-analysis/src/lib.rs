@@ -25,6 +25,7 @@ pub mod effects;
 pub mod finding;
 pub mod modularity;
 pub mod redundancy;
+pub mod validation_duplication;
 
 pub use boundary_leak::BoundaryLeakAnalyzer;
 pub use composition::{unify_shapes, CompositionAnalyzer, Unification};

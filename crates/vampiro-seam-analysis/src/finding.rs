@@ -219,6 +219,22 @@ pub enum Evidence {
         /// The target node's display name.
         target_name: String,
     },
+    /// REQ-B4: a validation check appears at a location outside the
+    /// recognized smart constructor, duplicating the constructor's own
+    /// validation.
+    ///
+    /// Carries the validation identity, the constructor identity/shape,
+    /// the duplicate-check location, and how the observation was recognized.
+    ValidationDuplication {
+        /// The stable validation identity.
+        identity: String,
+        /// The smart constructor's stable identity.
+        constructor_id: String,
+        /// The refined shape of the constructor.
+        refined_shape: String,
+        /// The origin of recognition: `"declaration"` or `"idiom"`.
+        origin: String,
+    },
 }
 
 /// One reported issue (REQ-4).

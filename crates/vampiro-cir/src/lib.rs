@@ -35,6 +35,8 @@ pub use cir::{CirEdge, CirGraph, CirNode};
 pub use effect::{EffectChannel, EffectResolution, Totality, UnwrapEvidence, UnwrapKind};
 pub use error::CirError;
 pub use frontend::Frontend;
-pub use provenance::{DiscardSpan, Provenance, SourceSpan, StableId, TrustProvenance};
+pub use provenance::{
+    DiscardSpan, Provenance, SourceSpan, StableId, TrustProvenance, ValidationObservation,
+};
 pub use shape::Shape;
 pub use visibility::{BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts};

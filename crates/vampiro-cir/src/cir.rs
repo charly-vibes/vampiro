@@ -79,6 +79,10 @@ pub struct CirGraph {
     pub nodes: Vec<CirNode>,
     /// All edges in the graph.
     pub edges: Vec<CirEdge>,
+    /// Validation observations extracted by frontends, keyed by stable
+    /// validation identity.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub validation_observations: Vec<crate::ValidationObservation>,
 }
 
 impl CirGraph {
@@ -89,6 +93,7 @@ impl CirGraph {
             source_file: source_file.into(),
             nodes: Vec::new(),
             edges: Vec::new(),
+            validation_observations: Vec::new(),
         }
     }
 
@@ -328,6 +333,37 @@ mod tests {
         let deserialized: CirGraph = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.nodes.len(), 0);
         assert_eq!(deserialized.edges.len(), 0);
+        assert_eq!(deserialized.validation_observations.len(), 0);
+    }
+
+    #[test]
+    fn cir_graph_with_validation_observations() {
+        // Test that ValidationObservations round-trip through CirGraph
+        let mut graph = CirGraph::new("lib.rs");
+        graph
+            .validation_observations
+            .push(crate::ValidationObservation::new(
+                "validate_user",
+                crate::StableId::new("User::new"),
+                "User",
+                crate::SourceSpan {
+                    file: "lib.rs".into(),
+                    start_line: 10,
+                    start_column: 1,
+                    end_line: 10,
+                    end_column: 30,
+                },
+                "idiom",
+            ));
+
+        let json = serde_json::to_string_pretty(&graph).unwrap();
+        let deserialized: CirGraph = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.validation_observations.len(), 1);
+        assert_eq!(
+            deserialized.validation_observations[0].identity,
+            "validate_user"
+        );
+        assert_eq!(deserialized.validation_observations[0].origin, "idiom");
     }
 
     #[test]

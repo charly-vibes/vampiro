@@ -187,6 +187,45 @@ impl Default for TrustProvenance {
     }
 }
 
+/// A validation observation extracted by a frontend.
+///
+/// Records that a specific validation check was observed at a source
+/// location, tied to a smart constructor and its refined shape. The
+/// validation identity is used by the validation-duplication analyzer
+/// to detect when the same check is performed at multiple locations.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ValidationObservation {
+    /// The stable validation identity (from declaration or idiom).
+    pub identity: String,
+    /// The stable identity of the recognized smart constructor.
+    pub constructor_id: StableId,
+    /// The refined shape produced by the constructor.
+    pub refined_shape: String,
+    /// The source span of the validation check.
+    pub span: SourceSpan,
+    /// How this observation was recognized: `"declaration"` or `"idiom"`.
+    pub origin: String,
+}
+
+impl ValidationObservation {
+    /// Create a new validation observation.
+    pub fn new(
+        identity: impl Into<String>,
+        constructor_id: StableId,
+        refined_shape: impl Into<String>,
+        span: SourceSpan,
+        origin: impl Into<String>,
+    ) -> Self {
+        ValidationObservation {
+            identity: identity.into(),
+            constructor_id,
+            refined_shape: refined_shape.into(),
+            span,
+            origin: origin.into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -393,6 +432,57 @@ mod tests {
             let deser: TrustProvenance = serde_json::from_str(&json).unwrap();
             assert_eq!(*tp, deser);
         }
+    }
+
+    // --- ValidationObservation ---
+
+    #[test]
+    fn validation_observation_round_trip() {
+        let obs = super::ValidationObservation::new(
+            "validate_user",
+            super::StableId::new("User::new"),
+            "User",
+            super::SourceSpan {
+                file: "lib.rs".into(),
+                start_line: 10,
+                start_column: 1,
+                end_line: 10,
+                end_column: 30,
+            },
+            "idiom",
+        );
+        let json = serde_json::to_string(&obs).unwrap();
+        let deser: super::ValidationObservation = serde_json::from_str(&json).unwrap();
+        assert_eq!(obs.identity, deser.identity);
+        assert_eq!(obs.constructor_id, deser.constructor_id);
+        assert_eq!(obs.refined_shape, deser.refined_shape);
+        assert_eq!(obs.origin, deser.origin);
+        assert_eq!(obs.span.file, deser.span.file);
+        assert_eq!(obs.span.start_line, deser.span.start_line);
+    }
+
+    #[test]
+    fn validation_observation_serialized_fields() {
+        let obs = super::ValidationObservation::new(
+            "vid",
+            super::StableId::new("Ctor::new"),
+            "RefinedType",
+            super::SourceSpan {
+                file: "src/lib.rs".into(),
+                start_line: 5,
+                start_column: 1,
+                end_line: 5,
+                end_column: 40,
+            },
+            "declaration",
+        );
+        let json = serde_json::to_value(&obs).unwrap();
+        assert_eq!(json["identity"], "vid");
+        assert_eq!(json["constructor_id"], "Ctor::new");
+        assert_eq!(json["refined_shape"], "RefinedType");
+        assert_eq!(json["origin"], "declaration");
+        assert_eq!(json["span"]["file"], "src/lib.rs");
+        assert_eq!(json["span"]["start_line"], 5);
     }
 
     #[test]
