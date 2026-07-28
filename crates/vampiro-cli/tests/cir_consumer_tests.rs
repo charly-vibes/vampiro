@@ -37,6 +37,7 @@ impl Frontend for ConsumerTestFrontend {
                 end_column: 1,
             },
             name: Some("main".into()),
+            trust_provenance: Default::default(),
         };
         graph.add_node(node);
         Ok(graph)
@@ -61,6 +62,7 @@ fn consumer_imports_cir_and_constructs_graph() {
             end_column: 1,
         },
         name: Some("caller".into()),
+        trust_provenance: Default::default(),
     };
     let callee = CirNode {
         id: "callee".into(),
@@ -75,6 +77,7 @@ fn consumer_imports_cir_and_constructs_graph() {
             end_column: 1,
         },
         name: Some("callee".into()),
+        trust_provenance: Default::default(),
     };
     let edge = CirEdge {
         id: "call-1".into(),
@@ -91,6 +94,7 @@ fn consumer_imports_cir_and_constructs_graph() {
             end_column: 15,
         },
         discard_spans: vec![],
+        trust_provenance: Default::default(),
     };
 
     graph.add_node(caller);
@@ -120,6 +124,7 @@ fn consumer_validates_graph() {
             end_column: 1,
         },
         name: None,
+        trust_provenance: Default::default(),
     };
     graph.add_node(node);
 
@@ -145,6 +150,7 @@ fn consumer_detects_invalid_graph() {
             end_column: 1,
         },
         name: None,
+        trust_provenance: Default::default(),
     };
     let edge = CirEdge {
         id: "e1".into(),
@@ -161,6 +167,7 @@ fn consumer_detects_invalid_graph() {
             end_column: 1,
         },
         discard_spans: vec![],
+        trust_provenance: Default::default(),
     };
     graph.add_node(node);
     graph.add_edge(edge);
@@ -244,6 +251,7 @@ fn consumer_round_trips_cir_via_json() {
             end_column: 1,
         },
         name: Some("consumer_fn".into()),
+        trust_provenance: Default::default(),
     };
     graph.add_node(node);
 

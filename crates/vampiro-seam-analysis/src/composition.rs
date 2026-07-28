@@ -308,6 +308,7 @@ mod tests {
                 end_column: 10,
             },
             name: Some(id.into()),
+            trust_provenance: Default::default(),
         }
     }
 
@@ -327,6 +328,7 @@ mod tests {
                 end_column: 20,
             },
             discard_spans: Vec::new(),
+            trust_provenance: Default::default(),
         }
     }
 
@@ -461,6 +463,7 @@ mod tests {
                 end_column: 20,
             },
             discard_spans: Vec::new(),
+            trust_provenance: Default::default(),
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -502,6 +505,7 @@ mod tests {
                 end_column: 20,
             },
             discard_spans: Vec::new(),
+            trust_provenance: Default::default(),
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -556,6 +560,7 @@ mod tests {
                 end_column: 20,
             },
             discard_spans: Vec::new(),
+            trust_provenance: Default::default(),
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);

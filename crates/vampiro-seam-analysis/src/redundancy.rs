@@ -195,6 +195,7 @@ mod tests {
             effect: EffectChannel::Plain,
             span: span("src/lib.rs", line),
             name: Some(id.into()),
+            trust_provenance: Default::default(),
         }
     }
 
@@ -208,6 +209,7 @@ mod tests {
             provenance: Provenance::Direct,
             span: span("src/lib.rs", line),
             discard_spans: Vec::new(),
+            trust_provenance: Default::default(),
         }
     }
 

@@ -121,6 +121,72 @@ pub struct DiscardSpan {
     pub end_line: usize,
 }
 
+/// Trust provenance classification for a CIR value occurrence.
+///
+/// Tracks whether a value originates from a declared trust boundary and
+/// whether it has passed through a recognized refinement step.
+///
+/// The join order is `Untrusted > Unknown > Trusted`: any untrusted
+/// contributor makes a derived occurrence untrusted; otherwise any unknown
+/// contributor makes it unknown; otherwise it is trusted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TrustProvenance {
+    /// Value originates from a declared trust-boundary source.
+    Untrusted,
+    /// Value originates within the trust domain or has been refined.
+    Trusted,
+    /// No trust classification could be determined.
+    Unknown,
+}
+
+impl TrustProvenance {
+    /// Join two trust provenance values using the order
+    /// `Untrusted > Unknown > Trusted`.
+    ///
+    /// Used when combining contributors to a derived value.
+    pub fn join(self, other: TrustProvenance) -> TrustProvenance {
+        use TrustProvenance::*;
+        match (self, other) {
+            (Untrusted, _) | (_, Untrusted) => Untrusted,
+            (Unknown, _) | (_, Unknown) => Unknown,
+            (Trusted, Trusted) => Trusted,
+        }
+    }
+
+    /// Returns `true` if this is `Untrusted`.
+    pub fn is_untrusted(self) -> bool {
+        matches!(self, TrustProvenance::Untrusted)
+    }
+
+    /// Returns `true` if this is `Trusted`.
+    pub fn is_trusted(self) -> bool {
+        matches!(self, TrustProvenance::Trusted)
+    }
+
+    /// Returns `true` if this is `Unknown`.
+    pub fn is_unknown(self) -> bool {
+        matches!(self, TrustProvenance::Unknown)
+    }
+}
+
+impl std::fmt::Display for TrustProvenance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TrustProvenance::Untrusted => f.write_str("untrusted"),
+            TrustProvenance::Trusted => f.write_str("trusted"),
+            TrustProvenance::Unknown => f.write_str("unknown"),
+        }
+    }
+}
+
+/// Default trust provenance is `Trusted` (same-origin default).
+impl Default for TrustProvenance {
+    fn default() -> Self {
+        TrustProvenance::Trusted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +282,117 @@ mod tests {
         assert_eq!(json["file"], "src/lib.rs");
         assert_eq!(json["start_line"], 5);
         assert_eq!(json["end_line"], 8);
+    }
+
+    // --- TrustProvenance ---
+
+    #[test]
+    fn trust_provenance_variants() {
+        assert_eq!(
+            serde_json::to_value(TrustProvenance::Untrusted).unwrap(),
+            serde_json::json!("untrusted")
+        );
+        assert_eq!(
+            serde_json::to_value(TrustProvenance::Trusted).unwrap(),
+            serde_json::json!("trusted")
+        );
+        assert_eq!(
+            serde_json::to_value(TrustProvenance::Unknown).unwrap(),
+            serde_json::json!("unknown")
+        );
+    }
+
+    #[test]
+    fn trust_provenance_join_untrusted_dominates() {
+        use TrustProvenance::*;
+        // Untrusted + anything = Untrusted
+        assert_eq!(Untrusted.join(Trusted), Untrusted);
+        assert_eq!(Untrusted.join(Unknown), Untrusted);
+        assert_eq!(Untrusted.join(Untrusted), Untrusted);
+        assert_eq!(Trusted.join(Untrusted), Untrusted);
+        assert_eq!(Unknown.join(Untrusted), Untrusted);
+    }
+
+    #[test]
+    fn trust_provenance_join_unknown_second() {
+        use TrustProvenance::*;
+        assert_eq!(Unknown.join(Trusted), Unknown);
+        assert_eq!(Trusted.join(Unknown), Unknown);
+        assert_eq!(Unknown.join(Unknown), Unknown);
+    }
+
+    #[test]
+    fn trust_provenance_join_trusted_only() {
+        use TrustProvenance::*;
+        assert_eq!(Trusted.join(Trusted), Trusted);
+    }
+
+    #[test]
+    fn trust_provenance_join_truth_table() {
+        use TrustProvenance::*;
+        let cases = [
+            (Untrusted, Untrusted, Untrusted),
+            (Untrusted, Trusted, Untrusted),
+            (Untrusted, Unknown, Untrusted),
+            (Trusted, Untrusted, Untrusted),
+            (Trusted, Trusted, Trusted),
+            (Trusted, Unknown, Unknown),
+            (Unknown, Untrusted, Untrusted),
+            (Unknown, Trusted, Unknown),
+            (Unknown, Unknown, Unknown),
+        ];
+        for (a, b, expected) in &cases {
+            assert_eq!(
+                a.join(*b),
+                *expected,
+                "{a:?} join {b:?} should be {expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn trust_provenance_join_is_commutative() {
+        use TrustProvenance::*;
+        let all = [Untrusted, Trusted, Unknown];
+        for a in &all {
+            for b in &all {
+                assert_eq!(
+                    a.join(*b),
+                    b.join(*a),
+                    "{a:?} join {b:?} should be commutative"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn trust_provenance_display() {
+        assert_eq!(TrustProvenance::Untrusted.to_string(), "untrusted");
+        assert_eq!(TrustProvenance::Trusted.to_string(), "trusted");
+        assert_eq!(TrustProvenance::Unknown.to_string(), "unknown");
+    }
+
+    #[test]
+    fn trust_provenance_predicates() {
+        assert!(TrustProvenance::Untrusted.is_untrusted());
+        assert!(!TrustProvenance::Untrusted.is_trusted());
+        assert!(!TrustProvenance::Untrusted.is_unknown());
+        assert!(TrustProvenance::Trusted.is_trusted());
+        assert!(TrustProvenance::Unknown.is_unknown());
+    }
+
+    #[test]
+    fn trust_provenance_serde_round_trip() {
+        let cases = [
+            TrustProvenance::Untrusted,
+            TrustProvenance::Trusted,
+            TrustProvenance::Unknown,
+        ];
+        for tp in &cases {
+            let json = serde_json::to_string(tp).unwrap();
+            let deser: TrustProvenance = serde_json::from_str(&json).unwrap();
+            assert_eq!(*tp, deser);
+        }
     }
 
     #[test]

@@ -64,6 +64,7 @@ impl Frontend for MockValidFrontend {
                 end_column: 1,
             },
             name: Some("caller_fn".into()),
+            trust_provenance: Default::default(),
         };
         let callee = CirNode {
             id: "callee".into(),
@@ -78,6 +79,7 @@ impl Frontend for MockValidFrontend {
                 end_column: 1,
             },
             name: Some("callee_fn".into()),
+            trust_provenance: Default::default(),
         };
         let edge = CirEdge {
             id: "call-1".into(),
@@ -94,6 +96,7 @@ impl Frontend for MockValidFrontend {
                 end_column: 15,
             },
             discard_spans: vec![],
+            trust_provenance: Default::default(),
         };
         graph.add_node(caller);
         graph.add_node(callee);
@@ -129,6 +132,7 @@ impl Frontend for MockDepthExceededEffectFrontend {
                 end_column: 1,
             },
             name: Some("deep_fn".into()),
+            trust_provenance: Default::default(),
         };
         graph.add_node(node);
         // The frontend produces the graph, but it should be rejected by validate()
@@ -164,6 +168,7 @@ impl Frontend for MockDepthExceededShapeFrontend {
                 end_column: 1,
             },
             name: Some("deep_fn".into()),
+            trust_provenance: Default::default(),
         };
         graph.add_node(node);
         Ok(graph)

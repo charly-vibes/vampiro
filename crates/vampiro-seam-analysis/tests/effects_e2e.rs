@@ -35,6 +35,7 @@ fn node(id: &str, effect: EffectChannel, line: usize) -> CirNode {
         effect,
         span: span(line),
         name: Some(id.into()),
+        trust_provenance: Default::default(),
     }
 }
 
@@ -56,6 +57,7 @@ fn edge(
         provenance: Provenance::Direct,
         span: span(line),
         discard_spans,
+        trust_provenance: Default::default(),
     }
 }
 

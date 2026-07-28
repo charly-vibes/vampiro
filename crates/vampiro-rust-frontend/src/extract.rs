@@ -356,6 +356,7 @@ impl<'src> Extractor<'src> {
             effect,
             span,
             name: Some(name.clone()),
+            trust_provenance: Default::default(),
         };
 
         self.graph.add_node(node);
@@ -623,6 +624,7 @@ impl<'src> Extractor<'src> {
             provenance: Provenance::Direct,
             span: source_span,
             discard_spans: vec![],
+            trust_provenance: Default::default(),
         };
 
         self.graph.add_edge(edge);

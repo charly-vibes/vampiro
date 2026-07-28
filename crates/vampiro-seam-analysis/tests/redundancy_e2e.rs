@@ -31,6 +31,7 @@ fn node(id: &str, domain: Shape, codomain: Shape, line: usize) -> CirNode {
         effect: EffectChannel::Plain,
         span: span(line),
         name: Some(id.into()),
+        trust_provenance: Default::default(),
     }
 }
 
@@ -44,6 +45,7 @@ fn edge(id: &str, source: &str, target: &str, line: usize) -> CirEdge {
         provenance: Provenance::Direct,
         span: span(line),
         discard_spans: Vec::new(),
+        trust_provenance: Default::default(),
     }
 }
 

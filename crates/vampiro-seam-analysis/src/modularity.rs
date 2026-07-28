@@ -240,6 +240,7 @@ mod tests {
             effect: EffectChannel::Plain,
             span: span(line),
             name: Some(name.into()),
+            trust_provenance: Default::default(),
         }
     }
 
@@ -253,6 +254,7 @@ mod tests {
             provenance: Provenance::Direct,
             span: span(line),
             discard_spans: Vec::new(),
+            trust_provenance: Default::default(),
         }
     }
 
@@ -452,6 +454,7 @@ mod tests {
                 end_column: 10,
             },
             name: Some("caller".into()),
+            trust_provenance: Default::default(),
         });
         graph.add_edge(edge("e1", "caller", "exposed", 2));
 

@@ -1,13 +1,13 @@
 > Implementation is blocked until the roadmap approval gate records approval of the EARS source and this proposal.
 
 ## 0. Trust and Evidence Contract Decision Gate (HITL)
-- [ ] 0.1 Compare value/arm representations, trust-domain/source idioms, transfer/join and over-`H` rules, declaration/idiom conflicts, smart-constructor and validation-identity declarations, default finding severities, boundary-class syntax, and evidence-schema alternatives against ambiguous source, mixed input, stale revision, unsupported version, constructor-hash mismatch, and empty/duplicate/incomplete-class examples; record the choice in `docs/decisions/trust-boundary-contract.md`.
-- [ ] 0.2 Record the initial Rust idiom scope, project configuration and validation-observation schemas, finding cardinality/severity, evidence producer/version/freshness and closed-reason contracts, rejected alternatives, approver, and immutable review reference before implementation.
+- [x] 0.1 Compare value/arm representations, trust-domain/source idioms, transfer/join and over-`H` rules, declaration/idiom conflicts, smart-constructor and validation-identity declarations, default finding severities, boundary-class syntax, and evidence-schema alternatives against ambiguous source, mixed input, stale revision, unsupported version, constructor-hash mismatch, and empty/duplicate/incomplete-class examples; record the choice in `docs/decisions/trust-boundary-contract.md`.
+- [x] 0.2 Record the initial Rust idiom scope, project configuration and validation-observation schemas, finding cardinality/severity, evidence producer/version/freshness and closed-reason contracts, rejected alternatives, approver, and immutable review reference before implementation.
 
 ## 1. Trust-Provenance Contract Tracer
-- [ ] 1.1 Add failing serialized-schema, propagation, conflict, and Rust E2E fixtures for value/arm-level trust-boundary sources, internal constants, explicit declarations, recognized smart-constructor success/non-success arms, mixed contributors, raw/refined shapes, `untrusted`/`trusted`/`unknown`, and direct/within-`H`/over-`H` argument-provenance separation (REQ-B1, REQ-B2, REQ-B6).
-- [ ] 1.2 Implement the approved versioned CIR/configuration extension, Rust source/refinement idioms, project declarations, value-level transfer/join rules, conflict/over-`H` unknown behavior, and exact `trust-provenance:unknown` diagnostic required by the fixtures.
-- [ ] 1.3 Run focused schema round-trip, plugin conformance, canonical-byte, and Rust E2E tests; publish schema/idiom versions and fixture paths as the consumer contract.
+- [x] 1.1 Add failing serialized-schema, propagation, conflict, and Rust E2E fixtures for value/arm-level trust-boundary sources, internal constants, explicit declarations, recognized smart-constructor success/non-success arms, mixed contributors, raw/refined shapes, `untrusted`/`trusted`/`unknown`, and direct/within-`H`/over-`H` argument-provenance separation (REQ-B1, REQ-B2, REQ-B6).
+- [x] 1.2 Implement the approved versioned CIR/configuration extension, Rust source/refinement idioms, project declarations, value-level transfer/join rules, conflict/over-`H` unknown behavior, and exact `trust-provenance:unknown` diagnostic required by the fixtures.
+- [x] 1.3 Run focused schema round-trip, plugin conformance, canonical-byte, and Rust E2E tests; publish schema/idiom versions and fixture paths as the consumer contract.
 
 ## 2. Boundary-Leak Tracer
 - [ ] 2.1 Add failing Rust E2E fixtures for direct and propagated raw flow into an interior node, flow into a recognized smart constructor, totally handled refinement outcomes, and unknown provenance (REQ-B3, REQ-C4).

@@ -2,6 +2,7 @@ use crate::effect::{EffectChannel, EffectResolution, UnwrapEvidence};
 use crate::error::{CirError, NodeRole};
 use crate::provenance::{DiscardSpan, Provenance, SourceSpan, StableId};
 use crate::shape::Shape;
+use crate::TrustProvenance;
 
 /// A node in the Composition IR, representing a callable or declaration.
 ///
@@ -22,6 +23,13 @@ pub struct CirNode {
     /// Optional name of the declaration.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    /// Trust provenance for this node's output value.
+    ///
+    /// Tracks whether the value produced by this declaration originates from
+    /// a declared trust-boundary source. Nodes with no trust information
+    /// default to `Trusted` (same-origin default).
+    #[serde(default)]
+    pub trust_provenance: TrustProvenance,
 }
 
 /// An edge in the Composition IR, representing a call site.
@@ -48,6 +56,13 @@ pub struct CirEdge {
     /// Exact discard spans at this call site, if any.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub discard_spans: Vec<DiscardSpan>,
+    /// Trust provenance for the argument value at this call site.
+    ///
+    /// Tracks the trust classification of the value flowing through this
+    /// edge. Defaults to `Trusted` when absent (backward-compatible with
+    /// graphs produced before this field was added).
+    #[serde(default)]
+    pub trust_provenance: TrustProvenance,
 }
 
 /// A complete Composition IR graph for a single compilation unit.
@@ -193,6 +208,7 @@ mod tests {
                 end_column: 10,
             },
             name: Some(name.into()),
+            trust_provenance: Default::default(),
         }
     }
 
@@ -219,6 +235,7 @@ mod tests {
                 end_column: 20,
             },
             discard_spans: vec![],
+            trust_provenance: Default::default(),
         };
 
         graph.add_node(caller);
@@ -269,6 +286,7 @@ mod tests {
                 end_column: 1,
             },
             name: Some("risky_fn".into()),
+            trust_provenance: Default::default(),
         };
 
         let edge = CirEdge {
@@ -293,6 +311,7 @@ mod tests {
                 start_line: 6,
                 end_line: 8,
             }],
+            trust_provenance: Default::default(),
         };
 
         graph.add_node(node);
@@ -329,6 +348,7 @@ mod tests {
                 end_column: 1,
             },
             name: Some("custom_fn".into()),
+            trust_provenance: Default::default(),
         };
 
         let edge = CirEdge {
@@ -346,6 +366,7 @@ mod tests {
                 end_column: 1,
             },
             discard_spans: vec![],
+            trust_provenance: Default::default(),
         };
 
         graph.add_node(node);
@@ -383,6 +404,7 @@ mod tests {
                 end_column: 1,
             },
             discard_spans: vec![],
+            trust_provenance: Default::default(),
         };
         graph.add_node(node);
         graph.add_edge(edge);
@@ -424,6 +446,7 @@ mod tests {
                 end_column: 1,
             },
             name: None,
+            trust_provenance: Default::default(),
         };
         graph.add_node(node);
 
@@ -456,6 +479,7 @@ mod tests {
                 end_column: 1,
             },
             name: None,
+            trust_provenance: Default::default(),
         };
         graph.add_node(node);
 
