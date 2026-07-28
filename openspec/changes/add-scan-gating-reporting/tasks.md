@@ -20,6 +20,6 @@
 - [x] 3.3 Run focused policy/CLI tests and each approved provider golden; record generated workflow paths and passing evidence.
 
 ## 4. Performance and Workflow Acceptance
-- [ ] 4.1 Document hardware, OS, repository state/size, cache state, plugin/tool/config/platform versions, fixture, warm-up, repetitions, and statistic; add reproducible 1/50-edge benchmarks (REQ-27).
-- [ ] 4.2 Run cold/warm, output parity, CI golden, and benchmark suites; pass only when the 50-edge result is below 9 seconds under the published profile.
-- [ ] 4.3 Run workspace formatting/Clippy and `openspec validate add-scan-gating-reporting --strict`; record requirement traceability, contract versions, commands, and evidence location.
+- [x] 4.1 Document hardware, OS, repository state/size, cache state, plugin/tool/config/platform versions, fixture, warm-up, repetitions, and statistic; add reproducible 1/50-edge benchmarks (REQ-27).
+- [x] 4.2 Run cold/warm, output parity, CI golden, and benchmark suites; pass only when the 50-edge result is below 9 seconds under the published profile.
+- [x] 4.3 Run workspace formatting/Clippy and `openspec validate add-scan-gating-reporting --strict`; record requirement traceability, contract versions, commands, and evidence location.

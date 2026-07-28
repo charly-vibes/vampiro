@@ -1,10 +1,16 @@
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
-use genesis::envelope::{Envelope, EnvelopeKind, Warning};
 use vampiro_rust_frontend::visibility_adapter::to_visibility_facts;
 use vampiro_rust_frontend::RustFrontend;
 use vampiro_seam_analysis::analyze_with_visibility;
+
+use crate::exit_code::ExitCode;
+use crate::output::ScanResult;
+use crate::output::ScanResultMetadata;
+use crate::output::ScopeKind;
+use crate::policy::{generate_github_actions_workflow, ScanMode, ScanPolicy};
+use crate::scan::GitContext;
 
 /// A program analysis tool for verifying compliance with laws and policies.
 #[derive(Parser, Debug)]
@@ -18,6 +24,12 @@ pub struct Cli {
 pub enum Commands {
     /// Analyze source files for composition, modularity, and robustness breaks
     Check(CheckArgs),
+    /// Generate CI workflow configuration
+    InitCi {
+        /// CI provider (default: github-actions)
+        #[arg(long, default_value = "github-actions")]
+        provider: String,
+    },
     /// Reserved for proof commands
     Prove {
         #[command(subcommand)]
@@ -31,6 +43,26 @@ pub struct CheckArgs {
     #[arg(long, short)]
     pub path: Vec<PathBuf>,
 
+    /// Explicit target revision (commit SHA or ref) for diff scope
+    #[arg(long)]
+    pub target: Option<String>,
+
+    /// Base revision (commit SHA or ref) for diff scope
+    #[arg(long)]
+    pub base: Option<String>,
+
+    /// Scan all files (full scope) instead of diff
+    #[arg(long)]
+    pub full: bool,
+
+    /// Scan mode: guidance, tiered, or gate
+    #[arg(long, default_value = "guidance")]
+    pub mode: String,
+
+    /// Severity threshold for gate mode (low, medium, high)
+    #[arg(long)]
+    pub severity_threshold: Option<String>,
+
     /// Output findings as JSON
     #[arg(long, short)]
     pub json: bool,
@@ -40,10 +72,33 @@ pub struct CheckArgs {
 pub enum ProveCommands {}
 
 impl Cli {
-    pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run(&self) -> ExitCode {
         match &self.command {
             Some(Commands::Check(args)) => run_check(args),
-            _ => Ok(()),
+            Some(Commands::InitCi { provider }) => run_init_ci(provider),
+            _ => ExitCode::Success,
+        }
+    }
+}
+
+fn run_init_ci(provider: &str) -> ExitCode {
+    match provider {
+        "github-actions" | "gha" => {
+            let policy = ScanPolicy::default();
+            match generate_github_actions_workflow(&policy) {
+                Ok(workflow) => {
+                    println!("{}", workflow);
+                    ExitCode::Success
+                }
+                Err(e) => {
+                    eprintln!("vampiro: failed to generate CI workflow: {e}");
+                    ExitCode::InternalError
+                }
+            }
+        }
+        _ => {
+            eprintln!("vampiro: unsupported CI provider: {provider}");
+            ExitCode::UsageError
         }
     }
 }
@@ -84,18 +139,16 @@ fn collect_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
     Ok(())
 }
 
-/// A single-file scan result.
-struct FileResult {
-    path: PathBuf,
-    findings: Vec<vampiro_seam_analysis::Finding>,
-    diagnostics: Vec<vampiro_seam_analysis::Diagnostic>,
-}
+fn scan_files(
+    files: &[PathBuf],
+) -> (
+    Vec<vampiro_seam_analysis::Finding>,
+    Vec<vampiro_seam_analysis::Diagnostic>,
+) {
+    let mut scanned_findings: Vec<vampiro_seam_analysis::Finding> = Vec::new();
+    let mut scanned_diagnostics: Vec<vampiro_seam_analysis::Diagnostic> = Vec::new();
 
-fn run_check(args: &CheckArgs) -> Result<(), Box<dyn std::error::Error>> {
-    let files = collect_rs_files(&args.path)?;
-
-    let mut all_results: Vec<FileResult> = Vec::new();
-    for file in &files {
+    for file in files {
         let source = match std::fs::read_to_string(file) {
             Ok(s) => s,
             Err(e) => {
@@ -115,103 +168,120 @@ fn run_check(args: &CheckArgs) -> Result<(), Box<dyn std::error::Error>> {
         let vis = to_visibility_facts(&out);
         let (findings, diagnostics) = analyze_with_visibility(&out.graph, &vis);
 
-        // Filter findings to only those from this file (analysis may reference
-        // other files via test fixture paths, etc.)
-        let own_findings: Vec<_> = findings.into_iter().filter(|f| f.path == *file).collect();
-        let own_diagnostics: Vec<_> = diagnostics
-            .into_iter()
-            .filter(|d| d.path == *file)
-            .collect();
-
-        all_results.push(FileResult {
-            path: file.clone(),
-            findings: own_findings,
-            diagnostics: own_diagnostics,
-        });
+        scanned_findings.extend(findings);
+        scanned_diagnostics.extend(diagnostics);
     }
+
+    (scanned_findings, scanned_diagnostics)
+}
+
+fn run_check(args: &CheckArgs) -> ExitCode {
+    // Resolve scan scope.
+    let files: Vec<PathBuf> = if !args.path.is_empty() {
+        // Explicit --path: use as-is
+        match collect_rs_files(&args.path) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("vampiro: {e}");
+                return ExitCode::UsageError;
+            }
+        }
+    } else if args.full {
+        // Full scope via Git
+        match GitContext::open_from_cwd() {
+            Ok(ctx) => match ctx.full_scope() {
+                Ok(scope) => scope.files().to_vec(),
+                Err(e) => {
+                    eprintln!("vampiro: failed to resolve full scope: {e}");
+                    return ExitCode::InternalError;
+                }
+            },
+            Err(_) => {
+                eprintln!("vampiro: not a Git repository. Use --path to specify files.");
+                return ExitCode::UsageError;
+            }
+        }
+    } else if let Some(target) = &args.target {
+        // Explicit diff scope
+        let base = args.base.as_deref().unwrap_or("HEAD~1");
+        match GitContext::open_from_cwd() {
+            Ok(ctx) => match ctx.diff_between(base, target) {
+                Ok(scope) => scope.files().to_vec(),
+                Err(e) => {
+                    eprintln!("vampiro: diff scope error: {e}");
+                    return ExitCode::InternalError;
+                }
+            },
+            Err(_) => {
+                eprintln!("vampiro: not a Git repository. Use --path to specify files.");
+                return ExitCode::UsageError;
+            }
+        }
+    } else {
+        // Default: local diff (HEAD vs worktree)
+        match GitContext::open_from_cwd() {
+            Ok(ctx) => match ctx.local_diff() {
+                Ok(scope) => scope.files().to_vec(),
+                Err(e) => {
+                    eprintln!("vampiro: local diff error: {e}");
+                    return ExitCode::InternalError;
+                }
+            },
+            Err(_) => {
+                eprintln!("vampiro: not a Git repository, and no --path or --target given");
+                return ExitCode::UsageError;
+            }
+        }
+    };
+
+    if files.is_empty() {
+        eprintln!("vampiro: no files to scan");
+        return ExitCode::Success;
+    }
+
+    let (scanned_findings, scanned_diagnostics) = scan_files(&files);
+
+    let metadata = ScanResultMetadata {
+        scope: if args.full || args.path.is_empty() {
+            ScopeKind::Full
+        } else {
+            ScopeKind::Diff
+        },
+        base_commit: args.base.clone(),
+        target_commit: args.target.clone(),
+        scanned_files: files.len(),
+    };
+
+    let result = ScanResult::new(
+        "vampiro check".to_string(),
+        scanned_findings,
+        scanned_diagnostics,
+        vec![],
+        metadata,
+    );
 
     if args.json {
-        output_json_all(&all_results)?;
+        if let Ok(json) = crate::output::render_json(&result) {
+            println!("{json}");
+        }
     } else {
-        output_human_all(&all_results);
+        let human = crate::output::render_human(&result);
+        print!("{human}");
     }
 
-    Ok(())
-}
+    // Apply policy
+    let mode: ScanMode = args.mode.parse().unwrap_or(ScanMode::Guidance);
+    let policy = ScanPolicy {
+        mode,
+        severity_threshold: args
+            .severity_threshold
+            .as_ref()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(crate::finding::Severity::Medium),
+        ..Default::default()
+    };
 
-fn output_human_all(results: &[FileResult]) {
-    let mut total_findings = 0;
-    let mut total_diagnostics = 0;
-    let mut scanned = 0;
-
-    for r in results {
-        scanned += 1;
-        if r.findings.is_empty() && r.diagnostics.is_empty() {
-            continue;
-        }
-        for f in &r.findings {
-            println!(
-                "{}:{}-{}  {} [{}]  {}  ({})",
-                f.path.display(),
-                f.line_range.start,
-                f.line_range.end,
-                f.rule,
-                f.severity,
-                f.classification,
-                f.axis,
-            );
-        }
-        for d in &r.diagnostics {
-            println!(
-                "{}:{}-{}  {}  {}",
-                d.path.display(),
-                d.line_range.start,
-                d.line_range.end,
-                d.diagnostic,
-                d.detail,
-            );
-        }
-        let ft = r.findings.len();
-        let dt = r.diagnostics.len();
-        println!(
-            "\n{} finding(s), {} diagnostic(s) in {}",
-            ft,
-            dt,
-            r.path.display()
-        );
-        total_findings += ft;
-        total_diagnostics += dt;
-    }
-
-    if total_findings == 0 && total_diagnostics == 0 {
-        println!("vampiro: no findings in {} file(s)", scanned);
-    }
-
-    let _ = total_findings;
-    let _ = total_diagnostics;
-}
-
-fn output_json_all(results: &[FileResult]) -> Result<(), Box<dyn std::error::Error>> {
-    let mut all_findings: Vec<serde_json::Value> = Vec::new();
-    let mut all_warnings: Vec<Warning> = Vec::new();
-
-    for r in results {
-        for f in &r.findings {
-            all_findings.push(serde_json::to_value(f)?);
-        }
-        for d in &r.diagnostics {
-            all_warnings.push(Warning {
-                rule_name: d.diagnostic.clone(),
-                entity_id: Some(format!("{}:{}", d.path.display(), d.line_range.start)),
-                message: d.detail.clone(),
-                suggested_remediation: None,
-            });
-        }
-    }
-
-    let env = Envelope::success(EnvelopeKind::Check, all_findings, all_warnings, vec![]);
-    println!("{}", serde_json::to_string_pretty(&env)?);
-    Ok(())
+    policy.evaluate(&result.findings)
 }
 
 #[cfg(test)]

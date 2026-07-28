@@ -3,6 +3,19 @@ Analyze source files for composition, modularity, and robustness breaks
 Usage: vampiro check [OPTIONS]
 
 Options:
-  -p, --path <PATH>  Path(s) to Rust source file(s) or directories to scan
-  -j, --json         Output findings as JSON
-  -h, --help         Print help
+  -p, --path <PATH>
+          Path(s) to Rust source file(s) or directories to scan
+      --target <TARGET>
+          Explicit target revision (commit SHA or ref) for diff scope
+      --base <BASE>
+          Base revision (commit SHA or ref) for diff scope
+      --full
+          Scan all files (full scope) instead of diff
+      --mode <MODE>
+          Scan mode: guidance, tiered, or gate [default: guidance]
+      --severity-threshold <SEVERITY_THRESHOLD>
+          Severity threshold for gate mode (low, medium, high)
+  -j, --json
+          Output findings as JSON
+  -h, --help
+          Print help

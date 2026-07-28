@@ -52,7 +52,9 @@ impl std::fmt::Display for Axis {
 /// The closed severity vocabulary (REQ-4, v1.3.0).
 ///
 /// JSON form is lowercase (`low`/`medium`/`high`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord, Default,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Low,

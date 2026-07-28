@@ -27,12 +27,5 @@ fn main() -> ExitCode {
     }
 
     let cli = Cli::parse();
-    match cli.run() {
-        Ok(()) => ExitCode::Success,
-        Err(e) => {
-            let sink = guide.error_sink();
-            sink.handle(&*e, &mut std::io::stderr());
-            ExitCode::InternalError
-        }
-    }
+    cli.run()
 }
