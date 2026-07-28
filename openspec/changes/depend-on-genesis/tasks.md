@@ -16,9 +16,9 @@
 - [x] 3.3 Run focused CLI snapshots and workspace tests; record suggestion API/version and passing commands in `docs/verification/depend-on-genesis-3.md`.
 
 ## 4. Managed-Block Tracer
-- [ ] 4.1 Add failing fixtures for insert/update/idempotent replay of WAI, OPENSPEC, and DONT managed blocks while preserving surrounding user content.
-- [ ] 4.2 Source injector mechanics from `genesis::managed_block` and carry the three project blocks needed for `wai status` detection (`wai-bdqw.9`).
-- [ ] 4.3 Run focused byte/idempotency fixtures and a `wai status` integration check; record block/API versions and passing commands in `docs/verification/depend-on-genesis-4.md`.
+- [x] 4.1 Add failing fixtures for insert/update/idempotent replay of WAI, OPENSPEC, and DONT managed blocks while preserving surrounding user content.
+- [x] 4.2 Source injector mechanics from `genesis::managed_block` and carry the three project blocks needed for `wai status` detection (`wai-bdqw.9`).
+- [x] 4.3 Run focused byte/idempotency fixtures and a `wai status` integration check; record block/API versions and passing commands in `docs/verification/depend-on-genesis-4.md`.
 
 ## 5. AIX Artifact Tracer
 - [ ] 5.1 Add failing golden fixtures for deterministic `llms.txt` and `llm.txt` generation from the repository's authoritative project inputs.
