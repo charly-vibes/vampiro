@@ -7,6 +7,8 @@ pub enum CirError {
         node_id: String,
         role: NodeRole,
     },
+    /// Two nodes share the same stable identity.
+    DuplicateNode { id: String },
     /// An effect channel exceeds the maximum allowed nesting depth.
     EffectDepthExceeded { max_depth: u32, observed: u32 },
     /// A shape exceeds the maximum allowed nesting depth.
@@ -41,6 +43,9 @@ impl std::fmt::Display for CirError {
                     "edge `{edge_id}` references missing {role_str} node `{node_id}`"
                 )
             }
+            CirError::DuplicateNode { id } => {
+                write!(f, "duplicate stable identity `{id}`")
+            }
             CirError::EffectDepthExceeded {
                 max_depth,
                 observed,
@@ -68,12 +73,17 @@ impl std::fmt::Display for CirError {
 
 impl std::error::Error for CirError {}
 
+/// Convenience conversion: treats an ad-hoc `String` message as an extraction
+/// error. Use `CirError::Deserialization` explicitly when the error originated
+/// from a deserializer to preserve that classification.
 impl From<String> for CirError {
     fn from(msg: String) -> Self {
         CirError::Extraction(msg)
     }
 }
 
+/// Convenience conversion: treats an ad-hoc `&str` message as an extraction
+/// error. See the `From<String>` impl for classification caveats.
 impl From<&str> for CirError {
     fn from(msg: &str) -> Self {
         CirError::Extraction(msg.to_string())
@@ -145,5 +155,12 @@ mod tests {
         let err: CirError = "test error".into();
         assert!(matches!(err, CirError::Extraction(_)));
         assert_eq!(err.to_string(), "CIR extraction error: test error");
+    }
+
+    #[test]
+    fn cir_error_duplicate_node_display() {
+        let err = CirError::DuplicateNode { id: "abc123".into() };
+        assert!(err.to_string().contains("abc123"));
+        assert!(err.to_string().contains("duplicate"));
     }
 }

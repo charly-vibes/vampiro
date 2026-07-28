@@ -88,6 +88,10 @@ impl CirGraph {
     }
 
     /// Find a node by its stable ID.
+    ///
+    /// Performs an O(n) linear scan. Callers that issue many lookups should
+    /// build their own `HashMap<&StableId, &CirNode>` index rather than call
+    /// this repeatedly.
     pub fn node_by_id(&self, id: &StableId) -> Option<&CirNode> {
         self.nodes.iter().find(|n| n.id == *id)
     }
@@ -101,9 +105,15 @@ impl CirGraph {
     ///
     /// Returns `Ok(())` if all invariants hold, or the first error encountered.
     pub fn validate(&self) -> Result<(), CirError> {
-        // Collect node IDs for O(1) lookup
-        let node_ids: std::collections::HashSet<&StableId> =
-            self.nodes.iter().map(|n| &n.id).collect();
+        // Collect node IDs for O(1) lookup and detect duplicates.
+        let mut node_ids: std::collections::HashSet<&StableId> = std::collections::HashSet::new();
+        for node in &self.nodes {
+            if !node_ids.insert(&node.id) {
+                return Err(CirError::DuplicateNode {
+                    id: node.id.to_string(),
+                });
+            }
+        }
 
         // Validate edges
         for edge in &self.edges {
@@ -473,6 +483,23 @@ mod tests {
         }"#;
         let graph = CirGraph::from_json(json).unwrap();
         assert_eq!(graph.nodes.len(), 1);
+    }
+
+    #[test]
+    fn cir_graph_validate_duplicate_node() {
+        let mut graph = CirGraph::new("test.rs");
+        let mut node = make_node("dup", "fn_a", Shape::Scalar, Shape::Scalar);
+        graph.add_node(node.clone());
+        // Same id, different name — should be rejected.
+        node.name = Some("fn_b".into());
+        graph.add_node(node);
+
+        let result = graph.validate();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CirError::DuplicateNode { .. }
+        ));
     }
 
     #[test]

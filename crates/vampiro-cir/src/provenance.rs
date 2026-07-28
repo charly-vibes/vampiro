@@ -56,24 +56,32 @@ pub struct SourceSpan {
 /// A stable identity for a node or edge.
 ///
 /// Identities are deterministic and stable across repeated extractions
-/// on unchanged input. The identity scheme is:
+/// on unchanged input. The identity scheme implemented by the reference
+/// Rust frontend is:
 ///
-/// `StableId = SHA256(content_hash + ":" + path + ":" + line) truncated to 128 bits`
+/// `StableId = SHA256(name + ":" + path + ":" + line + ":" + column + ":" + content)`
+///           truncated to 128 bits (16 bytes), hex-encoded
 ///
-/// where `content_hash` is a hash of the source content at the declaration/call
-/// site, `path` is the relative file path, and `line` is the start line.
-/// This ensures that:
+/// where `name` is the declaration/callee name, `path` is the relative file
+/// path, `line`/`column` are the start location, and `content` is the source
+/// text spanning the declaration or call site. This ensures that:
 /// - Same source + same location → same ID (repeatable)
-/// - Different source at same location → different ID (content-sensitive)
-/// - Same source at different location → different ID (location-sensitive)
+/// - Different source at the same location → different ID (content-sensitive)
+/// - Same source at a different location → different ID (location-sensitive)
+/// - Two call sites on the same line → different IDs (column-sensitive)
+///
+/// Frontends in other languages may choose a different scheme, but they must
+/// preserve the three properties above. `StableId::new` itself is scheme-
+/// agnostic; it only stores the producer-computed string.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct StableId(String);
 
 impl StableId {
     /// Create a new stable identity from a string.
     ///
-    /// In production, the string should be derived from
-    /// `SHA256(content_hash:path:line)` as documented.
+    /// Frontends should pass the producer-computed identity (see the
+    /// type-level docstring for the reference scheme). Consumers constructing
+    /// fixtures may pass any opaque string.
     pub fn new(id: impl Into<String>) -> Self {
         StableId(id.into())
     }

@@ -157,33 +157,61 @@ const SERIALIZABLE_TYPES: &[&str] = &[
     "SystemTime",
 ];
 
-/// Check if a type name is known to be serializable.
-fn is_serializable_type(type_name: &str) -> bool {
-    // Strip generics
-    let base = type_name.split('<').next().unwrap_or(type_name);
-    if SERIALIZABLE_TYPES.contains(&base) {
-        return true;
+/// Collection type names that are serializable iff their type parameters are.
+const COLLECTIONS: &[&str] = &[
+    "Vec",
+    "Option",
+    "Result",
+    "Box",
+    "HashMap",
+    "BTreeMap",
+    "HashSet",
+    "BTreeSet",
+    "VecDeque",
+    "LinkedList",
+    "Rc",
+    "Arc",
+    "Cell",
+    "RefCell",
+    "Mutex",
+    "RwLock",
+];
+
+/// Check if a syn type is known to implement `serde::Serialize`.
+///
+/// Leaf types in [`SERIALIZABLE_TYPES`] are serializable. Collections
+/// (`Vec`, `Option`, …) are serializable iff *all* their type parameters
+/// are serializable, so `Vec<NonSerializable>` returns `false` rather than
+/// the previous unconditional `true`.
+fn is_serializable_type(ty: &syn::Type) -> bool {
+    match ty {
+        syn::Type::Path(type_path) => {
+            let Some(seg) = type_path.path.segments.last() else {
+                return false;
+            };
+            let ident = seg.ident.to_string();
+            if SERIALIZABLE_TYPES.contains(&ident.as_str()) {
+                return true;
+            }
+            if !COLLECTIONS.contains(&ident.as_str()) {
+                return false;
+            }
+            match &seg.arguments {
+                syn::PathArguments::AngleBracketed(args) => {
+                    args.args.iter().all(|arg| match arg {
+                        syn::GenericArgument::Type(t) => is_serializable_type(t),
+                        _ => false,
+                    })
+                }
+                _ => false,
+            }
+        }
+        syn::Type::Reference(r) => is_serializable_type(&r.elem),
+        syn::Type::Tuple(t) => !t.elems.is_empty() && t.elems.iter().all(is_serializable_type),
+        syn::Type::Slice(s) => is_serializable_type(&s.elem),
+        syn::Type::Array(a) => is_serializable_type(&a.elem),
+        _ => false,
     }
-    // Collections are serializable if their elements are
-    matches!(
-        base,
-        "Vec"
-            | "Option"
-            | "Result"
-            | "Box"
-            | "HashMap"
-            | "BTreeMap"
-            | "HashSet"
-            | "BTreeSet"
-            | "VecDeque"
-            | "LinkedList"
-            | "Rc"
-            | "Arc"
-            | "Cell"
-            | "RefCell"
-            | "Mutex"
-            | "RwLock"
-    )
 }
 
 /// Extract the base type name from a syn type (without generics).
@@ -342,7 +370,7 @@ impl LawExtractor {
                     FnParam {
                         name: param_name,
                         type_name: type_name.clone(),
-                        is_serializable: is_serializable_type(&type_name),
+                        is_serializable: is_serializable_type(&pat_type.ty),
                     }
                 }
                 syn::FnArg::Receiver(_) => FnParam {
@@ -367,41 +395,36 @@ impl LawExtractor {
         });
     }
 
-    /// Extract generator/iterator references from a variable declaration.
-    #[allow(dead_code)]
-    fn extract_generator_from_type(&mut self, name: &str, ty: &syn::Type, span: &SourceSpan) {
-        let type_str = type_name_as_string(ty);
-        let kind = if type_str.starts_with("Stream") {
-            "stream"
-        } else if type_str.starts_with("Generator") {
-            "generator"
-        } else {
-            "iterator"
+    /// Extract generator/iterator references from a `let` binding whose
+    /// initializer is an `iter`/`into_iter`/`iterate` call.
+    fn extract_generator_from_local(&mut self, local: &syn::Local) {
+        let Some(init) = &local.init else {
+            return;
         };
-
-        let item_type = match ty {
-            syn::Type::Path(type_path) => {
-                if let Some(seg) = type_path.path.segments.last() {
-                    if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
-                        args.args.first().and_then(|arg| match arg {
-                            syn::GenericArgument::Type(t) => Some(type_name_as_string(t)),
-                            _ => None,
-                        })
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }
-            _ => None,
+        let syn::Expr::Call(expr_call) = &*init.expr else {
+            return;
         };
-
+        let syn::Expr::Path(expr_path) = &*expr_call.func else {
+            return;
+        };
+        let name = expr_path
+            .path
+            .segments
+            .last()
+            .map(|s| s.ident.to_string())
+            .unwrap_or_default();
+        if name != "iter" && name != "into_iter" && name != "iterate" {
+            return;
+        }
+        let var_name = match &local.pat {
+            syn::Pat::Ident(pat_ident) => pat_ident.ident.to_string(),
+            _ => "_".to_string(),
+        };
         self.input.generator_refs.push(GeneratorRef {
-            name: name.to_string(),
-            item_type,
-            kind: kind.to_string(),
-            span: span.clone(),
+            name: var_name,
+            item_type: None,
+            kind: "iterator".to_string(),
+            span: self.make_span(local),
         });
     }
 }
@@ -418,33 +441,7 @@ impl<'ast> Visit<'ast> for LawExtractor {
     }
 
     fn visit_local(&mut self, local: &'ast syn::Local) {
-        // Extract generator/iterator references from let bindings
-        if let Some(init) = &local.init {
-            if let syn::Expr::Call(expr_call) = &*init.expr {
-                if let syn::Expr::Path(expr_path) = &*expr_call.func {
-                    let name = expr_path
-                        .path
-                        .segments
-                        .last()
-                        .map(|s| s.ident.to_string())
-                        .unwrap_or_default();
-                    if name == "iter" || name == "into_iter" || name == "iterate" {
-                        let span = self.make_span(local);
-                        let var_name = match &local.pat {
-                            syn::Pat::Ident(pat_ident) => pat_ident.ident.to_string(),
-                            _ => "_".to_string(),
-                        };
-                        self.input.generator_refs.push(GeneratorRef {
-                            name: var_name,
-                            item_type: None,
-                            kind: "iterator".to_string(),
-                            span,
-                        });
-                    }
-                }
-            }
-        }
-
+        self.extract_generator_from_local(local);
         visit::visit_local(self, local);
     }
 }
@@ -546,12 +543,20 @@ mod tests {
 
     #[test]
     fn extract_serializable_type() {
-        assert!(is_serializable_type("i32"));
-        assert!(is_serializable_type("String"));
-        assert!(is_serializable_type("Vec<i32>"));
-        assert!(is_serializable_type("Option<bool>"));
-        assert!(!is_serializable_type("CustomType"));
-        assert!(!is_serializable_type("*const u8"));
+        assert!(is_serializable_type(&syn::parse_quote!(i32)));
+        assert!(is_serializable_type(&syn::parse_quote!(String)));
+        assert!(is_serializable_type(&syn::parse_quote!(Vec<i32>)));
+        assert!(is_serializable_type(&syn::parse_quote!(Option<bool>)));
+        assert!(!is_serializable_type(&syn::parse_quote!(CustomType)));
+        assert!(!is_serializable_type(&syn::parse_quote!(*const u8)));
+        // Collections require their element types to be serializable.
+        assert!(!is_serializable_type(&syn::parse_quote!(Vec<CustomType>)));
+        assert!(is_serializable_type(&syn::parse_quote!(HashMap<String, Vec<i32>>)));
+        assert!(!is_serializable_type(&syn::parse_quote!(HashMap<String, CustomType>)));
+        // References and slices recurse.
+        assert!(is_serializable_type(&syn::parse_quote!(&str)));
+        assert!(is_serializable_type(&syn::parse_quote!(&[i32])));
+        assert!(!is_serializable_type(&syn::parse_quote!(&CustomType)));
     }
 
     #[test]

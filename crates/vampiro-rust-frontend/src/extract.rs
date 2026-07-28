@@ -28,7 +28,10 @@ pub struct ExtractionResult {
 }
 
 /// Extract a `CirGraph` and metadata from a parsed syn file.
-pub fn extract_graph(syntax: &syn::File, path: &Path) -> ExtractionResult {
+///
+/// `source` is the original source text, used to compute content-sensitive
+/// stable identities (see [`StableId`](vampiro_cir::StableId)).
+pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> ExtractionResult {
     let mut extractor = Extractor {
         graph: CirGraph::new(path.to_string_lossy()),
         nodes: HashMap::new(),
@@ -38,6 +41,7 @@ pub fn extract_graph(syntax: &syn::File, path: &Path) -> ExtractionResult {
         facades: Vec::new(),
         visibility: HashMap::new(),
         doc_hidden_stack: Vec::new(),
+        source,
     };
     visit::visit_file(&mut extractor, syntax);
     ExtractionResult {
@@ -48,11 +52,15 @@ pub fn extract_graph(syntax: &syn::File, path: &Path) -> ExtractionResult {
 }
 
 /// The extraction visitor.
-struct Extractor {
+struct Extractor<'src> {
     graph: CirGraph,
-    /// Map from function name to node stable ID.
+    /// Map from fully-qualified function path to node stable ID.
+    ///
+    /// Keys are module-qualified (e.g. `"a::b::fn_name"`) so that shadowed
+    /// or same-named functions in different modules do not collide.
     nodes: HashMap<String, StableId>,
-    /// The current function being visited (for edge source resolution).
+    /// The fully-qualified path of the function currently being visited
+    /// (for edge source resolution).
     current_function: Option<String>,
     path: std::path::PathBuf,
     /// Module path stack (e.g., [] for root, ["foo"] for `mod foo`).
@@ -64,23 +72,83 @@ struct Extractor {
     /// Stack of #[doc(hidden)] state (for nested items).
     #[allow(dead_code)]
     doc_hidden_stack: Vec<bool>,
+    /// The original source text, used for content-sensitive stable IDs.
+    source: &'src str,
 }
 
-impl Extractor {
+impl<'src> Extractor<'src> {
     /// Check if an attribute list includes `#[doc(hidden)]`.
+    ///
+    /// Matches only the attribute form `#[doc(hidden)]`; a doc *comment*
+    /// such as `/// hidden features` is not a false positive.
     fn has_doc_hidden(&self, attrs: &[syn::Attribute]) -> bool {
         attrs.iter().any(|attr| {
-            attr.path().is_ident("doc")
-                && attr
-                    .meta
-                    .require_list()
-                    .is_ok_and(|meta| meta.tokens.to_string().contains("hidden"))
+            if !attr.path().is_ident("doc") {
+                return false;
+            }
+            match &attr.meta {
+                syn::Meta::List(list) => list
+                    .parse_args::<syn::Path>()
+                    .ok()
+                    .map(|p| p.is_ident("hidden"))
+                    .unwrap_or(false),
+                _ => false,
+            }
         })
     }
 
-    /// Get the current module path as a string.
+    /// The current module path as a `::`-joined string.
     fn current_module_path(&self) -> String {
         self.module_stack.join("::")
+    }
+
+    /// The fully-qualified key for a declaration named `name` in the
+    /// current module (e.g. `"a::b::fn_name"`, or just `"fn_name"` at root).
+    fn current_fq(&self, name: &str) -> String {
+        let mp = self.current_module_path();
+        if mp.is_empty() {
+            name.to_string()
+        } else {
+            format!("{mp}::{name}")
+        }
+    }
+
+    /// Resolve a callee name to a node stable ID.
+    ///
+    /// Tries the name as-is (handles fully-qualified calls like `a::b::f`),
+    /// then walks the current module stack from innermost to outermost
+    /// (so a bare call `f()` from within `a::b` resolves to `a::b::f` then
+    /// `a::f` then the crate-root `f`), then the bare name at crate root.
+    fn resolve_node(&self, callee: &str) -> Option<&StableId> {
+        if let Some(id) = self.nodes.get(callee) {
+            return Some(id);
+        }
+        let mut acc = self.current_module_path();
+        while !acc.is_empty() {
+            let candidate = format!("{acc}::{callee}");
+            if let Some(id) = self.nodes.get(&candidate) {
+                return Some(id);
+            }
+            acc = match acc.rsplit_once("::") {
+                Some((parent, _)) => parent.to_string(),
+                None => break,
+            };
+        }
+        self.nodes.get(callee)
+    }
+
+    /// Slice the source lines `[start_line, end_line]` (1-indexed, inclusive).
+    fn source_slice(&self, start_line: usize, end_line: usize) -> String {
+        self.source
+            .lines()
+            .enumerate()
+            .filter(|(i, _)| {
+                let line = i + 1;
+                line >= start_line && line <= end_line
+            })
+            .map(|(_, l)| l)
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// Extract a shape from a syn type.
@@ -154,7 +222,7 @@ impl Extractor {
             }
             syn::Type::ImplTrait(_) => Shape::Opaque,
             syn::Type::TraitObject(_) => Shape::Opaque,
-            syn::Type::Never(_) => Shape::Scalar,
+            syn::Type::Never(_) => Shape::Bottom,
             _ => Shape::Opaque,
         }
     }
@@ -236,17 +304,38 @@ impl Extractor {
         self.make_span_from_span(span, file)
     }
 
-    /// Build a stable ID from a name and span.
+    /// Build a stable ID for a declaration or call site.
+    ///
+    /// Implements `SHA256(name:file:line:column:content)` truncated to
+    /// 128 bits, hex-encoded. The content slice makes the ID content-
+    /// sensitive; the column makes two same-line call sites distinct.
     fn make_id(&self, name: &str, span: &proc_macro2::Span) -> StableId {
+        use sha2::{Digest, Sha256};
         let file = self.path.to_string_lossy();
-        let line = span.start().line;
-        StableId::new(format!("{name}:{file}:{line}"))
+        let start = span.start();
+        let end = span.end();
+        let content = self.source_slice(start.line, end.line);
+        let mut hasher = Sha256::new();
+        hasher.update(name.as_bytes());
+        hasher.update(b":");
+        hasher.update(file.as_bytes());
+        hasher.update(b":");
+        hasher.update(start.line.to_string().as_bytes());
+        hasher.update(b":");
+        hasher.update(start.column.to_string().as_bytes());
+        hasher.update(b":");
+        hasher.update(content.as_bytes());
+        let hash = hasher.finalize();
+        // Truncate to 128 bits (16 bytes) and hex-encode.
+        let hex: String = hash[..16].iter().map(|b| format!("{b:02x}")).collect();
+        StableId::new(hex)
     }
 
     /// Extract nodes from a function declaration.
     fn extract_function(&mut self, func: &syn::ItemFn, _attrs: &[syn::Attribute]) {
         let name = func.sig.ident.to_string();
         let id = self.make_id(&name, &func.sig.ident.span());
+        let fq = self.current_fq(&name);
 
         let domain = self.extract_fn_params(&func.sig);
         let codomain = self.extract_return_shape(&func.sig.output);
@@ -270,10 +359,12 @@ impl Extractor {
         };
 
         self.graph.add_node(node);
-        self.nodes.insert(name.clone(), id.clone());
+        // Key by fully-qualified path so shadowed same-named functions
+        // in different modules do not collide.
+        self.nodes.insert(fq.clone(), id.clone());
         self.visibility.insert(id, vis);
 
-        let prev = self.current_function.replace(name);
+        let prev = self.current_function.replace(fq);
 
         visit::visit_block(self, &func.block);
 
@@ -327,6 +418,7 @@ impl Extractor {
             &vis,
             doc_hidden,
             &module_path,
+            "",
             &span,
             &self.path,
         );
@@ -345,11 +437,16 @@ impl Extractor {
     }
 
     /// Recursively extract re-export entries from a use tree (free function, no borrow issues).
+    ///
+    /// `prefix` accumulates the source path segments from `UseTree::Path`
+    /// nodes so that `pub use foo::bar::baz;` records `original_path ==
+    /// "foo::bar::baz"` rather than just `"baz"`.
     fn extract_use_tree_entries(
         tree: &syn::UseTree,
         vis: &Visibility,
         doc_hidden: bool,
         module_path: &str,
+        prefix: &str,
         span: &proc_macro2::Span,
         file_path: &Path,
     ) -> Vec<FacadeEntry> {
@@ -359,6 +456,7 @@ impl Extractor {
             vis,
             doc_hidden,
             module_path,
+            prefix,
             span,
             file_path,
             &mut entries,
@@ -366,22 +464,34 @@ impl Extractor {
         entries
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn collect_use_entries(
         tree: &syn::UseTree,
         vis: &Visibility,
         doc_hidden: bool,
         module_path: &str,
+        prefix: &str,
         span: &proc_macro2::Span,
         file_path: &Path,
         entries: &mut Vec<FacadeEntry>,
     ) {
+        let join = |prefix: &str, segment: &str| -> String {
+            if prefix.is_empty() {
+                segment.to_string()
+            } else {
+                format!("{prefix}::{segment}")
+            }
+        };
         match tree {
             syn::UseTree::Path(use_path) => {
+                let ident = use_path.ident.to_string();
+                let new_prefix = join(prefix, &ident);
                 Self::collect_use_entries(
                     &use_path.tree,
                     vis,
                     doc_hidden,
                     module_path,
+                    &new_prefix,
                     span,
                     file_path,
                     entries,
@@ -389,13 +499,8 @@ impl Extractor {
             }
             syn::UseTree::Name(use_name) => {
                 let name = use_name.ident.to_string();
-                let original_path = if module_path.is_empty() {
-                    name.clone()
-                } else {
-                    format!("{module_path}::{name}")
-                };
-                let start = span.start();
-                let end = span.end();
+                let original_path = join(prefix, &name);
+                let (start, end) = (span.start(), span.end());
                 entries.push(FacadeEntry {
                     name,
                     original_path,
@@ -413,9 +518,8 @@ impl Extractor {
             }
             syn::UseTree::Rename(use_rename) => {
                 let name = use_rename.rename.to_string();
-                let original_path = use_rename.ident.to_string();
-                let start = span.start();
-                let end = span.end();
+                let original_path = join(prefix, &use_rename.ident.to_string());
+                let (start, end) = (span.start(), span.end());
                 entries.push(FacadeEntry {
                     name,
                     original_path,
@@ -432,11 +536,17 @@ impl Extractor {
                 });
             }
             syn::UseTree::Glob(_) => {
-                let start = span.start();
-                let end = span.end();
+                // The glob source is the accumulated prefix (e.g.
+                // `pub use foo::bar::*` → original_path "foo::bar").
+                let original_path = if prefix.is_empty() {
+                    module_path.to_string()
+                } else {
+                    prefix.to_string()
+                };
+                let (start, end) = (span.start(), span.end());
                 entries.push(FacadeEntry {
                     name: "*".into(),
-                    original_path: module_path.to_string(),
+                    original_path,
                     is_wildcard: true,
                     visibility: vis.clone(),
                     span: SourceSpan {
@@ -456,6 +566,7 @@ impl Extractor {
                         vis,
                         doc_hidden,
                         module_path,
+                        prefix,
                         span,
                         file_path,
                         entries,
@@ -465,23 +576,21 @@ impl Extractor {
         }
     }
 
-    /// Extract an edge from a function call expression.
-    fn extract_call(&mut self, func: &syn::Expr, span: proc_macro2::Span) {
-        let callee_name = match func {
-            syn::Expr::Path(expr_path) => {
-                let segments: Vec<String> = expr_path
-                    .path
-                    .segments
-                    .iter()
-                    .map(|s| s.ident.to_string())
-                    .collect();
-                segments.join("::")
-            }
-            syn::Expr::MethodCall(method_call) => method_call.method.to_string(),
-            _ => return,
-        };
-
-        if Self::is_builtin(&callee_name) {
+    /// Record an edge for a call site, if the callee resolves to a known node.
+    ///
+    /// `resolution`/`unwrap_evidence` are supplied by the caller: `Propagated`/
+    /// `None` for ordinary calls, `Unwrapped`/evidence for `?` operands and
+    /// `.unwrap()`/`.expect()` receiver edges. Dedup is by stable edge ID, so
+    /// the first recorder wins — callers that need to tag an edge with unwrap
+    /// evidence must call this before the plain call visitor runs.
+    fn add_call_edge(
+        &mut self,
+        callee_name: &str,
+        span: proc_macro2::Span,
+        resolution: EffectResolution,
+        unwrap_evidence: Option<UnwrapEvidence>,
+    ) {
+        if Self::is_builtin(callee_name) {
             return;
         }
 
@@ -493,20 +602,18 @@ impl Extractor {
         let source_id = match self
             .current_function
             .as_ref()
-            .and_then(|name| self.nodes.get(name))
+            .and_then(|fq| self.resolve_node(fq))
         {
             Some(id) => id.clone(),
             None => return,
         };
 
-        let target_id = match self.nodes.get(&callee_name) {
+        let target_id = match self.resolve_node(callee_name) {
             Some(id) => id.clone(),
             None => return,
         };
 
         let source_span = self.make_span_from_span(span, &self.path.to_string_lossy());
-        let (resolution, unwrap_evidence) = self.detect_unwrap(func);
-
         let edge = CirEdge {
             id: edge_id,
             source: source_id,
@@ -521,8 +628,41 @@ impl Extractor {
         self.graph.add_edge(edge);
     }
 
+    /// The `::`-joined name of a path expression.
+    fn path_name(expr_path: &syn::ExprPath) -> String {
+        expr_path
+            .path
+            .segments
+            .iter()
+            .map(|s| s.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::")
+    }
+
+    /// Pre-record an unwrap resolution on the receiver of a method call.
+    ///
+    /// For `opt().unwrap()`, the effect being resolved is `opt()`'s `Option`,
+    /// so the unwrap evidence attaches to the `opt` call edge (not to a
+    /// nonexistent `unwrap` node). Pre-recording runs before the receiver's
+    /// `visit_expr_call`, so the unwrap-tagged version wins via dedup.
+    fn pre_record_receiver_unwrap(
+        &mut self,
+        receiver: &syn::Expr,
+        resolution: EffectResolution,
+        evidence: Option<UnwrapEvidence>,
+    ) {
+        let (name, span) = match receiver {
+            syn::Expr::Call(c) => match &*c.func {
+                syn::Expr::Path(p) => (Self::path_name(p), p.span()),
+                _ => return,
+            },
+            _ => return,
+        };
+        self.add_call_edge(&name, span, resolution, evidence);
+    }
+
     /// Known Rust built-in functions/constructors that should not produce edges.
-    const BUILTINS: &[&str] = &[
+    const BUILTINS: &'static [&'static str] = &[
         "Ok",
         "Err",
         "Some",
@@ -546,46 +686,65 @@ impl Extractor {
         "panic",
         "vec",
         "String::from",
+        "String::new",
         "ToOwned::to_owned",
+        "Vec::new",
+        "Box::new",
+        "Arc::new",
+        "Rc::new",
+        "Default::default",
+        "Into::into",
     ];
 
     /// Check if a callee name is a known Rust built-in.
+    ///
+    /// Matches both the fully-qualified name (e.g. `String::from`) and the
+    /// last path segment, so `core::assert_eq` and `assert_eq` are both
+    /// treated as builtins.
     fn is_builtin(name: &str) -> bool {
-        Self::BUILTINS.contains(&name)
+        if Self::BUILTINS.contains(&name) {
+            return true;
+        }
+        match name.rsplit("::").next() {
+            Some(last) => Self::BUILTINS.contains(&last),
+            None => false,
+        }
     }
 
-    /// Detect unwrap patterns in a call expression.
-    fn detect_unwrap(&self, func: &syn::Expr) -> (EffectResolution, Option<UnwrapEvidence>) {
-        if let syn::Expr::MethodCall(method_call) = func {
-            let method_name = method_call.method.to_string();
-            match method_name.as_str() {
-                "unwrap" | "expect" => {
-                    return (
-                        EffectResolution::Unwrapped,
-                        Some(UnwrapEvidence {
-                            kind: UnwrapKind::Ordinary,
-                            totality: Totality::Total,
-                        }),
-                    );
-                }
-                "unwrap_unchecked" => {
-                    return (
-                        EffectResolution::Swallowed,
-                        Some(UnwrapEvidence {
-                            kind: UnwrapKind::Force,
-                            totality: Totality::Partial,
-                        }),
-                    );
-                }
-                _ => {}
-            }
+    /// Determine the effect resolution and unwrap evidence for a method call.
+    ///
+    /// Per the totality matrix in `vampiro_cir::effect`:
+    /// - `.unwrap()`/`.expect()` panic on the absent case → force unwrap,
+    ///   partial totality (an unhandled branch).
+    /// - `.unwrap_unchecked()` is an unchecked force → force unwrap, partial.
+    ///
+    /// The `?` operator (handled in `visit_expr_try`) is the ordinary/total
+    /// case and overrides any method-call resolution via `try_unwrap`.
+    fn detect_method_unwrap(
+        method_name: &str,
+    ) -> (EffectResolution, Option<UnwrapEvidence>) {
+        match method_name {
+            "unwrap" | "expect" => (
+                EffectResolution::Unwrapped,
+                Some(UnwrapEvidence {
+                    kind: UnwrapKind::Force,
+                    totality: Totality::Partial,
+                }),
+            ),
+            "unwrap_unchecked" => (
+                EffectResolution::Swallowed,
+                Some(UnwrapEvidence {
+                    kind: UnwrapKind::Force,
+                    totality: Totality::Partial,
+                }),
+            ),
+            _ => (EffectResolution::Propagated, None),
         }
-        (EffectResolution::Propagated, None)
     }
 }
 
 /// Visit functions and extract CIR nodes, visibility, and facades.
-impl<'ast> Visit<'ast> for Extractor {
+impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
     fn visit_item_fn(&mut self, func: &'ast syn::ItemFn) {
         self.extract_function(func, &func.attrs);
     }
@@ -607,15 +766,76 @@ impl<'ast> Visit<'ast> for Extractor {
     }
 
     fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
-        let span = call.func.as_ref().span();
-        self.extract_call(&call.func, span);
+        // Only direct path calls produce edges; calls through arbitrary
+        // expressions have no callee name to resolve.
+        if let syn::Expr::Path(expr_path) = &*call.func {
+            let callee_name = Self::path_name(expr_path);
+            self.add_call_edge(&callee_name, expr_path.span(), EffectResolution::Propagated, None);
+        }
         visit::visit_expr_call(self, call);
     }
 
     fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
-        let span = call.span();
-        self.extract_call(&syn::Expr::MethodCall(call.clone()), span);
+        // Method-call edges are best-effort: the callee name is the bare
+        // method name, and the target is resolved by name only when a
+        // same-named function exists. Receiver-type-aware resolution is
+        // future work; today this is safe-by-accident because methods like
+        // `iter` rarely collide with a defined free function.
+        let callee_name = call.method.to_string();
+        let span = call.method.span();
+        let (resolution, evidence) = Self::detect_method_unwrap(&callee_name);
+        self.add_call_edge(&callee_name, span, resolution.clone(), evidence.clone());
+        // For unwrap/expect/unwrap_unchecked, the effect being resolved is
+        // the receiver's, so tag the receiver call edge before it is visited.
+        if evidence.is_some() {
+            self.pre_record_receiver_unwrap(&call.receiver, resolution, evidence);
+        }
         visit::visit_expr_method_call(self, call);
+    }
+
+    fn visit_expr_try(&mut self, expr: &'ast syn::ExprTry) {
+        // The `?` operator is the ordinary/total unwrap. If its direct
+        // operand is a call, tag that call's edge as unwrapped/ordinary/total.
+        // We record *before* recursing so the dedup in `add_call_edge` lets
+        // the `?`-tagged version win over the plain version the call visitor
+        // would otherwise record. The span used must match the call visitor's
+        // span so dedup keys agree.
+        let ordinary_total = || Some(UnwrapEvidence {
+            kind: UnwrapKind::Ordinary,
+            totality: Totality::Total,
+        });
+        match &*expr.expr {
+            syn::Expr::Path(expr_path) => {
+                let callee_name = Self::path_name(expr_path);
+                self.add_call_edge(
+                    &callee_name,
+                    expr_path.span(),
+                    EffectResolution::Unwrapped,
+                    ordinary_total(),
+                );
+            }
+            syn::Expr::Call(inner) => {
+                if let syn::Expr::Path(expr_path) = &*inner.func {
+                    let callee_name = Self::path_name(expr_path);
+                    self.add_call_edge(
+                        &callee_name,
+                        expr_path.span(),
+                        EffectResolution::Unwrapped,
+                        ordinary_total(),
+                    );
+                }
+            }
+            syn::Expr::MethodCall(mc) => {
+                self.add_call_edge(
+                    &mc.method.to_string(),
+                    mc.method.span(),
+                    EffectResolution::Unwrapped,
+                    ordinary_total(),
+                );
+            }
+            _ => {}
+        }
+        visit::visit_expr_try(self, expr);
     }
 }
 
@@ -628,7 +848,7 @@ mod tests {
     fn extract_simple_function_no_params() {
         let source = "fn hello() -> i32 { 42 }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 1);
         let node = &result.graph.nodes[0];
         assert_eq!(node.name.as_deref(), Some("hello"));
@@ -641,7 +861,7 @@ mod tests {
     fn extract_function_with_params() {
         let source = "fn add(a: i32, b: i32) -> i32 { a + b }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 1);
         let node = &result.graph.nodes[0];
         assert_eq!(node.name.as_deref(), Some("add"));
@@ -656,7 +876,7 @@ mod tests {
     fn extract_async_function() {
         let source = "async fn fetch() -> String { \"data\".to_string() }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 1);
         let node = &result.graph.nodes[0];
         assert_eq!(node.name.as_deref(), Some("fetch"));
@@ -670,7 +890,7 @@ mod tests {
     fn extract_function_with_result() {
         let source = "fn parse(input: &str) -> Result<i32, Error> { Ok(42) }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 1);
         let node = &result.graph.nodes[0];
         assert_eq!(node.name.as_deref(), Some("parse"));
@@ -689,7 +909,7 @@ mod tests {
     fn extract_function_call() {
         let source = "fn helper() -> i32 { 42 }\nfn main() -> i32 { helper() }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 2);
         assert_eq!(result.graph.edges.len(), 1);
         let edge = &result.graph.edges[0];
@@ -700,7 +920,7 @@ mod tests {
     fn extract_fully_qualified_call_skipped() {
         let source = "fn helper() -> i32 { 42 }\nfn main() -> i32 { crate::helper() }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 2);
         assert_eq!(result.graph.edges.len(), 0);
     }
@@ -709,7 +929,7 @@ mod tests {
     fn extract_shape_ref() {
         let source = "fn foo(x: &str) { }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(
             result.graph.nodes[0].domain,
             Shape::Ref(Box::new(Shape::Scalar))
@@ -720,7 +940,7 @@ mod tests {
     fn extract_shape_parameterized() {
         let source = "fn foo(x: Vec<i32>) { }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(
             result.graph.nodes[0].domain,
             Shape::Parameterized {
@@ -734,7 +954,7 @@ mod tests {
     fn extract_span_information() {
         let source = "fn foo() { }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         let span = &result.graph.nodes[0].span;
         assert_eq!(span.file, "test.rs");
         assert!(span.start_line > 0);
@@ -744,7 +964,7 @@ mod tests {
     fn extract_empty_file() {
         let source = "";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("empty.rs"));
+        let result = extract_graph(&syntax, Path::new("empty.rs"), source);
         assert_eq!(result.graph.nodes.len(), 0);
         assert_eq!(result.graph.edges.len(), 0);
     }
@@ -753,7 +973,7 @@ mod tests {
     fn extract_only_comments() {
         let source = "// just a comment\n/* block */";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("comments.rs"));
+        let result = extract_graph(&syntax, Path::new("comments.rs"), source);
         assert_eq!(result.graph.nodes.len(), 0);
         assert_eq!(result.graph.edges.len(), 0);
     }
@@ -762,7 +982,7 @@ mod tests {
     fn extract_multiple_functions() {
         let source = "fn a() {}\nfn b() {}\nfn c() {}";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 3);
         assert_eq!(result.graph.nodes[0].name.as_deref(), Some("a"));
         assert_eq!(result.graph.nodes[1].name.as_deref(), Some("b"));
@@ -773,7 +993,7 @@ mod tests {
     fn extract_graph_validates() {
         let source = "fn foo() -> i32 { 42 }\nfn bar() -> i32 { foo() }";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         let res = result.graph.validate();
         assert!(res.is_ok(), "graph should be valid: {res:?}");
     }
@@ -784,7 +1004,7 @@ mod tests {
     fn extract_public_function_visibility() {
         let source = "pub fn foo() {}";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         let id = &result.graph.nodes[0].id;
         let vis = result.visibility.get(id).unwrap();
         assert_eq!(*vis, Visibility::Public);
@@ -794,7 +1014,7 @@ mod tests {
     fn extract_private_function_visibility() {
         let source = "fn foo() {}";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         let id = &result.graph.nodes[0].id;
         let vis = result.visibility.get(id).unwrap();
         assert_eq!(*vis, Visibility::Private);
@@ -804,7 +1024,7 @@ mod tests {
     fn extract_crate_visibility() {
         let source = "pub(crate) fn foo() {}";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         let id = &result.graph.nodes[0].id;
         let vis = result.visibility.get(id).unwrap();
         assert_eq!(*vis, Visibility::Crate);
@@ -814,7 +1034,7 @@ mod tests {
     fn extract_super_visibility() {
         let source = "pub(super) fn foo() {}";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         let id = &result.graph.nodes[0].id;
         let vis = result.visibility.get(id).unwrap();
         assert_eq!(*vis, Visibility::Super);
@@ -824,7 +1044,7 @@ mod tests {
     fn extract_restricted_visibility() {
         let source = "pub(in foo::bar) fn foo() {}";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         let id = &result.graph.nodes[0].id;
         let vis = result.visibility.get(id).unwrap();
         assert_eq!(*vis, Visibility::Restricted("foo::bar".into()));
@@ -836,7 +1056,7 @@ mod tests {
     fn extract_simple_pub_use() {
         let source = "pub use helper;";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.module_path, "");
@@ -850,7 +1070,7 @@ mod tests {
     fn extract_private_use() {
         let source = "use helper;";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.entries.len(), 1);
@@ -861,7 +1081,7 @@ mod tests {
     fn extract_wildcard_use() {
         let source = "pub use module::*;";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.entries.len(), 1);
@@ -873,7 +1093,7 @@ mod tests {
     fn extract_renamed_use() {
         let source = "pub use old_name as new_name;";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.entries.len(), 1);
@@ -885,7 +1105,7 @@ mod tests {
     fn extract_use_group() {
         let source = "pub use {foo, bar};";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.entries.len(), 2);
@@ -897,7 +1117,7 @@ mod tests {
     fn extract_use_path() {
         let source = "pub use foo::bar::baz;";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.entries.len(), 1);
@@ -908,7 +1128,7 @@ mod tests {
     fn extract_module_use() {
         let source = "mod inner {\n    pub use helper;\n}";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.module_path, "inner");
@@ -920,7 +1140,7 @@ mod tests {
     fn extract_multiple_uses() {
         let source = "pub use a;\npub use b;\npub use c;";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.entries.len(), 3);
@@ -930,7 +1150,7 @@ mod tests {
     fn extract_doc_hidden_use() {
         let source = "#[doc(hidden)] pub use internal;";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.entries.len(), 1);
@@ -941,7 +1161,7 @@ mod tests {
     fn extract_crate_use() {
         let source = "pub(crate) use internal;";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("lib.rs"));
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
         assert_eq!(result.facades.len(), 1);
         let facade = &result.facades[0];
         assert_eq!(facade.entries[0].visibility, Visibility::Crate);
@@ -951,7 +1171,7 @@ mod tests {
     fn extract_mixed_public_and_private() {
         let source = "pub fn public_fn() {}\nfn private_fn() {}";
         let syntax = syn::parse_file(source).unwrap();
-        let result = extract_graph(&syntax, Path::new("test.rs"));
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 2);
 
         let pub_id = &result.graph.nodes[0].id;
@@ -962,5 +1182,148 @@ mod tests {
             *result.visibility.get(priv_id).unwrap(),
             Visibility::Private
         );
+    }
+
+    // --- Regression tests for Rule of 5 fixes ---
+
+    #[test]
+    fn unwrap_method_call_is_force_partial() {
+        // `.unwrap()` panics on the absent case → force unwrap, partial totality.
+        let source = "fn opt() -> Option<i32> { None }\nfn main() { opt().unwrap(); }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        let edge = &result.graph.edges[0];
+        assert_eq!(edge.resolution, EffectResolution::Unwrapped);
+        let ev = edge.unwrap_evidence.as_ref().expect("unwrap evidence");
+        assert_eq!(ev.kind, UnwrapKind::Force);
+        assert_eq!(ev.totality, Totality::Partial);
+    }
+
+    #[test]
+    fn expect_method_call_is_force_partial() {
+        let source = "fn opt() -> Option<i32> { None }\nfn main() { opt().expect(\"boom\"); }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        let edge = &result.graph.edges[0];
+        assert_eq!(edge.resolution, EffectResolution::Unwrapped);
+        let ev = edge.unwrap_evidence.as_ref().expect("unwrap evidence");
+        assert_eq!(ev.kind, UnwrapKind::Force);
+        assert_eq!(ev.totality, Totality::Partial);
+    }
+
+    #[test]
+    fn try_operator_is_ordinary_total() {
+        // `?` is the canonical well-handled unwrap → ordinary, total.
+        let source = "fn inner() -> Result<i32, String> { Ok(1) }\nfn caller() -> Result<i32, String> { inner()? }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        assert_eq!(result.graph.edges.len(), 1);
+        let edge = &result.graph.edges[0];
+        assert_eq!(edge.resolution, EffectResolution::Unwrapped);
+        let ev = edge.unwrap_evidence.as_ref().expect("unwrap evidence");
+        assert_eq!(ev.kind, UnwrapKind::Ordinary);
+        assert_eq!(ev.totality, Totality::Total);
+    }
+
+    #[test]
+    fn try_operator_on_unresolved_method_is_safe() {
+        // `?` on a method whose callee does not resolve to a known function
+        // cannot attach unwrap evidence (there is no edge to attach to).
+        // This verifies the path is safe and produces no spurious unwrapped
+        // edge on the unrelated receiver.
+        let source = "fn maker() -> Thing { Thing }\nfn caller() -> Result<i32, E> { maker().do_thing()? }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        // `maker` edge exists, tagged as an ordinary propagated call (the `?`
+        // applies to `.do_thing()`, which has no node).
+        let unwrapped: Vec<_> = result
+            .graph
+            .edges
+            .iter()
+            .filter(|e| e.resolution == EffectResolution::Unwrapped)
+            .collect();
+        assert!(unwrapped.is_empty(), "no edge should be marked unwrapped here");
+    }
+
+    #[test]
+    fn use_path_preserves_original_path() {
+        let source = "pub use foo::bar::baz;";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
+        assert_eq!(result.facades.len(), 1);
+        let entry = &result.facades[0].entries[0];
+        assert_eq!(entry.name, "baz");
+        assert_eq!(entry.original_path, "foo::bar::baz");
+    }
+
+    #[test]
+    fn use_path_rename_preserves_original_path() {
+        let source = "pub use foo::bar::baz as qux;";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
+        let entry = &result.facades[0].entries[0];
+        assert_eq!(entry.name, "qux");
+        assert_eq!(entry.original_path, "foo::bar::baz");
+    }
+
+    #[test]
+    fn use_glob_preserves_prefix_path() {
+        let source = "pub use foo::bar::*;";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("lib.rs"), source);
+        let entry = &result.facades[0].entries[0];
+        assert!(entry.is_wildcard);
+        assert_eq!(entry.original_path, "foo::bar");
+    }
+
+    #[test]
+    fn same_line_calls_produce_distinct_edges() {
+        let source = "fn helper() -> i32 { 42 }\nfn main() { helper(); helper(); }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        assert_eq!(result.graph.nodes.len(), 2);
+        assert_eq!(
+            result.graph.edges.len(),
+            2,
+            "two same-line calls must produce two distinct edges"
+        );
+    }
+
+    #[test]
+    fn same_named_functions_in_different_modules_dont_collide() {
+        let source = "mod a { pub fn f() -> i32 { 1 } }\nmod b { pub fn f() -> i32 { 2 } }\nmod a { fn caller() -> i32 { f() } }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        // Two `f` declarations → two distinct nodes (distinct stable IDs).
+        let f_nodes: Vec<_> = result.graph.nodes.iter().filter(|n| n.name.as_deref() == Some("f")).collect();
+        assert_eq!(f_nodes.len(), 2);
+        assert_ne!(f_nodes[0].id, f_nodes[1].id);
+    }
+
+    #[test]
+    fn never_return_type_is_bottom_shape() {
+        let source = "fn boom() -> ! { panic!() }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        assert_eq!(result.graph.nodes.len(), 1);
+        assert_eq!(result.graph.nodes[0].codomain, Shape::Bottom);
+    }
+
+    #[test]
+    fn stable_id_is_hex_and_content_sensitive() {
+        // Same name + location, different body content → different IDs.
+        let a = "fn f() -> i32 { 1 }";
+        let b = "fn f() -> i32 { 2 }";
+        let ga = extract_graph(&syn::parse_file(a).unwrap(), Path::new("t.rs"), a);
+        let gb = extract_graph(&syn::parse_file(b).unwrap(), Path::new("t.rs"), b);
+        let id_a = &ga.graph.nodes[0].id;
+        let id_b = &gb.graph.nodes[0].id;
+        assert_ne!(id_a, id_b, "IDs must be content-sensitive");
+        // IDs are 32-char hex (128 bits).
+        assert_eq!(id_a.as_str().len(), 32);
+        assert!(id_a.as_str().chars().all(|c| c.is_ascii_hexdigit()));
+        // Same input re-extracted → same ID (repeatable).
+        let ga2 = extract_graph(&syn::parse_file(a).unwrap(), Path::new("t.rs"), a);
+        assert_eq!(&ga2.graph.nodes[0].id, id_a);
     }
 }

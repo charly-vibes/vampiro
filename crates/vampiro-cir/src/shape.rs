@@ -31,6 +31,10 @@ pub enum Shape {
     /// Sentinel for shapes that cannot be extracted (e.g., fully dynamic,
     /// untyped, no annotations available).
     Opaque,
+    /// The bottom/never type (e.g., Rust's `!`). A diverging computation
+    /// that does not produce a value. Distinct from `Scalar` so callers can
+    /// flag unreachable continuations.
+    Bottom,
 }
 
 impl Shape {
@@ -40,7 +44,7 @@ impl Shape {
     /// Compound variants have depth = 1 + max(depth of children).
     pub fn depth(&self) -> u32 {
         match self {
-            Shape::Scalar | Shape::Opaque => 0,
+            Shape::Scalar | Shape::Opaque | Shape::Bottom => 0,
             Shape::Record(fields) | Shape::Union(fields) => {
                 1 + fields.iter().map(Shape::depth).max().unwrap_or(0)
             }
@@ -76,6 +80,19 @@ mod tests {
             serde_json::to_value(Shape::Opaque).unwrap(),
             serde_json::json!("opaque")
         );
+    }
+
+    #[test]
+    fn shape_bottom() {
+        assert_eq!(
+            serde_json::to_value(Shape::Bottom).unwrap(),
+            serde_json::json!("bottom")
+        );
+    }
+
+    #[test]
+    fn shape_depth_bottom() {
+        assert_eq!(Shape::Bottom.depth(), 0);
     }
 
     #[test]
