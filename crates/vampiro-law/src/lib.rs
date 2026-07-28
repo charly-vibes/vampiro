@@ -3,9 +3,13 @@
 //! This crate defines the versioned, backend-neutral types that flow through
 //! the law-verification pipeline: from declared theories → obligation IR →
 //! runner inputs → evidence (property + proof).
-//!
-//! All types are `Serialize`/`Deserialize` for cross-version contract testing.
-//! The schema version is `0.1.0` for the initial contract milestone.
+
+pub mod aggregation;
+pub mod prover;
+pub mod runner;
+
+// All types are `Serialize`/`Deserialize` for cross-version contract testing.
+// The schema version is `0.1.0` for the initial contract milestone.
 
 use serde::{Deserialize, Serialize};
 
