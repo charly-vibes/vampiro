@@ -1,13 +1,13 @@
 > Implementation is blocked until the roadmap approval gate records approval of the EARS source and this proposal.
 
 ## 0. Snapshot and Lifecycle Idiom Decision Gate (HITL)
-- [ ] 0.1 Compare snapshot storage/schema/version/retention/baseline/migration alternatives and initial write/resource idiom sets against history, migration, unknown, and portability examples; record the choice in `docs/decisions/lifecycle-storage.md`.
-- [ ] 0.2 Record migration-reader policy, supported idioms, exclusions, approver, and immutable review reference before persistence or classifier implementation.
+- [x] 0.1 Compare snapshot storage/schema/version/retention/baseline/migration alternatives and initial write/resource idiom sets against history, migration, unknown, and portability examples; record the choice in `docs/decisions/lifecycle-storage.md`.
+- [x] 0.2 Record migration-reader policy, supported idioms, exclusions, approver, and immutable review reference before persistence or classifier implementation.
 
 ## 1. Facade History Tracer
-- [ ] 1.1 Add failing nearest-first-parent, explicit override, first snapshot, missing/non-ancestor baseline, deterministic multiple-snapshot, breaking shape, migration, and ambiguous-identity tests (REQ-T1, REQ-T4, REQ-T8).
-- [ ] 1.2 Implement versioned snapshot persistence, deterministic identity matching, aliases, and migration authorization under the approved storage contract.
-- [ ] 1.3 Run focused historical and core-result compatibility tests; publish snapshot schema/version, migration fixture path, and passing evidence.
+- [x] 1.1 Add failing nearest-first-parent, explicit override, first snapshot, missing/non-ancestor baseline, deterministic multiple-snapshot, breaking shape, migration, and ambiguous-identity tests (REQ-T1, REQ-T4, REQ-T8).
+- [x] 1.2 Implement versioned snapshot persistence, deterministic identity matching, aliases, and migration authorization under the approved storage contract.
+- [x] 1.3 Run focused historical and core-result compatibility tests; publish snapshot schema/version, migration fixture path, and passing evidence.
 
 ## 2. Retry Idempotency Tracer
 - [ ] 2.1 Add failing versioned write-table conformance, unknown, unsafe-retry, idempotency-equation, and robustness/optionality cross-reference tests (REQ-T2, REQ-T5–T6, REQ-T9).
