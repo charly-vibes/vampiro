@@ -25,6 +25,7 @@ pub mod effects;
 pub mod finding;
 pub mod modularity;
 pub mod redundancy;
+pub mod refinement_confirmation;
 pub mod validation_duplication;
 
 pub use boundary_leak::BoundaryLeakAnalyzer;
@@ -33,6 +34,10 @@ pub use effects::EffectHandlingAnalyzer;
 pub use finding::{Axis, Diagnostic, Evidence, Finding, Severity};
 pub use modularity::ModularityAnalyzer;
 pub use redundancy::RedundancyAnalyzer;
+pub use refinement_confirmation::{
+    correlate_evidence, EvidencePayload, RefinementConfirmation, RefinementReason,
+    RefinementStatus, EVIDENCE_SCHEMA_VERSION,
+};
 
 // Re-export the visibility types from vampiro-cir for convenience.
 pub use vampiro_cir::{

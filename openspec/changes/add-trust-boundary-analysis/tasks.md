@@ -20,9 +20,9 @@
 - [x] 3.3 Run focused Rust E2E and finding-schema tests; verify syntactic similarity without equivalence evidence emits no finding.
 
 ## 4. Refinement-Confirmation Tracer
-- [ ] 4.1 Add failing configuration, import, normalized-result, and consumer fixtures for non-empty unique classes with current complete passing evidence and absent, malformed, unsupported-version, stale-revision, constructor-identity/hash-mismatched, empty/duplicate/incomplete/unknown classes, or failing evidence (REQ-B5).
-- [ ] 4.2 Implement the approved boundary-class/evidence-source configuration, versioned importer, and deterministic correlation against analyzed revision, constructor identity/hash, and the complete declared class set; emit `refinement_confirmation.status=confirmed` only for the positive case and `status=unknown` with the closed primary reason otherwise, permitting downstream `unreachable` only from `confirmed`.
-- [ ] 4.3 Run focused import, canonical-byte, malformed-input, and reachability tests; publish the evidence schema/version and fixture path without coupling Vampiro to one companion implementation.
+- [x] 4.1 Add failing configuration, import, normalized-result, and consumer fixtures for non-empty unique classes with current complete passing evidence and absent, malformed, unsupported-version, stale-revision, constructor-identity/hash-mismatched, empty/duplicate/incomplete/unknown classes, or failing evidence (REQ-B5).
+- [x] 4.2 Implement the approved boundary-class/evidence-source configuration, versioned importer, and deterministic correlation against analyzed revision, constructor identity/hash, and the complete declared class set; emit `refinement_confirmation.status=confirmed` only for the positive case and `status=unknown` with the closed primary reason otherwise, permitting downstream `unreachable` only from `confirmed`.
+- [x] 4.3 Run focused import, canonical-byte, malformed-input, and reachability tests; publish the evidence schema/version and fixture path without coupling Vampiro to one companion implementation.
 
 ## 5. Trust-Boundary Acceptance
 - [ ] 5.1 Run all four tracer suites, Rust E2E positives/negatives, normalized finding/diagnostic compatibility, workspace tests, formatting, and Clippy with warnings denied.
