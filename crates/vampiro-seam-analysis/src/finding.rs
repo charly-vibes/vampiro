@@ -52,10 +52,11 @@ impl std::fmt::Display for Axis {
 /// The closed severity vocabulary (REQ-4, v1.3.0).
 ///
 /// JSON form is lowercase (`low`/`medium`/`high`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
     Low,
+    #[default]
     Medium,
     High,
 }
@@ -66,6 +67,20 @@ impl std::fmt::Display for Severity {
             Severity::Low => f.write_str("low"),
             Severity::Medium => f.write_str("medium"),
             Severity::High => f.write_str("high"),
+        }
+    }
+}
+
+impl std::str::FromStr for Severity {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "low" => Ok(Severity::Low),
+            "medium" => Ok(Severity::Medium),
+            "high" => Ok(Severity::High),
+            _ => Err(format!(
+                "unknown severity: {s}, expected low, medium, or high"
+            )),
         }
     }
 }

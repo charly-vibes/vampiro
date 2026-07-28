@@ -15,9 +15,9 @@
 - [x] 2.3 Run parity, dedupe, canonical-byte, and core-result compatibility tests; publish the result schema/version and fixture path.
 
 ## 3. Policy and CI Tracer
-- [ ] 3.1 Add failing guidance/tiered/gate, below/equal threshold, valid/invalid filtration mapping, and approved-provider CI golden tests including explicit PR head/base and failed-fetch behavior (REQ-13–14, REQ-20, REQ-C2).
-- [ ] 3.2 Implement deterministic policy exits and CI generation from the approved decision, gating on configured severity only after validated mapping.
-- [ ] 3.3 Run focused policy/CLI tests and each approved provider golden; record generated workflow paths and passing evidence.
+- [x] 3.1 Add failing guidance/tiered/gate, below/equal threshold, valid/invalid filtration mapping, and approved-provider CI golden tests including explicit PR head/base and failed-fetch behavior (REQ-13–14, REQ-20, REQ-C2).
+- [x] 3.2 Implement deterministic policy exits and CI generation from the approved decision, gating on configured severity only after validated mapping.
+- [x] 3.3 Run focused policy/CLI tests and each approved provider golden; record generated workflow paths and passing evidence.
 
 ## 4. Performance and Workflow Acceptance
 - [ ] 4.1 Document hardware, OS, repository state/size, cache state, plugin/tool/config/platform versions, fixture, warm-up, repetitions, and statistic; add reproducible 1/50-edge benchmarks (REQ-27).

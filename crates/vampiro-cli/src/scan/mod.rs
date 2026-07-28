@@ -152,9 +152,8 @@ impl GitContext {
             .repo
             .head()
             .map_err(|e| ScopeError::RevisionError(format!("no HEAD: {e}")))?;
-        head.target().ok_or_else(|| {
-            ScopeError::RevisionError("HEAD is not a direct reference".to_string())
-        })
+        head.target()
+            .ok_or_else(|| ScopeError::RevisionError("HEAD is not a direct reference".to_string()))
     }
 
     /// Get the OID of the first parent of a commit.
