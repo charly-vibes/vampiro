@@ -1,0 +1,51 @@
+{
+  "version": "0.1.0",
+  "source_file": "src/lib.rs",
+  "nodes": [
+    {
+      "id": "caller",
+      "domain": "scalar",
+      "codomain": "scalar",
+      "effect": "plain",
+      "span": {
+        "file": "src/lib.rs",
+        "start_line": 1,
+        "start_column": 1,
+        "end_line": 3,
+        "end_column": 1
+      },
+      "name": "caller_fn"
+    },
+    {
+      "id": "callee",
+      "domain": "scalar",
+      "codomain": "scalar",
+      "effect": "plain",
+      "span": {
+        "file": "src/lib.rs",
+        "start_line": 5,
+        "start_column": 1,
+        "end_line": 7,
+        "end_column": 1
+      },
+      "name": "callee_fn"
+    }
+  ],
+  "edges": [
+    {
+      "id": "call-1",
+      "source": "caller",
+      "target": "callee",
+      "resolution": "propagated",
+      "provenance": "direct",
+      "span": {
+        "file": "src/lib.rs",
+        "start_line": 2,
+        "start_column": 5,
+        "end_line": 2,
+        "end_column": 15
+      },
+      "discard_spans": []
+    }
+  ]
+}

@@ -1,0 +1,281 @@
+{
+  "version": "0.1.0",
+  "source_file": "deep.rs",
+  "nodes": [
+    {
+      "id": "deep-node",
+      "domain": {
+        "record": [
+          {
+            "record": [
+              {
+                "record": [
+                  {
+                    "record": [
+                      {
+                        "record": [
+                          {
+                            "record": [
+                              {
+                                "record": [
+                                  {
+                                    "record": [
+                                      {
+                                        "record": [
+                                          {
+                                            "record": [
+                                              {
+                                                "record": [
+                                                  {
+                                                    "record": [
+                                                      {
+                                                        "record": [
+                                                          {
+                                                            "record": [
+                                                              {
+                                                                "record": [
+                                                                  {
+                                                                    "record": [
+                                                                      {
+                                                                        "record": [
+                                                                          {
+                                                                            "record": [
+                                                                              {
+                                                                                "record": [
+                                                                                  {
+                                                                                    "record": [
+                                                                                      {
+                                                                                        "record": [
+                                                                                          {
+                                                                                            "record": [
+                                                                                              {
+                                                                                                "record": [
+                                                                                                  {
+                                                                                                    "record": [
+                                                                                                      {
+                                                                                                        "record": [
+                                                                                                          {
+                                                                                                            "record": [
+                                                                                                              {
+                                                                                                                "record": [
+                                                                                                                  {
+                                                                                                                    "record": [
+                                                                                                                      {
+                                                                                                                        "record": [
+                                                                                                                          {
+                                                                                                                            "record": [
+                                                                                                                              {
+                                                                                                                                "record": [
+                                                                                                                                  {
+                                                                                                                                    "record": [
+                                                                                                                                      {
+                                                                                                                                        "record": [
+                                                                                                                                          {
+                                                                                                                                            "record": [
+                                                                                                                                              {
+                                                                                                                                                "record": [
+                                                                                                                                                  {
+                                                                                                                                                    "record": [
+                                                                                                                                                      {
+                                                                                                                                                        "record": [
+                                                                                                                                                          {
+                                                                                                                                                            "record": [
+                                                                                                                                                              {
+                                                                                                                                                                "record": [
+                                                                                                                                                                  {
+                                                                                                                                                                    "record": [
+                                                                                                                                                                      {
+                                                                                                                                                                        "record": [
+                                                                                                                                                                          {
+                                                                                                                                                                            "record": [
+                                                                                                                                                                              {
+                                                                                                                                                                                "record": [
+                                                                                                                                                                                  {
+                                                                                                                                                                                    "record": [
+                                                                                                                                                                                      {
+                                                                                                                                                                                        "record": [
+                                                                                                                                                                                          {
+                                                                                                                                                                                            "record": [
+                                                                                                                                                                                              {
+                                                                                                                                                                                                "record": [
+                                                                                                                                                                                                  {
+                                                                                                                                                                                                    "record": [
+                                                                                                                                                                                                      {
+                                                                                                                                                                                                        "record": [
+                                                                                                                                                                                                          {
+                                                                                                                                                                                                            "record": [
+                                                                                                                                                                                                              {
+                                                                                                                                                                                                                "record": [
+                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                    "record": [
+                                                                                                                                                                                                                      {
+                                                                                                                                                                                                                        "record": [
+                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                            "record": [
+                                                                                                                                                                                                                              {
+                                                                                                                                                                                                                                "record": [
+                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                    "record": [
+                                                                                                                                                                                                                                      {
+                                                                                                                                                                                                                                        "record": [
+                                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                                            "record": [
+                                                                                                                                                                                                                                              {
+                                                                                                                                                                                                                                                "record": [
+                                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                                    "record": [
+                                                                                                                                                                                                                                                      {
+                                                                                                                                                                                                                                                        "record": [
+                                                                                                                                                                                                                                                          {
+                                                                                                                                                                                                                                                            "record": [
+                                                                                                                                                                                                                                                              {
+                                                                                                                                                                                                                                                                "record": [
+                                                                                                                                                                                                                                                                  {
+                                                                                                                                                                                                                                                                    "record": [
+                                                                                                                                                                                                                                                                      {
+                                                                                                                                                                                                                                                                        "record": [
+                                                                                                                                                                                                                                                                          "scalar"
+                                                                                                                                                                                                                                                                        ]
+                                                                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                                                                    ]
+                                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                                ]
+                                                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                                                            ]
+                                                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                                                        ]
+                                                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                                                    ]
+                                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                                ]
+                                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                                            ]
+                                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                                        ]
+                                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                                    ]
+                                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                                ]
+                                                                                                                                                                                                                              }
+                                                                                                                                                                                                                            ]
+                                                                                                                                                                                                                          }
+                                                                                                                                                                                                                        ]
+                                                                                                                                                                                                                      }
+                                                                                                                                                                                                                    ]
+                                                                                                                                                                                                                  }
+                                                                                                                                                                                                                ]
+                                                                                                                                                                                                              }
+                                                                                                                                                                                                            ]
+                                                                                                                                                                                                          }
+                                                                                                                                                                                                        ]
+                                                                                                                                                                                                      }
+                                                                                                                                                                                                    ]
+                                                                                                                                                                                                  }
+                                                                                                                                                                                                ]
+                                                                                                                                                                                              }
+                                                                                                                                                                                            ]
+                                                                                                                                                                                          }
+                                                                                                                                                                                        ]
+                                                                                                                                                                                      }
+                                                                                                                                                                                    ]
+                                                                                                                                                                                  }
+                                                                                                                                                                                ]
+                                                                                                                                                                              }
+                                                                                                                                                                            ]
+                                                                                                                                                                          }
+                                                                                                                                                                        ]
+                                                                                                                                                                      }
+                                                                                                                                                                    ]
+                                                                                                                                                                  }
+                                                                                                                                                                ]
+                                                                                                                                                              }
+                                                                                                                                                            ]
+                                                                                                                                                          }
+                                                                                                                                                        ]
+                                                                                                                                                      }
+                                                                                                                                                    ]
+                                                                                                                                                  }
+                                                                                                                                                ]
+                                                                                                                                              }
+                                                                                                                                            ]
+                                                                                                                                          }
+                                                                                                                                        ]
+                                                                                                                                      }
+                                                                                                                                    ]
+                                                                                                                                  }
+                                                                                                                                ]
+                                                                                                                              }
+                                                                                                                            ]
+                                                                                                                          }
+                                                                                                                        ]
+                                                                                                                      }
+                                                                                                                    ]
+                                                                                                                  }
+                                                                                                                ]
+                                                                                                              }
+                                                                                                            ]
+                                                                                                          }
+                                                                                                        ]
+                                                                                                      }
+                                                                                                    ]
+                                                                                                  }
+                                                                                                ]
+                                                                                              }
+                                                                                            ]
+                                                                                          }
+                                                                                        ]
+                                                                                      }
+                                                                                    ]
+                                                                                  }
+                                                                                ]
+                                                                              }
+                                                                            ]
+                                                                          }
+                                                                        ]
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                ]
+                                                              }
+                                                            ]
+                                                          }
+                                                        ]
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "codomain": "scalar",
+      "effect": "plain",
+      "span": {
+        "file": "deep.rs",
+        "start_line": 1,
+        "start_column": 1,
+        "end_line": 1,
+        "end_column": 1
+      },
+      "name": "deep_fn"
+    }
+  ],
+  "edges": []
+}
