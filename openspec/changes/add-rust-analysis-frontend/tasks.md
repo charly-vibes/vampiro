@@ -1,8 +1,10 @@
 > Implementation is blocked until the roadmap approval gate records approval of the EARS source and this proposal.
 
 ## 0. Rust Parser and Idiom Decision Gate (HITL)
-- [ ] 0.1 Evaluate tree-sitter-rust, `syn`, and rust-analyzer-assisted options against representative macros, modules, provenance, unsupported syntax, and the 50-seam performance profile; record the choice in `docs/decisions/rust-frontend.md`.
-- [ ] 0.2 Record supported Rust edition/version range, macro-expansion boundary, initial effect/write/acquire/release idioms, exclusions, approver, and immutable review reference.
+- [x] 0.1 Evaluate tree-sitter-rust, `syn`, and rust-analyzer-assisted options against representative macros, modules, provenance, unsupported syntax, and the 50-seam performance profile; record the choice in `docs/decisions/rust-frontend.md`.
+- [x] 0.2 Record supported Rust edition/version range, macro-expansion boundary, initial effect/write/acquire/release idioms, exclusions, approver, and immutable review reference.
+
+> **Decision (2026-07-28):** `syn` — typed AST, lightweight, no CST→CIR mapping layer. Rust 2021+ minimum. No macro expansion. See `docs/decisions/rust-frontend.md`.
 
 ## 1. Base Rust CIR Tracer
 - [ ] 1.1 Add failing Rust fixtures for callable nodes, structural/opaque shapes, recursive effects, unknowns, exact source spans, and direct/within-bound/over-bound argument provenance.
