@@ -1,31 +1,37 @@
 use clap::Parser;
-use genesis::suggestions::{CommandRegistry, SuggestionEngine};
+use genesis::guide::Guide;
 use vampiro_cli::exit_code::ExitCode;
-use vampiro_cli::{load_config, Cli};
+use vampiro_cli::Cli;
+
+const VAMPIRO_COMMANDS: &[&str] = &["check", "prove", "help"];
 
 fn main() -> ExitCode {
-    // Load config first — errors here are fatal
-    match load_config(None) {
-        Ok(_config) => {}
-        Err(e) => {
-            eprintln!("vampiro: error loading config: {e}");
+    // CLI scaffold from genesis::guide. The Guide bundles vampiro's name/version,
+    // a CommandRegistry (for typo detection), and an ErrorSink (self-healing
+    // error footer + feedback scratch).
+    let guide = Guide::builder("vampiro", env!("CARGO_PKG_VERSION"))
+        .commands(VAMPIRO_COMMANDS)
+        .build();
+
+    // ConfigStore with vampiro's registered config type.
+    let store = vampiro_cli::config::vampiro_config_store();
+
+    // Load config — missing config is fine (use defaults), but parse errors aren't.
+    let repo_root = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    if let Err(e) = store.get::<vampiro_cli::config::Config>("vampiro", &repo_root) {
+        if !matches!(e, genesis::config::ConfigError::MissingFile { .. }) {
+            let sink = guide.error_sink();
+            sink.handle(&e, &mut std::io::stderr());
             return ExitCode::InvalidConfig;
         }
     }
-
-    // Set up the Genesis suggestion engine with Vampiro's command list
-    let mut registry = CommandRegistry::new();
-    registry.register(
-        "vampiro",
-        vec!["check".into(), "prove".into(), "help".into()],
-    );
-    let _engine: SuggestionEngine = SuggestionEngine::new();
 
     let cli = Cli::parse();
     match cli.run() {
         Ok(()) => ExitCode::Success,
         Err(e) => {
-            eprintln!("vampiro: error: {e}");
+            let sink = guide.error_sink();
+            sink.handle(&*e, &mut std::io::stderr());
             ExitCode::InternalError
         }
     }

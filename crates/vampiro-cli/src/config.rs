@@ -1,155 +1,169 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use genesis::config::{ConfigError, ConfigFile, ConfigRegistry, ConfigStore, ConfigValidation};
+use serde::{Deserialize, Serialize};
 
 /// Vampiro configuration loaded from TOML files.
 ///
 /// Fields are optional — any unset field falls back to the built-in default.
-/// Config is loaded from the first file found, in order of precedence:
-/// 1. `./.vampiro/config.toml` (project-local)
-/// 2. `~/.config/vampiro/config.toml` (XDG)
-#[derive(Debug, Clone, Default, serde::Deserialize)]
+/// Config is loaded from `.vampiro/config.toml` relative to the repo root.
+///
+/// Implements `genesis::config::ConfigFile` for shared suite-wide config
+/// discovery and validation via `ConfigStore`.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     /// Number of threads to use for scanning (default: auto-detect)
     pub scan_threads: Option<u32>,
 }
 
-/// Errors that can occur during config loading.
-#[derive(Debug)]
-pub enum ConfigError {
-    /// TOML parse error
-    InvalidFormat(String),
-    /// I/O error reading the file
-    IoError(std::io::Error),
-}
+// ── genesis::config::ConfigFile adoption ──────────────────────────────
+//
+// vampiro adopts `genesis::config` for shared config I/O: `read`/`parse`
+// come from the trait's blanket impl (delegated to genesis), and `validate`
+// is a no-op for the current single-field config. Registering with a
+// `ConfigRegistry` enables suite-wide discovery and `ConfigStore` validation.
 
-impl std::fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConfigError::InvalidFormat(msg) => write!(f, "invalid config format: {msg}"),
-            ConfigError::IoError(err) => write!(f, "config I/O error: {err}"),
-        }
+impl ConfigFile for Config {
+    fn path(repo_root: &Path) -> PathBuf {
+        repo_root.join(".vampiro").join("config.toml")
+    }
+
+    fn validate(&self) -> Result<Vec<ConfigValidation>, ConfigError> {
+        // No domain-specific validation yet — scan_threads accepts any u32
+        Ok(Vec::new())
     }
 }
 
-impl std::error::Error for ConfigError {}
-
-/// Load configuration from the project-local or XDG config directory.
+/// Build a [`ConfigStore`] registering vampiro's config struct.
 ///
-/// `project_root` is typically the current working directory. If `None`,
-/// uses `std::env::current_dir()`.
-///
-/// Returns `Ok(Config::default())` if no config file is found — missing
-/// config is not an error.
-pub fn load_config(project_root: Option<&Path>) -> Result<Config, ConfigError> {
-    load_config_impl(project_root, None)
-}
-
-/// Like `load_config` but allows overriding the XDG config home for testing.
-///
-/// Pass `Some(path)` to override `XDG_CONFIG_HOME` with a specific directory,
-/// or `None` to use the environment variable or default `~/.config`.
-pub fn load_config_with_xdg(
-    project_root: Option<&Path>,
-    xdg_config_home: Option<&Path>,
-) -> Result<Config, ConfigError> {
-    load_config_impl(project_root, xdg_config_home)
-}
-
-fn load_config_impl(
-    project_root: Option<&Path>,
-    xdg_override: Option<&Path>,
-) -> Result<Config, ConfigError> {
-    let root = project_root.map_or_else(
-        || std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf()),
-        |p| p.to_path_buf(),
-    );
-
-    // 1. Try project-local config
-    let project_config = root.join(".vampiro").join("config.toml");
-    if project_config.exists() {
-        return load_from_file(&project_config);
-    }
-
-    // 2. Try XDG config
-    let xdg_base = xdg_override
-        .map(|p| p.to_path_buf())
-        .or_else(xdg_config_path_from_env);
-    if let Some(xdg_base) = xdg_base {
-        let xdg_path = xdg_base.join("vampiro").join("config.toml");
-        if xdg_path.exists() {
-            return load_from_file(&xdg_path);
-        }
-    }
-
-    // 3. No config found — use defaults
-    Ok(Config::default())
-}
-
-/// Read and parse a TOML config file from the given path.
-fn load_from_file(path: &Path) -> Result<Config, ConfigError> {
-    let content = std::fs::read_to_string(path).map_err(ConfigError::IoError)?;
-    toml::from_str(&content).map_err(|e| ConfigError::InvalidFormat(e.to_string()))
-}
-
-/// Resolve the XDG config home directory from environment.
-///
-/// Uses `$XDG_CONFIG_HOME` if set and non-empty, otherwise `~/.config`.
-/// Returns `None` if `HOME` is unset and `XDG_CONFIG_HOME` is not provided.
-fn xdg_config_path_from_env() -> Option<std::path::PathBuf> {
-    if let Ok(val) = std::env::var("XDG_CONFIG_HOME") {
-        if val.is_empty() {
-            let home = std::env::var("HOME").ok()?;
-            Some(std::path::PathBuf::from(home).join(".config"))
-        } else {
-            Some(std::path::PathBuf::from(val))
-        }
-    } else {
-        let home = std::env::var("HOME").ok()?;
-        Some(std::path::PathBuf::from(home).join(".config"))
-    }
+/// Registers `Config` under the `vampiro` tool name with the
+/// `.vampiro/config.toml` marker so suite tools (doctor, managed block
+/// generation) can discover and validate it alongside other suite configs.
+pub fn vampiro_config_store() -> ConfigStore {
+    let mut registry = ConfigRegistry::new();
+    registry.register::<Config>("vampiro", ".vampiro/config.toml");
+    ConfigStore::new(registry)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use genesis::config::ConfigFile;
 
     #[test]
-    fn config_not_found_returns_defaults() {
+    fn config_path_is_dot_vampiro_config_toml_relative_to_root() {
         let dir = tempfile::tempdir().unwrap();
-        let config = load_config(Some(dir.path())).unwrap();
-        assert_eq!(config.scan_threads, None);
+        let path = Config::path(dir.path());
+        assert_eq!(path, dir.path().join(".vampiro").join("config.toml"));
     }
 
     #[test]
-    fn config_none_root_uses_cwd() {
-        // Calling load_config(None) should not panic and should return defaults
-        let config = load_config(None).unwrap();
-        assert_eq!(config.scan_threads, None);
+    fn config_not_found_returns_missing_file_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = Config::read(dir.path());
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            genesis::config::ConfigError::MissingFile { .. } => {} // expected
+            e => panic!("expected MissingFile, got: {:?}", e),
+        }
     }
 
     #[test]
-    fn config_loads_project_local() {
+    fn config_read_write_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let config_dir = dir.path().join(".vampiro");
         std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::write(config_dir.join("config.toml"), "scan-threads = 4\n").unwrap();
 
-        let config = load_config(Some(dir.path())).unwrap();
+        let config = Config::read(dir.path()).unwrap();
         assert_eq!(config.scan_threads, Some(4));
     }
 
     #[test]
-    fn config_invalid_format_returns_error() {
+    fn config_write_then_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config {
+            scan_threads: Some(8),
+        };
+        config.write(dir.path()).unwrap();
+
+        let read = Config::read(dir.path()).unwrap();
+        assert_eq!(read.scan_threads, Some(8));
+    }
+
+    #[test]
+    fn config_invalid_format_returns_parse_error() {
         let dir = tempfile::tempdir().unwrap();
         let config_dir = dir.path().join(".vampiro");
         std::fs::create_dir_all(&config_dir).unwrap();
         std::fs::write(config_dir.join("config.toml"), "invalid [[[\n").unwrap();
 
-        let result = load_config(Some(dir.path()));
+        let result = Config::read(dir.path());
         assert!(result.is_err());
         match result.unwrap_err() {
-            ConfigError::InvalidFormat(_) => {} // expected
-            other => panic!("expected InvalidFormat, got {other:?}"),
+            genesis::config::ConfigError::ParseError { .. } => {} // expected
+            e => panic!("expected ParseError, got: {:?}", e),
         }
+    }
+
+    #[test]
+    fn config_default_has_no_scan_threads() {
+        let config = Config::default();
+        assert_eq!(config.scan_threads, None);
+    }
+
+    #[test]
+    fn config_validate_default_returns_empty() {
+        let config = Config::default();
+        let results = config.validate().unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn vampiro_config_store_registers_vampiro() {
+        let store = vampiro_config_store();
+        assert!(store.registry().is_registered("vampiro"));
+        assert_eq!(
+            store.registry().marker("vampiro"),
+            Some(".vampiro/config.toml")
+        );
+    }
+
+    #[test]
+    fn vampiro_config_store_discovers_missing_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = vampiro_config_store();
+        let discovered = ConfigStore::discover(dir.path(), store.registry());
+        assert!(discovered
+            .iter()
+            .any(|d| d.tool_name == "vampiro" && !d.found));
+    }
+
+    #[test]
+    fn vampiro_config_store_discovers_present_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_dir = dir.path().join(".vampiro");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("config.toml"), "scan-threads = 4\n").unwrap();
+
+        let store = vampiro_config_store();
+        let discovered = ConfigStore::discover(dir.path(), store.registry());
+        assert!(discovered
+            .iter()
+            .any(|d| d.tool_name == "vampiro" && d.found));
+    }
+
+    #[test]
+    fn config_works_with_store_get() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_dir = dir.path().join(".vampiro");
+        std::fs::create_dir_all(&config_dir).unwrap();
+        std::fs::write(config_dir.join("config.toml"), "scan-threads = 4\n").unwrap();
+
+        let store = vampiro_config_store();
+        let config: Config = store.get("vampiro", dir.path()).unwrap();
+        assert_eq!(config.scan_threads, Some(4));
     }
 }

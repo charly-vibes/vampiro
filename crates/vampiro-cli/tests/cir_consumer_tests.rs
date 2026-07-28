@@ -11,8 +11,8 @@ use vampiro_cir::{
     CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, Provenance,
     Shape, SourceSpan,
 };
+use vampiro_cli::config::Config;
 use vampiro_cli::finding::{Axis, Finding, Severity};
-use vampiro_cli::load_config;
 
 /// A simple test frontend for consumer compatibility.
 struct ConsumerTestFrontend;
@@ -220,8 +220,8 @@ fn consumer_uses_cli_finding_contract() {
 
 #[test]
 fn consumer_uses_cli_config_contract() {
-    // A consumer should be able to load configuration.
-    let config = load_config(None).unwrap();
+    // A consumer should be able to construct a default configuration.
+    let config = Config::default();
     // Default config has no scan_threads configured
     assert_eq!(config.scan_threads, None);
 }

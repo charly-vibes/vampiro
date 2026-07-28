@@ -1,7 +1,7 @@
-/// Compatibility fixture: verify Genesis tag v0.1.0 exposes the required APIs.
+/// Compatibility fixture: verify Genesis-vibes v0.2.0 exposes the required APIs.
 ///
-/// These tests will fail to compile until the `genesis` dependency is added
-/// to `Cargo.toml` — this is the red phase of the tracer.
+/// These tests verify that the published `genesis-vibes = "0.2"` crate
+/// provides the modules vampiro depends on.
 
 #[test]
 fn genesis_api_envelope_importable() {
@@ -42,9 +42,26 @@ fn genesis_api_aix_importable() {
 }
 
 #[test]
-fn genesis_version_is_v0_1_0() {
-    // Verify the pinned version matches expectations
-    // This is a compile-time check since we pin by tag
+fn genesis_api_config_importable() {
+    // genesis::config::ConfigFile trait must be accessible on a concrete type
+    use genesis::config::ConfigFile;
+    // The trait is not dyn-compatible (requires Sized), but concrete impls compile
+    fn _check<T: ConfigFile>() {}
+    _check::<vampiro_cli::config::Config>();
+}
+
+#[test]
+fn genesis_api_guide_importable() {
+    // genesis::guide::Guide, Output, ErrorSink must be accessible
+    use genesis::guide::Guide;
+    let guide = Guide::builder("test", "0.1").build();
+    let _ = guide.registry();
+    let _ = guide.error_sink();
+}
+
+#[test]
+fn genesis_version_is_v0_2() {
+    // Verify we're on genesis-vibes 0.2.x
     let _ = genesis::envelope::ENVELOPE_VERSION;
     let _ = genesis::envelope::CLI_VERSION;
 }
