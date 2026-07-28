@@ -124,7 +124,7 @@ def main() -> None:
     copy_with_notice(
         ROOT / "vampiro-ears-spec.md",
         SRC / "specification" / "ears.md",
-        "> **Document status:** Draft 1.2.0, not yet approved. The source file `vampiro-ears-spec.md` is authoritative.",
+        "> **Document status:** Approved 1.3.0 (2026-07-28). The source file `vampiro-ears-spec.md` is authoritative.",
     )
 
     # Copy project context

@@ -36,4 +36,5 @@ python scripts/check_planning.py
 ```
 
 Implementation remains blocked until the human approval gate recorded in
-`.beads/issues.jsonl` approves EARS 1.2.0 and every active OpenSpec proposal.
+`.beads/issues.jsonl` approves every active OpenSpec proposal. The EARS
+specification (v1.3.0) was approved on 2026-07-28.

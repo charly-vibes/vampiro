@@ -1,20 +1,21 @@
-> **Document status:** Draft 1.2.0, not yet approved. The source file `vampiro-ears-spec.md` is authoritative.
+> **Document status:** Approved 1.3.0 (2026-07-28). The source file `vampiro-ears-spec.md` is authoritative.
 
 # EARS Specification: Vampiro
 
 | Document control | Value |
 |---|---|
-| Document version | 1.2.0 |
-| Status | Draft |
+| Document version | 1.3.0 |
+| Status | Approved |
 | Owner | Project maintainers |
-| Last updated | 2026-07-27 |
-| Approval | Not yet approved |
+| Last updated | 2026-07-28 |
+| Approval | Approved 2026-07-28 |
 | Authoritative role | Normative, authoritative specification for Vampiro behavior; in a conflict with non-normative examples or notes, the requirements in this document govern. |
 
 ## Revision History
 
 | Version | Date | Status | Change |
 |---|---|---|---|
+| 1.3.0 | 2026-07-28 | Approved | Approval review: added REQ-30 (tiered gate-mode behavior), REQ-4 default-severity table, definition of the argument-provenance bound `H`, definition of `intentional branch`, canonical effect-channel combination grammar, and an explicit ordering of the `refinement_confirmation` reason vocabulary. |
 | 1.2.0 | 2026-07-27 | Draft | Added trust-boundary validation, refined-shape, validation-duplication, and boundary-coverage requirements from the alternate draft. |
 | 1.1.0 | 2026-07-24 | Draft | Remediated confirmed Rule of 5 findings: semantics, taxonomy, operational edge cases, measurability, traceability, and examples. |
 
@@ -124,8 +125,12 @@ type checker per language.
   (error-or-value), `option` (value-or-absence), `throws` (unchecked
   exception), `async`, and `stream`; validated project declarations may add
   effect/functor IDs under REQ-C1. Built-in and declared IDs may combine
-  recursively (e.g. `async<result>`). A wrapper that matches neither is the
-  `unknown` sentinel, never silently `plain`.
+  recursively (e.g. `async<result>`). Combinations SHALL be expressed in canonical
+  nesting form using angle brackets, outermost wrapper first (e.g.
+  `async<result<option<T>>>` for an async function returning `Result<Option<T>, E>`),
+  and SHALL be normalized to this form before any comparison, conformance-fixture
+  check (REQ-6, REQ-29), or `filtration_distance` computation. A wrapper that
+  matches neither is the `unknown` sentinel, never silently `plain`.
 - **Edge**: a directed relationship from callee to caller where an
   argument at the call site derives, directly or through a bounded number
   of intermediate local bindings, from the callee's return value.
@@ -230,7 +235,26 @@ type checker per language.
   active language's idiom table.
 - **REQ-4**: Every finding shall carry a rule ID, file path, line range,
   severity, and exactly one axis category from `{composition, modularity,
-  optionality, robustness}`.
+  optionality, robustness}`. Each rule SHALL carry a documented default
+  severity from `{LOW, MEDIUM, HIGH}`, overridable by project
+  configuration; the default severities are:
+
+  | Rule | Axis | Default severity |
+  |---|---|---|
+  | REQ-7 (composition break) | composition | MEDIUM |
+  | REQ-8, REQ-V4–V7 (reach-through / over-exposure / type-piracy / facade-leak) | modularity | MEDIUM |
+  | REQ-9 (swallowed effect) | robustness | MEDIUM |
+  | REQ-10 (law failure) | optionality | MEDIUM |
+  | REQ-11 (redundancy mismatch) | robustness | MEDIUM |
+  | REQ-T4 (breaking change) | composition | HIGH |
+  | REQ-T5 (unsafe retry) | robustness | HIGH |
+  | REQ-T7 (resource leak) | robustness | HIGH |
+  | REQ-B3 (boundary leak) | robustness | HIGH |
+  | REQ-B4 (validation duplication) | modularity | LOW |
+
+  Coverage and configuration diagnostics (e.g. `boundary:enforced-unreachable`,
+  `identity:unknown`, `trust-provenance:unknown`, `idempotency-coverage-unknown`,
+  `invalid-category`, `invalid-filtration`) carry no severity and no axis.
 - **REQ-5**: The tool shall support both a full-repository scan and a
   diff-scoped scan restricted to seam edges; diff-scoped shall be the
   default for interactive and agent-facing invocation. Without explicit
@@ -328,6 +352,14 @@ type checker per language.
   severity threshold.
 - **REQ-14**: While gate mode is `guidance`, the tool shall report all
   findings and shall not force a non-zero exit on their account.
+- **REQ-30**: While gate mode is `tiered`, the tool shall report all
+  seam-scoped findings and shall escalate their presentation (label,
+  ordering, and any machine-readable severity weight) monotonically with
+  configured severity, so that a strictly more severe finding is never
+  ranked below a strictly less severe one. Exit behavior in `tiered` SHALL
+  follow the `gate` rule (REQ-13) when a blocking threshold is configured,
+  and SHALL follow the `guidance` rule (REQ-14) — zero exit, findings
+  reported — when no blocking threshold is configured.
 - **REQ-15**: While no front-end plugin is available for a file's
   language, the tool shall report that file as `unanalyzed` explicitly in
   its output, rather than omitting it silently.
@@ -437,7 +469,7 @@ index; the summaries below are navigation aids only.
   REQ-12, REQ-16, REQ-17, REQ-26.
 - Multi-language plugin architecture and self-conformance → REQ-1, REQ-6,
   REQ-15, REQ-22, REQ-29.
-- Operational modes and CI integration → REQ-5, REQ-13, REQ-14, REQ-19,
+- Operational modes and CI integration → REQ-5, REQ-13, REQ-14, REQ-30, REQ-19,
   REQ-20, REQ-27, REQ-28.
 
 ## 10. Consolidated Requirement Traceability Matrix
@@ -461,6 +493,7 @@ implementation status.
 | REQ-12 | Prover result reporting | Mock backend status contract tests |
 | REQ-13 | Gate mode | Exit-code threshold tests |
 | REQ-14 | Guidance mode | Report and zero-exit tests |
+| REQ-30 | Tiered mode | Severity-escalation and threshold-exit tests |
 | REQ-15 | Unsupported languages | Unanalyzed-file output test |
 | REQ-16 | Prover availability | Unreachable/misconfigured backend tests |
 | REQ-17 | Optional proof dispatch | CLI/backend integration tests |
@@ -694,6 +727,18 @@ logic itself.
   identity morphisms and composition: `F(f∘g) = F(f)∘F(g)`). Front-end
   plugins are required to be functors into a shared target category
   (C.5).
+- **Intentional branch**: a program construct that explicitly names a
+  coproduct summand and either (a) propagates or transforms it as a
+  distinct, still-threaded effect channel, (b) returns or re-wraps it as
+  a value of the consuming domain shape, or (c) branches control flow on
+  it via a pattern match, conditional, or error-handler binding whose
+  scrutinee is that summand or a value derived only from it. A summand is
+  *unintentional* — and thus not an intentional branch — when the only
+  path it takes panics, aborts, force-unwraps (`unwrap`, `expect`, `try!`,
+  and equivalents), logs-and-continues without re-threading the channel,
+  or is reached by falling through a default arm that does not name it.
+  Totality under REQ-C4 is decided per summand by the presence of an
+  intentional branch for it.
 
 ### C.2 Ubiquitous Requirements
 
@@ -1037,9 +1082,36 @@ distinct from the callee-to-caller argument provenance recorded on CIR edges.
   boundary class applicable to its raw shape.
 - **Refinement confirmation**: normalized evidence on a refined shape with
   `status=confirmed` or `status=unknown`. `unknown` carries exactly one primary
-  reason from `{absent, malformed, unsupported-version, stale, mismatched,
-  empty-classes, duplicate-class, incomplete, unknown-class, failing}` and MAY
-  carry additional detail without changing that closed reason vocabulary.
+  reason. The closed reason vocabulary is evaluated in this fixed order, and
+  the first matching reason is the reported primary reason:
+  (1) `absent` — no boundary-coverage evidence exists for the constructor;
+  (2) `malformed` — evidence exists but is not parseable against the schema;
+  (3) `unsupported-version` — evidence exists but its producer/version is
+  not in the supported set;
+  (4) `stale` — evidence exists but its analyzed revision does not match
+  the analyzed input;
+  (5) `mismatched` — evidence exists but its constructor identity or
+  source/shape hash does not match the analyzed input;
+  (6) `empty-classes` — the constructor declares no boundary classes;
+  (7) `duplicate-class` — the constructor declares two or more classes
+  with the same ID;
+  (8) `incomplete` — evidence exists but does not cover every declared
+  boundary class;
+  (9) `unknown-class` — evidence reports a class ID not in the declared
+  set;
+  (10) `failing` — evidence exists, is current, and reports a non-pass
+  for at least one declared class.
+  A `confirmed` status SHALL carry no reason. Additional detail MAY
+  accompany the primary reason without changing it, and no reason outside
+  this ordered vocabulary is permitted.
+- **Argument-provenance bound `H`**: the maximum depth of the
+  dependency path the tool will walk, from a given CIR value occurrence
+  backward through contributing occurrences, while computing trust
+  provenance under REQ-B1 before classifying the occurrence as `unknown`.
+  `H` SHALL be a positive integer, SHALL be configurable, and SHALL
+  default to `32` when not declared. A path that reaches `H` without
+  terminating at a recognized source, propagation, or refinement idiom
+  yields `unknown` rather than `trusted`, per REQ-B1/REQ-B6.
 
 ### B.2 Ubiquitous Requirements
 

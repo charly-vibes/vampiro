@@ -13,11 +13,11 @@ It is designed to detect four classes of seam defect:
 | Optionality | Are structurally interchangeable implementations lawfully interchangeable? |
 | Robustness | Are effects, retries, fallbacks, and resource obligations handled completely? |
 
-> **Draft and unimplemented**
+> **Approved specification, proposals in progress**
 >
-> EARS 1.2.0 and the active OpenSpec changes are proposals awaiting
-> human approval. This site documents intended behavior; it does not claim
-> that the CLI has been implemented.
+> EARS 1.3.0 is approved. The active OpenSpec changes are proposals
+> awaiting human approval. This site documents intended behavior; it does
+> not claim that the CLI has been implemented.
 
 ## Start here
 

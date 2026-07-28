@@ -3,8 +3,9 @@
 ## Current phase
 
 Vampiro is in the planning and approval phase. Do not implement application
-code until the human approval gate accepts EARS 1.2.0 and every active OpenSpec
-proposal.
+code until every active OpenSpec proposal is approved. The EARS
+specification (v1.3.0) was approved on 2026-07-28; the OpenSpec changes
+remain the open approval gate.
 
 ## Change workflow
 
