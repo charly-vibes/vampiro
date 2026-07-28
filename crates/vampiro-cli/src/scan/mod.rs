@@ -372,9 +372,13 @@ impl GitContext {
             }
         }
 
-        // Also include untracked .rs files.
+        // Also include untracked .rs files. Exclude deleted tracked files.
         for entry in statuses.iter() {
-            if entry.status() == git2::Status::WT_NEW {
+            let status = entry.status();
+            if status == git2::Status::WT_NEW
+                || status == git2::Status::WT_MODIFIED
+                || status == git2::Status::INDEX_MODIFIED
+            {
                 if let Some(path) = entry.path() {
                     let p = PathBuf::from(path);
                     if p.extension().is_some_and(|e| e == "rs") {

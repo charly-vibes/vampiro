@@ -30,6 +30,10 @@ pub trait ProverAdapter {
     fn is_available(&self) -> bool;
 
     /// Translate an obligation into prover input and invoke the prover.
+    ///
+    /// **Timeout note:** The `timeout` parameter is accepted for future use.
+    /// Current implementation does not enforce a hard deadline on the
+    /// subprocess. A hanging prover may hang indefinitely.
     fn prove(&self, obligation: &Obligation, timeout: Duration) -> ProverResult;
 }
 
@@ -66,7 +70,7 @@ impl ProverAdapter for LeanAdapter {
             .unwrap_or(false)
     }
 
-    fn prove(&self, obligation: &Obligation, timeout: Duration) -> ProverResult {
+    fn prove(&self, obligation: &Obligation, _timeout: Duration) -> ProverResult {
         if !self.is_available() {
             return ProverResult {
                 status: ProverStatus::ProverUnavailable,
@@ -75,9 +79,16 @@ impl ProverAdapter for LeanAdapter {
         }
 
         let theorem = Self::generate_theorem(obligation);
-        let dir = std::env::temp_dir().join(format!("vampiro_lean_{}", obligation.id));
-        let _ = std::fs::create_dir_all(&dir);
-        let input_path = dir.join("theorem.lean");
+        let dir = match tempfile::TempDir::new() {
+            Ok(d) => d,
+            Err(e) => {
+                return ProverResult {
+                    status: ProverStatus::ProverUnavailable,
+                    detail: Some(format!("failed to create temp dir: {e}")),
+                };
+            }
+        };
+        let input_path = dir.path().join("theorem.lean");
         if std::fs::write(&input_path, &theorem).is_err() {
             return ProverResult {
                 status: ProverStatus::ProverUnavailable,
@@ -85,7 +96,7 @@ impl ProverAdapter for LeanAdapter {
             };
         }
 
-        let result = run_prover(&["lean"], &[input_path.to_str().unwrap()], timeout);
+        let result = run_prover(&["lean"], &[input_path.to_str().unwrap()], _timeout);
         match result {
             Ok(output) => {
                 if output.status.success() {
@@ -106,6 +117,7 @@ impl ProverAdapter for LeanAdapter {
                 detail: Some(format!("lean process error: {e}")),
             },
         }
+        // dir is dropped here → temp dir cleaned up
     }
 }
 
@@ -144,7 +156,7 @@ impl ProverAdapter for DafnyAdapter {
             .unwrap_or(false)
     }
 
-    fn prove(&self, obligation: &Obligation, timeout: Duration) -> ProverResult {
+    fn prove(&self, obligation: &Obligation, _timeout: Duration) -> ProverResult {
         if !self.is_available() {
             return ProverResult {
                 status: ProverStatus::ProverUnavailable,
@@ -153,9 +165,16 @@ impl ProverAdapter for DafnyAdapter {
         }
 
         let method = Self::generate_method(obligation);
-        let dir = std::env::temp_dir().join(format!("vampiro_dafny_{}", obligation.id));
-        let _ = std::fs::create_dir_all(&dir);
-        let input_path = dir.join("theorem.dfy");
+        let dir = match tempfile::TempDir::new() {
+            Ok(d) => d,
+            Err(e) => {
+                return ProverResult {
+                    status: ProverStatus::ProverUnavailable,
+                    detail: Some(format!("failed to create temp dir: {e}")),
+                };
+            }
+        };
+        let input_path = dir.path().join("theorem.dfy");
         if std::fs::write(&input_path, &method).is_err() {
             return ProverResult {
                 status: ProverStatus::ProverUnavailable,
@@ -166,7 +185,7 @@ impl ProverAdapter for DafnyAdapter {
         let result = run_prover(
             &["dafny", "verify"],
             &[input_path.to_str().unwrap()],
-            timeout,
+            _timeout,
         );
         match result {
             Ok(output) => {
@@ -188,6 +207,7 @@ impl ProverAdapter for DafnyAdapter {
                 detail: Some(format!("dafny process error: {e}")),
             },
         }
+        // dir is dropped here → temp dir cleaned up
     }
 }
 
@@ -228,7 +248,7 @@ impl ProverAdapter for TlaPlusAdapter {
             .unwrap_or(false)
     }
 
-    fn prove(&self, obligation: &Obligation, timeout: Duration) -> ProverResult {
+    fn prove(&self, obligation: &Obligation, _timeout: Duration) -> ProverResult {
         if !self.is_available() {
             return ProverResult {
                 status: ProverStatus::ProverUnavailable,
@@ -237,9 +257,16 @@ impl ProverAdapter for TlaPlusAdapter {
         }
 
         let spec = Self::generate_spec(obligation);
-        let dir = std::env::temp_dir().join(format!("vampiro_tla_{}", obligation.id));
-        let _ = std::fs::create_dir_all(&dir);
-        let input_path = dir.join("spec.tla");
+        let dir = match tempfile::TempDir::new() {
+            Ok(d) => d,
+            Err(e) => {
+                return ProverResult {
+                    status: ProverStatus::ProverUnavailable,
+                    detail: Some(format!("failed to create temp dir: {e}")),
+                };
+            }
+        };
+        let input_path = dir.path().join("spec.tla");
         if std::fs::write(&input_path, &spec).is_err() {
             return ProverResult {
                 status: ProverStatus::ProverUnavailable,
@@ -247,7 +274,7 @@ impl ProverAdapter for TlaPlusAdapter {
             };
         }
 
-        let result = run_prover(&["tlc"], &[input_path.to_str().unwrap()], timeout);
+        let result = run_prover(&["tlc"], &[input_path.to_str().unwrap()], _timeout);
         match result {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -268,6 +295,7 @@ impl ProverAdapter for TlaPlusAdapter {
                 detail: Some(format!("tlc process error: {e}")),
             },
         }
+        // dir is dropped here → temp dir cleaned up
     }
 }
 
