@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "source_file": "impls.rs",
+  "clusters": [
+    {
+      "self_type": "Foo",
+      "is_trait_impl": false,
+      "methods": ["bar", "baz"],
+      "span": {
+        "file": "impls.rs",
+        "start_line": 1,
+        "start_column": 1,
+        "end_line": 3,
+        "end_column": 2
+      }
+    }
+  ],
+  "tagged_fns": [],
+  "serializable_values": [],
+  "generator_refs": []
+}

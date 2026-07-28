@@ -21,9 +21,11 @@
 > **Verification (2026-07-28):** 28 visibility/facade tests pass. Visibility idiom table v0.1.0. Fixtures at `tests/fixtures/add-rust-analysis-frontend/2/`. Full details in `docs/verification/add-rust-analysis-frontend-2.md`.
 
 ## 3. Law Runner-Input Tracer
-- [ ] 3.1 Add failing extraction fixtures for implementation clusters, proof/law tags, serializable values, generator references, and construct-specific unsupported evidence.
-- [ ] 3.2 Implement runner-input extraction only; keep runner execution owned by law verification.
-- [ ] 3.3 Run deterministic round-trip and law-consumer compatibility tests; publish the runner-input schema/version and fixture path.
+- [x] 3.1 Add failing extraction fixtures for implementation clusters, proof/law tags, serializable values, generator references, and construct-specific unsupported evidence.
+- [x] 3.2 Implement runner-input extraction only; keep runner execution owned by law verification.
+- [x] 3.3 Run deterministic round-trip and law-consumer compatibility tests; publish the runner-input schema/version and fixture path.
+
+> **Verification (2026-07-28):** 14 law runner-input tests pass. Runner-input schema v0.1.0. Fixtures at `tests/fixtures/add-rust-analysis-frontend/3/`. Full details in `docs/verification/add-rust-analysis-frontend-3.md`.
 
 ## 4. Lifecycle Fact Tracer
 - [ ] 4.1 Add failing extraction fixtures for write/retry facts, resource identity, acquisition/release/transfer, normal/early/error/panic exit paths, aliases, and explicit unknowns.

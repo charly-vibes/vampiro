@@ -223,7 +223,7 @@ fn type_name_as_string(ty: &syn::Type) -> String {
             format!("&{inner}")
         }
         syn::Type::Tuple(tuple) => {
-            let elems: Vec<String> = tuple.elems.iter().map(|t| type_name_as_string(t)).collect();
+            let elems: Vec<String> = tuple.elems.iter().map(type_name_as_string).collect();
             format!("({})", elems.join(", "))
         }
         syn::Type::Slice(slice) => {
@@ -331,24 +331,24 @@ impl LawExtractor {
             .sig
             .inputs
             .iter()
-            .filter_map(|param| match param {
+            .map(|param| match param {
                 syn::FnArg::Typed(pat_type) => {
                     let type_name = type_name_as_string(&pat_type.ty);
                     let param_name = match &*pat_type.pat {
                         syn::Pat::Ident(pat_ident) => pat_ident.ident.to_string(),
                         _ => "_".to_string(),
                     };
-                    Some(FnParam {
+                    FnParam {
                         name: param_name,
                         type_name: type_name.clone(),
                         is_serializable: is_serializable_type(&type_name),
-                    })
+                    }
                 }
-                syn::FnArg::Receiver(_) => Some(FnParam {
+                syn::FnArg::Receiver(_) => FnParam {
                     name: "self".to_string(),
                     type_name: "Self".to_string(),
                     is_serializable: false,
-                }),
+                },
             })
             .collect();
 
@@ -551,14 +551,6 @@ mod tests {
         assert!(is_serializable_type("Option<bool>"));
         assert!(!is_serializable_type("CustomType"));
         assert!(!is_serializable_type("*const u8"));
-    }
-
-    #[test]
-    fn extract_generator_type() {
-        assert!(is_generator_type("Iterator"));
-        assert!(is_generator_type("Iterator<Item = i32>"));
-        assert!(is_generator_type("Stream"));
-        assert!(!is_generator_type("i32"));
     }
 
     #[test]

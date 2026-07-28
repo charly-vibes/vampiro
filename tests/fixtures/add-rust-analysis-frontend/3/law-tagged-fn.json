@@ -1,0 +1,33 @@
+{
+  "version": "0.1.0",
+  "source_file": "law.rs",
+  "clusters": [],
+  "tagged_fns": [
+    {
+      "name": "check_property",
+      "tags": ["law"],
+      "params": [
+        {
+          "name": "n",
+          "type_name": "i32",
+          "is_serializable": true
+        },
+        {
+          "name": "s",
+          "type_name": "String",
+          "is_serializable": true
+        }
+      ],
+      "return_type": "bool",
+      "span": {
+        "file": "law.rs",
+        "start_line": 1,
+        "start_column": 1,
+        "end_line": 1,
+        "end_column": 42
+      }
+    }
+  ],
+  "serializable_values": [],
+  "generator_refs": []
+}
