@@ -1,0 +1,90 @@
+{
+  "version": "v1",
+  "change": "add-core-seam-analysis",
+  "tracer": "normalized-finding-contract",
+  "contract": {
+    "finding": {
+      "fields": {
+        "rule": "String — e.g., \"REQ-7\", \"REQ-9\", \"REQ-11\"",
+        "path": "PathBuf — file path where finding occurs",
+        "line-range-start": "usize — first line of range (1-indexed)",
+        "line-range-end": "usize — last line of range (1-indexed, inclusive)",
+        "severity": "enum: low, medium, high — closed set per REQ-4 v1.3.0",
+        "axis": "enum: composition, modularity, optionality, robustness — closed set per REQ-4 v1.3.0",
+        "filtration-distance": "Option<u32> — absent when no filtration declared",
+        "classification": "String — sub-classifies the rule within the axis",
+        "evidence": "Evidence enum — rule-specific payload"
+      },
+      "evidence-variants": {
+        "CompositionMismatch": {
+          "rule": "REQ-7",
+          "axis": "composition",
+          "fields": {
+            "caller-expected": "Shape — the shape the caller's domain expected",
+            "callee-produced": "Shape — the shape the callee's codomain produced",
+            "unhandled": "Vec<Shape> — union arms the caller left unhandled (empty for cross-variant)"
+          }
+        },
+        "ReachThrough": {
+          "rule": "REQ-8",
+          "axis": "modularity",
+          "fields": {
+            "target_level": "String — the target's lattice level",
+            "target_boundary": "String — advisory or enforced",
+            "boundary_crossed": "String — human-readable boundary description"
+          }
+        },
+        "OverExposure": {
+          "rule": "REQ-V4",
+          "axis": "modularity",
+          "fields": {
+            "target_level": "String — the declaration's lattice level",
+            "convention": "String — why internal-by-convention"
+          }
+        },
+        "FacadeLeak": {
+          "rule": "REQ-V7",
+          "axis": "modularity",
+          "fields": {
+            "facade_scope": "String — facade module path",
+            "exported_name": "String — re-exported symbol name",
+            "underlying_level": "String — underlying declaration's lattice level"
+          }
+        },
+        "SwallowedEffect": {
+          "rule": "REQ-9",
+          "axis": "robustness",
+          "fields": {
+            "discarded_channel": "EffectChannel — the effect that was discarded",
+            "discard_lines": "Vec<DiscardSpan> — exact source lines of discard",
+            "totality": "String — total, partial, or unknown",
+            "ancestor_handled": "Option<bool> — present for throws (REQ-25)"
+          }
+        },
+        "RedundancyMismatch": {
+          "rule": "REQ-11",
+          "axis": "robustness",
+          "fields": {
+            "branch_shapes": "Vec<Shape> — normalized codomains of branch sources",
+            "expected_shape": "Shape — the consumer's domain shape",
+            "adapters": "Vec<String> — adapter node names found (empty if none)"
+          }
+        }
+      }
+    },
+    "diagnostic": {
+      "fields": {
+        "diagnostic": "String — diagnostic identifier (e.g. 'boundary:enforced-unreachable')",
+        "path": "PathBuf — diagnostic file path",
+        "line-range-start": "usize",
+        "line-range-end": "usize",
+        "detail": "String — human-readable context and remediation guidance"
+      }
+    }
+  },
+  "serialization": {
+    "format": "JSON via serde",
+    "naming-convention": "kebab-case via serde(rename_all = kebab-case)",
+    "line-range": "flattened via serde(flatten) on LineRange"
+  }
+}

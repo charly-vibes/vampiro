@@ -151,6 +151,40 @@ pub enum Evidence {
         /// The underlying declaration's lattice level.
         underlying_level: String,
     },
+    /// REQ-9 / REQ-C4: a seam edge resolves a `result`, `option`, or `throws`
+    /// channel via an idiom classified `swallowed` — the effect is discarded
+    /// rather than handled.
+    ///
+    /// Carries the discarded effect channel, the exact discard source lines,
+    /// the unwrap totality, and whether an ancestor handling path was found
+    /// (REQ-25).
+    SwallowedEffect {
+        /// The effect channel that was discarded (e.g. `result`, `option`,
+        /// `throws`, or a nested `recursive` combination).
+        discarded_channel: vampiro_cir::EffectChannel,
+        /// Exact source lines of the discard (REQ-9: "exact line where it
+        /// was discarded").
+        discard_lines: Vec<vampiro_cir::DiscardSpan>,
+        /// The totality of the unwrap — whether all summands were handled.
+        totality: String,
+        /// Whether an ancestor path handles this exception type (REQ-25).
+        /// Absent when ancestor search is not applicable.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ancestor_handled: Option<bool>,
+    },
+    /// REQ-11 / REQ-C7: a redundancy chain's branches do not all produce the
+    /// same codomain shape, and no explicit adapter node reconciles the
+    /// differences. The branches' shapes, expected target shape, and any found
+    /// adapter names are carried as evidence.
+    RedundancyMismatch {
+        /// The normalized codomain shapes of each branch source node.
+        branch_shapes: Vec<Shape>,
+        /// The domain shape the target node expects.
+        expected_shape: Shape,
+        /// Adapter node names found that reconcile differences (empty if none).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        adapters: Vec<String>,
+    },
 }
 
 /// One reported issue (REQ-4).
@@ -202,6 +236,58 @@ impl Finding {
                 unhandled: unhandled.into_iter().map(|s| s.normalize()).collect(),
             },
             classification: "composition-break".into(),
+        }
+    }
+
+    /// Build a swallowed-effect finding (REQ-9) with the default severity
+    /// (`MEDIUM`) and the supplied discard evidence.
+    pub fn swallowed_effect(
+        path: PathBuf,
+        line_range: impl Into<LineRange>,
+        discarded_channel: vampiro_cir::EffectChannel,
+        discard_spans: Vec<vampiro_cir::DiscardSpan>,
+        totality: impl Into<String>,
+        ancestor_handled: Option<bool>,
+    ) -> Self {
+        Finding {
+            rule: "REQ-9".into(),
+            path,
+            line_range: line_range.into(),
+            severity: Severity::Medium,
+            axis: Axis::Robustness,
+            filtration_distance: None,
+            evidence: Evidence::SwallowedEffect {
+                discarded_channel,
+                discard_lines: discard_spans,
+                totality: totality.into(),
+                ancestor_handled,
+            },
+            classification: "swallowed-effect".into(),
+        }
+    }
+
+    /// Build a redundancy-mismatch finding (REQ-11) with the default severity
+    /// (`MEDIUM`) and the supplied branch codomain evidence.
+    pub fn redundancy_mismatch(
+        path: PathBuf,
+        line_range: impl Into<LineRange>,
+        branch_shapes: Vec<Shape>,
+        expected_shape: Shape,
+        adapters: Vec<String>,
+    ) -> Self {
+        Finding {
+            rule: "REQ-11".into(),
+            path,
+            line_range: line_range.into(),
+            severity: Severity::Medium,
+            axis: Axis::Robustness,
+            filtration_distance: None,
+            evidence: Evidence::RedundancyMismatch {
+                branch_shapes: branch_shapes.into_iter().map(|s| s.normalize()).collect(),
+                expected_shape: expected_shape.normalize(),
+                adapters,
+            },
+            classification: "redundancy-mismatch".into(),
         }
     }
 }

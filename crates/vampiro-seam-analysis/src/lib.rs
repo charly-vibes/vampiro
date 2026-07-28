@@ -12,19 +12,24 @@
 //!
 //! # Current scope
 //!
-//! Only the **composition tracer** (REQ-7, REQ-23) is implemented. The
-//! modularity, optionality, and robustness tracers are delivered by tasks
-//! `0vb.4.3`–`0vb.4.5`.
+//! The **composition tracer** (REQ-7, REQ-23), **modularity tracer**
+//! (REQ-8, REQ-V3–V4, REQ-V7, REQ-C5), **effect-handling tracer**
+//! (REQ-9, REQ-25, REQ-C4), and **redundancy tracer** (REQ-11, REQ-C7)
+//! are implemented. The optionality tracer is delivered by task `0vb.4.5`+.
 
 use vampiro_cir::CirGraph;
 
 pub mod composition;
+pub mod effects;
 pub mod finding;
 pub mod modularity;
+pub mod redundancy;
 
 pub use composition::{unify_shapes, CompositionAnalyzer, Unification};
+pub use effects::EffectHandlingAnalyzer;
 pub use finding::{Axis, Diagnostic, Evidence, Finding, Severity};
 pub use modularity::ModularityAnalyzer;
+pub use redundancy::RedundancyAnalyzer;
 
 // Re-export the visibility types from vampiro-cir for convenience.
 pub use vampiro_cir::{
@@ -34,11 +39,14 @@ pub use vampiro_cir::{
 /// Run the currently-implemented analysis slices over `graph` and return the
 /// findings.
 ///
-/// Only composition is implemented today; modularity/optionality/robustness
-/// are added by later tasks in `add-core-seam-analysis`.
+/// Composition, effect-handling, and redundancy tracers run on the graph alone.
+/// The modularity tracer requires visibility facts (REQ-V1), which are not
+/// part of the CIR graph itself. Call `analyze_with_visibility` instead.
 pub fn analyze(graph: &CirGraph) -> Vec<Finding> {
     let mut findings = Vec::new();
     findings.extend(CompositionAnalyzer::new().analyze(graph));
+    findings.extend(EffectHandlingAnalyzer::new().analyze(graph));
+    findings.extend(RedundancyAnalyzer::new().analyze(graph));
     // The modularity tracer requires visibility facts (REQ-V1), which are not
     // part of the CIR graph itself. Call `ModularityAnalyzer::analyze` with
     // visibility facts directly when running the full seam analysis.

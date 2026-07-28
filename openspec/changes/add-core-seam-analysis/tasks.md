@@ -15,16 +15,16 @@
 - [x] 2.3 Run focused fixtures plus a Rust facade E2E test; record finding/diagnostic schemas and passing evidence.
 
 ## 3. Effect Handling Tracer
-- [ ] 3.1 Add failing direct result/option/throws discard-line, nested/custom effect, ancestor-boundary, ordinary partial/total unwrap, and panic/force-unwrap fixtures (REQ-9, REQ-25, REQ-C4).
-- [ ] 3.2 Implement recursive coproduct resolution, independent totality, and memoized bounded ancestor handling search.
-- [ ] 3.3 Run focused effect and Rust E2E negative tests; verify swallowed findings use only the robustness axis and preserve exact discard evidence.
+- [x] 3.1 Add failing direct result/option/throws discard-line, nested/custom effect, ancestor-boundary, ordinary partial/total unwrap, and panic/force-unwrap fixtures (REQ-9, REQ-25, REQ-C4).
+- [x] 3.2 Implement recursive coproduct resolution, independent totality, and memoized bounded ancestor handling search.
+- [x] 3.3 Run focused effect and Rust E2E negative tests; verify swallowed findings use only the robustness axis and preserve exact discard evidence.
 
 ## 4. Redundancy Tracer
-- [ ] 4.1 Add failing arbitrary-branch common-codomain, explicit-adapter, incompatible-effect, and no-cocone fixtures (REQ-11, REQ-C7).
-- [ ] 4.2 Implement deterministic redundancy reconciliation over any branch count without introducing a fifth or combined axis.
-- [ ] 4.3 Run focused property/E2E tests and record common-codomain evidence plus passing commands.
+- [x] 4.1 Add failing arbitrary-branch common-codomain, explicit-adapter, incompatible-effect, and no-cocone fixtures (REQ-11, REQ-C7).
+- [x] 4.2 Implement deterministic redundancy reconciliation over any branch count without introducing a fifth or combined axis.
+- [x] 4.3 Run focused property/E2E tests and record common-codomain evidence plus passing commands.
 
 ## 5. Core Acceptance and Result Contract
-- [ ] 5.1 Run all four slice suites, Rust E2E negatives, workspace formatting, and Clippy with warnings denied.
-- [ ] 5.2 Publish the normalized finding/result consumer contract and compatibility fixture used by scan and lifecycle; verify every owned requirement maps to a test.
-- [ ] 5.3 Run `openspec validate add-core-seam-analysis --strict` and record contract version, fixture path, commands, and passing evidence location.
+- [x] 5.1 Run all four slice suites, Rust E2E negatives, workspace formatting, and Clippy with warnings denied.
+- [x] 5.2 Publish the normalized finding/result consumer contract and compatibility fixture used by scan and lifecycle; verify every owned requirement maps to a test.
+- [x] 5.3 Run `openspec validate add-core-seam-analysis --strict` and record contract version, fixture path, commands, and passing evidence location.
