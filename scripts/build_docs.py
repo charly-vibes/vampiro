@@ -10,17 +10,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "docs" / "src"
 
-CHANGES = {
-    "add-rust-cli-foundation": "cli-foundation",
-    "add-cir-plugin-platform": "cir-plugin-platform",
-    "add-rust-analysis-frontend": "rust-analysis",
-    "add-core-seam-analysis": "seam-analysis",
-    "add-scan-gating-reporting": "scan-workflows",
-    "add-law-and-proof-verification": "law-verification",
-    "add-lifecycle-safety-analysis": "lifecycle-safety",
-    "add-python-clojure-julia-frontends": "additional-frontends",
-    "add-trust-boundary-analysis": "trust-boundary-analysis",
-    "depend-on-genesis": "cli-foundation",
+# Each entry maps change_id → list of capability slugs.
+# A change declares one capability per directory under its specs/ folder.
+CHANGES: dict[str, list[str]] = {
+    "add-rust-cli-foundation": ["cli-foundation"],
+    "add-cir-plugin-platform": ["cir-plugin-platform"],
+    "add-rust-analysis-frontend": ["rust-analysis"],
+    "add-core-seam-analysis": ["seam-analysis"],
+    "add-scan-gating-reporting": ["scan-workflows"],
+    "add-law-and-proof-verification": ["law-verification"],
+    "add-lifecycle-safety-analysis": ["lifecycle-safety"],
+    "add-python-clojure-julia-frontends": ["additional-frontends"],
+    "add-trust-boundary-analysis": ["trust-boundary-analysis"],
+    "depend-on-genesis": ["cli-foundation"],
+    "upgrade-genesis": ["cli-core", "config"],
 }
 
 
@@ -39,13 +42,13 @@ def validate_source_inventory() -> None:
             f"removed: {sorted(declared_changes - discovered_changes)}"
         )
 
-    for change_id, capability in CHANGES.items():
+    for change_id, capabilities in CHANGES.items():
         source = changes_root / change_id
         discovered_specs = {
             path.relative_to(source)
             for path in (source / "specs").rglob("spec.md")
         }
-        declared_specs = {Path("specs") / capability / "spec.md"}
+        declared_specs = {Path("specs") / cap / "spec.md" for cap in capabilities}
         if discovered_specs != declared_specs:
             raise ValueError(
                 f"documentation capability inventory is stale for {change_id}; "
@@ -145,13 +148,16 @@ def main() -> None:
         "> **Status:** Active OpenSpec proposal; not implemented or deployed. "
         "The source under `openspec/changes/` is authoritative."
     )
-    for change_id, capability in CHANGES.items():
+    for change_id, capabilities in CHANGES.items():
         source = ROOT / "openspec" / "changes" / change_id
         destination = roadmap / change_id
         for name in ("proposal", "design", "tasks"):
             copy_with_notice(source / f"{name}.md", destination / f"{name}.md", notice)
+        # Multi-capability changes: copy the primary spec (first capability),
+        # with additional capability specs linked by convention.
+        primary_cap = capabilities[0]
         copy_with_notice(
-            source / "specs" / capability / "spec.md",
+            source / "specs" / primary_cap / "spec.md",
             destination / "spec.md",
             notice,
         )
