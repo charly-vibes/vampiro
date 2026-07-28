@@ -21,6 +21,6 @@
 - [x] 4.3 Run focused byte/idempotency fixtures and a `wai status` integration check; record block/API versions and passing commands in `docs/verification/depend-on-genesis-4.md`.
 
 ## 5. AIX Artifact Tracer
-- [ ] 5.1 Add failing golden fixtures for deterministic `llms.txt` and `llm.txt` generation from the repository's authoritative project inputs.
-- [ ] 5.2 Generate both artifacts through `genesis::aix`, retaining no second local renderer or hand-maintained divergent content.
-- [ ] 5.3 Run focused golden/idempotency tests and verify committed artifacts are current; record AIX API/version and passing commands in `docs/verification/depend-on-genesis-5.md`.
+- [x] 5.1 Add failing golden fixtures for deterministic `llms.txt` and `llm.txt` generation from the repository's authoritative project inputs.
+- [x] 5.2 Generate both artifacts through `genesis::aix`, retaining no second local renderer or hand-maintained divergent content.
+- [x] 5.3 Run focused golden/idempotency tests and verify committed artifacts are current; record AIX API/version and passing commands in `docs/verification/depend-on-genesis-5.md`.

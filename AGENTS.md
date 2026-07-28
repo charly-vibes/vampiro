@@ -67,9 +67,6 @@ Keep this managed block so `wai init` can refresh the instructions.
 
 <!-- WAI:END -->
 
-<!-- DONT:START -->
-<!-- DONT:END -->
-
 <!-- WAI:REFLECT:REF:START -->
 ## Accumulated Project Patterns
 

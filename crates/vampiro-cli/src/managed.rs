@@ -1,20 +1,16 @@
 //! Vampiro's managed block configuration.
 //!
-//! These blocks are injected into project files for `wai status` detection
-//! and other tooling integration. The injector is sourced from
-//! `genesis::managed_block`.
+//! Vampiro registers its own `VAMPIRO` managed block for agent instructions.
+//! The injector is sourced from `genesis::managed_block`.
 
 use genesis::managed_block::{BlockDef, BlockInjector, BlockRegistry};
 
-/// Create a `BlockRegistry` with Vampiro's three managed blocks.
+/// Create a `BlockRegistry` with Vampiro's managed block.
 ///
-/// Registers `WAI`, `OPENSPEC`, and `DONT` blocks — the three blocks
-/// needed for `wai status` detection (`wai-bdqw.9`).
+/// Registers the `VAMPIRO` block for vampiro's own agent instructions.
 pub fn vampiro_registry() -> BlockRegistry {
     let mut reg = BlockRegistry::new();
-    reg.register(BlockDef::new("WAI"));
-    reg.register(BlockDef::new("OPENSPEC"));
-    reg.register(BlockDef::new("DONT"));
+    reg.register(BlockDef::new("VAMPIRO"));
     reg
 }
 

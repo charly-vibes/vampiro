@@ -5,6 +5,7 @@
 //! The binary is a thin wrapper; library boundaries exist here for consumption
 //! by CIR, analysis, and scan crates.
 
+pub mod aix;
 pub mod cli;
 pub mod config;
 pub mod exit_code;
