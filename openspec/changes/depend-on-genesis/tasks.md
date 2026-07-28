@@ -11,9 +11,9 @@
 - [x] 2.3 Run focused JSON/golden and existing result-contract tests; record the envelope version, fixture, and passing commands in `docs/verification/depend-on-genesis-2.md`.
 
 ## 3. Shared Suggestions Tracer
-- [ ] 3.1 Add failing CLI fixtures for a close typo, an unrelated token, deterministic candidate ordering, and no locally defined suggestion engine.
-- [ ] 3.2 Register Vampiro's command list with `genesis::suggestions::SuggestionEngine` and route unknown-command footers through its result.
-- [ ] 3.3 Run focused CLI snapshots and workspace tests; record suggestion API/version and passing commands in `docs/verification/depend-on-genesis-3.md`.
+- [x] 3.1 Add failing CLI fixtures for a close typo, an unrelated token, deterministic candidate ordering, and no locally defined suggestion engine.
+- [x] 3.2 Register Vampiro's command list with `genesis::suggestions::SuggestionEngine` and route unknown-command footers through its result.
+- [x] 3.3 Run focused CLI snapshots and workspace tests; record suggestion API/version and passing commands in `docs/verification/depend-on-genesis-3.md`.
 
 ## 4. Managed-Block Tracer
 - [ ] 4.1 Add failing fixtures for insert/update/idempotent replay of WAI, OPENSPEC, and DONT managed blocks while preserving surrounding user content.
