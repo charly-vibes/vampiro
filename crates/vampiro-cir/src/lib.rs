@@ -25,6 +25,7 @@ pub mod error;
 pub mod frontend;
 pub mod provenance;
 pub mod shape;
+pub mod visibility;
 
 pub use category::{
     validate_category, validate_filtration, CategoryDecl, FiltrationDecl, FiltrationLevel,
@@ -36,3 +37,4 @@ pub use error::CirError;
 pub use frontend::Frontend;
 pub use provenance::{DiscardSpan, Provenance, SourceSpan, StableId};
 pub use shape::Shape;
+pub use visibility::{BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts};

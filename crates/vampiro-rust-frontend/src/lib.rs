@@ -25,6 +25,7 @@ mod extract;
 pub mod law;
 pub mod lifecycle;
 pub mod visibility;
+pub mod visibility_adapter;
 
 use std::collections::HashMap;
 use std::path::Path;

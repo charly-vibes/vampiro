@@ -5,8 +5,8 @@
 //! layer consumes these facts to check modularity (REQ-8, REQ-V3–V4, REQ-V7,
 //! REQ-C5) without depending on any particular language's syntax.
 
+use crate::StableId;
 use serde::{Deserialize, Serialize};
-use vampiro_cir::StableId;
 
 /// The visibility lattice levels (Addendum V, per-language table).
 ///

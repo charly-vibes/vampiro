@@ -30,7 +30,7 @@ use std::path::PathBuf;
 use vampiro_cir::CirGraph;
 
 use crate::finding::{Diagnostic, Evidence, Finding, Severity};
-use crate::visibility::{BoundaryKind, LatticeLevel, VisibilityFacts};
+use vampiro_cir::{BoundaryKind, LatticeLevel, VisibilityFacts};
 
 /// The modularity tracer. See module docs.
 #[derive(Debug, Default, Clone)]
@@ -196,7 +196,7 @@ impl ModularityAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::visibility::{
+    use vampiro_cir::{
         BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts,
     };
     use vampiro_cir::{

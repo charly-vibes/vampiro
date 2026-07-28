@@ -9,11 +9,9 @@
 
 use std::path::Path;
 
-use vampiro_rust_frontend::{ExtractionOutput, RustFrontend, Visibility};
-use vampiro_seam_analysis::{
-    modularity::ModularityAnalyzer, Axis, BoundaryKind, Evidence, FacadeReexport, LatticeLevel,
-    VisibilityFact, VisibilityFacts,
-};
+use vampiro_rust_frontend::visibility_adapter::to_visibility_facts;
+use vampiro_rust_frontend::RustFrontend;
+use vampiro_seam_analysis::{modularity::ModularityAnalyzer, Axis, Evidence};
 
 /// Resolve the fixture path relative to the workspace root.
 fn fixture_path() -> String {
@@ -25,83 +23,6 @@ fn fixture_path() -> String {
         .unwrap()
         .join("tests/fixtures/add-core-seam-analysis/2/modularity_break.rs");
     path.to_string_lossy().to_string()
-}
-
-/// Map the Rust frontend's extraction output to language-neutral visibility
-/// facts. This is the Rust idiom-table mapping (Addendum V, per-language
-/// table) implemented as an adapter so the analysis crate does not depend on
-/// the Rust frontend at runtime.
-fn map_visibility(out: &ExtractionOutput) -> VisibilityFacts {
-    let mut facts = VisibilityFacts::new(Visibility::TABLE_VERSION);
-
-    // Map each node's Rust visibility to a lattice level + boundary kind.
-    for (node_id, vis) in &out.visibility {
-        let node = match out.graph.node_by_id(node_id) {
-            Some(n) => n,
-            None => continue,
-        };
-        // Derive scope from source_file + module context (simplified: use the
-        // source file path as the scope for E2E purposes).
-        let scope = node.span.file.clone();
-
-        let (level, boundary, internal) = match vis {
-            Visibility::Public => {
-                // Check if this node is in the crate-root facade.
-                let in_facade = out.facades.iter().any(|fd| {
-                    fd.module_path.is_empty()
-                        && fd
-                            .entries
-                            .iter()
-                            .any(|e| e.name == node.name.clone().unwrap_or_default())
-                });
-                let doc_hidden = out
-                    .facades
-                    .iter()
-                    .flat_map(|fd| &fd.entries)
-                    .any(|e| e.doc_hidden && e.name == node.name.clone().unwrap_or_default());
-                let leading_underscore = node.name.as_ref().is_some_and(|n| n.starts_with('_'));
-                let internal = doc_hidden || leading_underscore || !in_facade;
-                if in_facade && !doc_hidden && !leading_underscore {
-                    (LatticeLevel::L4, BoundaryKind::EnforcedOpen, false)
-                } else {
-                    (LatticeLevel::L3, BoundaryKind::EnforcedOpen, internal)
-                }
-            }
-            Visibility::Crate | Visibility::Restricted(_) => {
-                (LatticeLevel::L2, BoundaryKind::Enforced, false)
-            }
-            Visibility::Super => (LatticeLevel::L1Half, BoundaryKind::Enforced, false),
-            Visibility::Private => (LatticeLevel::L1, BoundaryKind::Enforced, false),
-        };
-        facts.add_fact(VisibilityFact {
-            node: node_id.clone(),
-            level,
-            boundary,
-            scope,
-            internal_by_convention: internal,
-        });
-    }
-
-    // Map facades to language-neutral re-exports.
-    for fd in &out.facades {
-        for entry in &fd.entries {
-            // Find the underlying node by matching the re-exported name.
-            if let Some(node) = out
-                .graph
-                .nodes
-                .iter()
-                .find(|n| n.name.as_ref().is_some_and(|n| n == &entry.name))
-            {
-                facts.add_facade(FacadeReexport {
-                    facade_scope: fd.module_path.clone(),
-                    exported_name: entry.name.clone(),
-                    underlying_node: node.id.clone(),
-                });
-            }
-        }
-    }
-
-    facts
 }
 
 #[test]
@@ -117,7 +38,7 @@ fn modularity_e2e_over_exposure_and_facade_leak() {
         )
         .expect("frontend extraction must succeed");
 
-    let vis = map_visibility(&out);
+    let vis = to_visibility_facts(&out);
     let (findings, _diags) = ModularityAnalyzer::new().analyze(&out.graph, &vis);
 
     // REQ-V4: _helper is pub + leading-underscore → over-exposure.

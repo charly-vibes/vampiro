@@ -21,12 +21,15 @@ use vampiro_cir::CirGraph;
 pub mod composition;
 pub mod finding;
 pub mod modularity;
-pub mod visibility;
 
 pub use composition::{unify_shapes, CompositionAnalyzer, Unification};
 pub use finding::{Axis, Diagnostic, Evidence, Finding, Severity};
 pub use modularity::ModularityAnalyzer;
-pub use visibility::{BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts};
+
+// Re-export the visibility types from vampiro-cir for convenience.
+pub use vampiro_cir::{
+    BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts,
+};
 
 /// Run the currently-implemented analysis slices over `graph` and return the
 /// findings.
