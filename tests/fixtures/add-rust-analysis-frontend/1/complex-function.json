@@ -1,0 +1,33 @@
+{
+  "version": "0.1.0",
+  "source_file": "complex.rs",
+  "nodes": [
+    {
+      "id": "process:complex.rs:1",
+      "domain": {
+        "record": [
+          "scalar",
+          {
+            "ref": "scalar"
+          }
+        ]
+      },
+      "codomain": {
+        "parameterized": {
+          "base": "Result",
+          "parameters": ["scalar", "scalar"]
+        }
+      },
+      "effect": "result",
+      "span": {
+        "file": "complex.rs",
+        "start_line": 1,
+        "start_column": 1,
+        "end_line": 3,
+        "end_column": 1
+      },
+      "name": "process"
+    }
+  ],
+  "edges": []
+}

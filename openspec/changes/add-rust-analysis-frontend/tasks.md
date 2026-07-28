@@ -7,9 +7,11 @@
 > **Decision (2026-07-28):** `syn` — typed AST, lightweight, no CST→CIR mapping layer. Rust 2021+ minimum. No macro expansion. See `docs/decisions/rust-frontend.md`.
 
 ## 1. Base Rust CIR Tracer
-- [ ] 1.1 Add failing Rust fixtures for callable nodes, structural/opaque shapes, recursive effects, unknowns, exact source spans, and direct/within-bound/over-bound argument provenance.
-- [ ] 1.2 Implement syntax-to-CIR extraction under the approved parser boundary without executing source.
-- [ ] 1.3 Run deterministic CIR conformance and negative fixtures; publish the frontend/schema version, fixture path, and consumer test proving the CIR milestone for core.
+- [x] 1.1 Add failing Rust fixtures for callable nodes, structural/opaque shapes, recursive effects, unknowns, exact source spans, and direct/within-bound/over-bound argument provenance.
+- [x] 1.2 Implement syntax-to-CIR extraction under the approved parser boundary without executing source.
+- [x] 1.3 Run deterministic CIR conformance and negative fixtures; publish the frontend/schema version, fixture path, and consumer test proving the CIR milestone for core.
+
+> **Verification (2026-07-28):** All 20 Rust frontend tests pass. 3 fixtures at `tests/fixtures/add-rust-analysis-frontend/1/`. `RustFrontend` implemented in `crates/vampiro-rust-frontend/`. Full details in `docs/verification/add-rust-analysis-frontend-1.md`.
 
 ## 2. Visibility and Facade Tracer
 - [ ] 2.1 Add failing fixtures for module ancestry, every `pub` form, `pub use`, crate-root facades, hidden/internal conventions, macros beyond coverage, and unsupported constructs (REQ-V1–V2).

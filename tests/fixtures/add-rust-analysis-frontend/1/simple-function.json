@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "source_file": "simple.rs",
+  "nodes": [
+    {
+      "id": "hello:simple.rs:1",
+      "domain": "scalar",
+      "codomain": "scalar",
+      "effect": "plain",
+      "span": {
+        "file": "simple.rs",
+        "start_line": 1,
+        "start_column": 1,
+        "end_line": 1,
+        "end_column": 6
+      },
+      "name": "hello"
+    }
+  ],
+  "edges": []
+}
