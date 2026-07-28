@@ -1,16 +1,24 @@
 use std::process::Command;
 
+const TEST_FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/minimal.rs");
+
 #[test]
 fn rust_cli_foundation_2_envelope_json_top_level_keys() {
-    // Verify `vampiro check --json` outputs a Genesis envelope with the
-    // required top-level keys and composition findings under `data`.
+    // Verify `vampiro check --json --path <file>` outputs a Genesis envelope
+    // with the required top-level keys and findings under `data`.
     let output = Command::new(env!("CARGO_BIN_EXE_vampiro"))
         .arg("check")
         .arg("--json")
+        .arg("--path")
+        .arg(TEST_FIXTURE)
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "check --json should succeed");
+    assert!(
+        output.status.success(),
+        "check --json should succeed: stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value =

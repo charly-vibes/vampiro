@@ -3,7 +3,7 @@ A program analysis tool for verifying compliance with laws and policies
 Usage: vampiro [COMMAND]
 
 Commands:
-  check  Reserved for analysis commands
+  check  Analyze source files for composition, modularity, and robustness breaks
   prove  Reserved for proof commands
   help   Print this message or the help of the given subcommand(s)
 

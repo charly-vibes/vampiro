@@ -1,7 +1,8 @@
-Reserved for analysis commands
+Analyze source files for composition, modularity, and robustness breaks
 
-Usage: vampiro check [OPTIONS]
+Usage: vampiro check [OPTIONS] --path <PATH>
 
 Options:
-  -j, --json  Output findings as JSON
-  -h, --help  Print help
+  -p, --path <PATH>  Path to the Rust source file to analyze
+  -j, --json         Output findings as JSON
+  -h, --help         Print help
