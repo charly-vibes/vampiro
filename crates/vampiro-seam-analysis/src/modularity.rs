@@ -144,6 +144,20 @@ impl ModularityAnalyzer {
                 && node_vis.level < LatticeLevel::L4
                 && node_vis.internal_by_convention
             {
+                // Check whether the node is actually reachable from outside
+                // its own file. A pub fn in a private module (L3 EnforcedOpen)
+                // is effectively pub(crate) and should not be flagged as
+                // over-exposure (vampiro-6ty).
+                let cross_file_edge = graph.edges.iter().any(|e| {
+                    e.target == node.id
+                        && graph
+                            .node_by_id(&e.source)
+                            .map(|src| src.span.file != node.span.file)
+                            .unwrap_or(false)
+                });
+                if !cross_file_edge {
+                    continue;
+                }
                 findings.push(Finding {
                     rule: "REQ-V4".into(),
                     path: PathBuf::from(&node.span.file),
@@ -421,7 +435,60 @@ mod tests {
     fn over_exposure_for_doc_hidden_pub() {
         let mut graph = CirGraph::new("src/lib.rs");
         // A pub fn marked doc(hidden) at L3, internal_by_convention = true.
+        // This node has an incoming edge from a different file, making it
+        // externally reachable (vampiro-6ty).
         graph.add_node(node("exposed", 3, "_internal"));
+        // Caller in a different file to trigger the cross-file edge check.
+        graph.add_node(CirNode {
+            id: sid("caller"),
+            domain: vampiro_cir::Shape::Scalar,
+            codomain: vampiro_cir::Shape::Scalar,
+            effect: EffectChannel::Plain,
+            span: SourceSpan {
+                file: "other.rs".into(),
+                start_line: 1,
+                start_column: 1,
+                end_line: 1,
+                end_column: 10,
+            },
+            name: Some("caller".into()),
+        });
+        graph.add_edge(edge("e1", "caller", "exposed", 2));
+
+        let mut vis = VisibilityFacts::new("0.1.0");
+        vis.add_fact(vis_fact(
+            "caller",
+            LatticeLevel::L2,
+            BoundaryKind::Enforced,
+            "other",
+            false,
+        ));
+        vis.add_fact(vis_fact(
+            "exposed",
+            LatticeLevel::L3,
+            BoundaryKind::EnforcedOpen,
+            "pkg",
+            true,
+        ));
+
+        let (findings, _diags) = ModularityAnalyzer::new().analyze(&graph, &vis);
+        assert_eq!(findings.len(), 1, "cross-file edge makes this externally reachable");
+        let f = &findings[0];
+        assert_eq!(f.rule, "REQ-V4");
+        assert_eq!(f.classification, "over-exposure");
+        assert_eq!(f.axis, crate::finding::Axis::Modularity);
+        let Evidence::OverExposure { target_level, .. } = &f.evidence else {
+            panic!("expected over-exposure evidence");
+        };
+        assert_eq!(target_level, "L3");
+    }
+
+    #[test]
+    fn no_over_exposure_for_private_module() {
+        // A pub fn in a private module with no cross-file edges should not
+        // be flagged as over-exposure (vampiro-6ty).
+        let mut graph = CirGraph::new("src/lib.rs");
+        graph.add_node(node("exposed", 3, "extract_graph"));
 
         let mut vis = VisibilityFacts::new("0.1.0");
         vis.add_fact(vis_fact(
@@ -433,15 +500,10 @@ mod tests {
         ));
 
         let (findings, _diags) = ModularityAnalyzer::new().analyze(&graph, &vis);
-        assert_eq!(findings.len(), 1);
-        let f = &findings[0];
-        assert_eq!(f.rule, "REQ-V4");
-        assert_eq!(f.classification, "over-exposure");
-        assert_eq!(f.axis, crate::finding::Axis::Modularity);
-        let Evidence::OverExposure { target_level, .. } = &f.evidence else {
-            panic!("expected over-exposure evidence");
-        };
-        assert_eq!(target_level, "L3");
+        assert!(
+            findings.is_empty(),
+            "pub fn in private module with no cross-file callers should not be over-exposed"
+        );
     }
 
     #[test]

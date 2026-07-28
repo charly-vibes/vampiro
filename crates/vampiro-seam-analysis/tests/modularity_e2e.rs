@@ -4,8 +4,12 @@
 //! `tests/fixtures/add-core-seam-analysis/2/modularity_break.rs`, extracts a
 //! CIR graph + visibility/facade data via `vampiro-rust-frontend`, maps the
 //! Rust-specific visibility/facade data to language-neutral `VisibilityFacts`,
-//! and runs the modularity tracer. Asserts that over-exposure (REQ-V4) and
-//! facade-leak (REQ-V7) findings are produced with the required fields.
+//! and runs the modularity tracer.
+//!
+//! Note: Over-exposure findings (REQ-V4) now require a cross-file caller
+//! (vampiro-6ty). In the single-file fixture, the `_helper` function has no
+//! cross-file callers, so it is not flagged. The facade-leak check (REQ-V7)
+//! is unaffected.
 
 use std::path::Path;
 
@@ -40,23 +44,6 @@ fn modularity_e2e_over_exposure_and_facade_leak() {
 
     let vis = to_visibility_facts(&out);
     let (findings, _diags) = ModularityAnalyzer::new().analyze(&out.graph, &vis);
-
-    // REQ-V4: _helper is pub + leading-underscore → over-exposure.
-    let over_exposure: Vec<_> = findings
-        .iter()
-        .filter(|f| f.classification == "over-exposure")
-        .collect();
-    assert!(
-        !over_exposure.is_empty(),
-        "expected at least one over-exposure finding for `_helper`; got {findings:?}"
-    );
-    let f = &over_exposure[0];
-    assert_eq!(f.rule, "REQ-V4");
-    assert_eq!(f.axis, Axis::Modularity);
-    let Evidence::OverExposure { target_level, .. } = &f.evidence else {
-        panic!("expected over-exposure evidence");
-    };
-    assert_eq!(target_level, "L3");
 
     // REQ-V7: `pub use internal::RawTable` re-exports an L2 symbol at L4.
     let facade_leak: Vec<_> = findings
