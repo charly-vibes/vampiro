@@ -1,14 +1,14 @@
 > Implementation is blocked until the roadmap approval gate records approval of the EARS source and this proposal.
 
 ## 0. Per-Language Parser Decision Gates (HITL)
-- [ ] 0.1 Evaluate Python parser options against supported versions, package/module loading, dynamic constructs, provenance, and performance; record scope, exclusions, approver, and review reference in `docs/decisions/python-frontend.md`.
-- [ ] 0.2 Evaluate Clojure parser options against supported versions, reader macros, namespace loading, private-var forms, provenance, and performance; record scope, exclusions, approver, and review reference in `docs/decisions/clojure-frontend.md`.
-- [ ] 0.3 Evaluate Julia parser options against supported versions, macro/module loading, ownership/type-piracy forms, provenance, and performance; record scope, exclusions, approver, and review reference in `docs/decisions/julia-frontend.md`.
+- [x] 0.1 Evaluate Python parser options against supported versions, package/module loading, dynamic constructs, provenance, and performance; record scope, exclusions, approver, and review reference in `docs/decisions/python-frontend.md`.
+- [x] 0.2 Evaluate Clojure parser options against supported versions, reader macros, namespace loading, private-var forms, provenance, and performance; record scope, exclusions, approver, and review reference in `docs/decisions/clojure-frontend.md`.
+- [x] 0.3 Evaluate Julia parser options against supported versions, macro/module loading, ownership/type-piracy forms, provenance, and performance; record scope, exclusions, approver, and review reference in `docs/decisions/julia-frontend.md`.
 
 ## 1. Shared CIR Acceptance Contract
-- [ ] 1.1 Add per-language matrices for full node/edge/shape/effect extraction, direct/within/over-bound provenance, visibility, opaque/unknown, deterministic output, and construct-specific unsupported evidence (REQ-1–3, REQ-V1–V2).
-- [ ] 1.2 Add a versioned platform compatibility harness that consumes only published CIR/plugin contracts and can run independently for each language.
-- [ ] 1.3 Run the empty/reference harness for all three languages; publish matrix schema and fixtures under `tests/fixtures/add-python-clojure-julia-frontends/1/` and write the reference report to `reports/conformance/additional-frontends-v1.json`.
+- [x] 1.1 Add per-language matrices for full node/edge/shape/effect extraction, direct/within/over-bound provenance, visibility, opaque/unknown, deterministic output, and construct-specific unsupported evidence (REQ-1–3, REQ-V1–V2).
+- [x] 1.2 Add a versioned platform compatibility harness that consumes only published CIR/plugin contracts and can run independently for each language.
+- [x] 1.3 Run the empty/reference harness for all three languages; publish matrix schema and fixtures under `tests/fixtures/add-python-clojure-julia-frontends/1/` and write the reference report to `reports/conformance/additional-frontends-v1.json`.
 
 ## 2. Python Extraction Tracer
 - [ ] 2.1 Add failing approved-version Python fixtures for CIR/provenance, effect/visibility idioms, dynamic unknowns, and `__init__.py` facade metadata.

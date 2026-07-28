@@ -1484,6 +1484,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "vampiro-frontend-harness"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "vampiro-cir",
+]
+
+[[package]]
 name = "vampiro-law"
 version = "0.1.0"
 dependencies = [
