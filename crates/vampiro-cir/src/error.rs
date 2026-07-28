@@ -159,7 +159,9 @@ mod tests {
 
     #[test]
     fn cir_error_duplicate_node_display() {
-        let err = CirError::DuplicateNode { id: "abc123".into() };
+        let err = CirError::DuplicateNode {
+            id: "abc123".into(),
+        };
         assert!(err.to_string().contains("abc123"));
         assert!(err.to_string().contains("duplicate"));
     }

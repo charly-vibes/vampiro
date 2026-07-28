@@ -197,12 +197,10 @@ fn is_serializable_type(ty: &syn::Type) -> bool {
                 return false;
             }
             match &seg.arguments {
-                syn::PathArguments::AngleBracketed(args) => {
-                    args.args.iter().all(|arg| match arg {
-                        syn::GenericArgument::Type(t) => is_serializable_type(t),
-                        _ => false,
-                    })
-                }
+                syn::PathArguments::AngleBracketed(args) => args.args.iter().all(|arg| match arg {
+                    syn::GenericArgument::Type(t) => is_serializable_type(t),
+                    _ => false,
+                }),
                 _ => false,
             }
         }
@@ -551,8 +549,12 @@ mod tests {
         assert!(!is_serializable_type(&syn::parse_quote!(*const u8)));
         // Collections require their element types to be serializable.
         assert!(!is_serializable_type(&syn::parse_quote!(Vec<CustomType>)));
-        assert!(is_serializable_type(&syn::parse_quote!(HashMap<String, Vec<i32>>)));
-        assert!(!is_serializable_type(&syn::parse_quote!(HashMap<String, CustomType>)));
+        assert!(is_serializable_type(
+            &syn::parse_quote!(HashMap<String, Vec<i32>>)
+        ));
+        assert!(!is_serializable_type(
+            &syn::parse_quote!(HashMap<String, CustomType>)
+        ));
         // References and slices recurse.
         assert!(is_serializable_type(&syn::parse_quote!(&str)));
         assert!(is_serializable_type(&syn::parse_quote!(&[i32])));

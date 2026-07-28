@@ -720,9 +720,7 @@ impl<'src> Extractor<'src> {
     ///
     /// The `?` operator (handled in `visit_expr_try`) is the ordinary/total
     /// case and overrides any method-call resolution via `try_unwrap`.
-    fn detect_method_unwrap(
-        method_name: &str,
-    ) -> (EffectResolution, Option<UnwrapEvidence>) {
+    fn detect_method_unwrap(method_name: &str) -> (EffectResolution, Option<UnwrapEvidence>) {
         match method_name {
             "unwrap" | "expect" => (
                 EffectResolution::Unwrapped,
@@ -770,7 +768,12 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         // expressions have no callee name to resolve.
         if let syn::Expr::Path(expr_path) = &*call.func {
             let callee_name = Self::path_name(expr_path);
-            self.add_call_edge(&callee_name, expr_path.span(), EffectResolution::Propagated, None);
+            self.add_call_edge(
+                &callee_name,
+                expr_path.span(),
+                EffectResolution::Propagated,
+                None,
+            );
         }
         visit::visit_expr_call(self, call);
     }
@@ -800,10 +803,12 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         // the `?`-tagged version win over the plain version the call visitor
         // would otherwise record. The span used must match the call visitor's
         // span so dedup keys agree.
-        let ordinary_total = || Some(UnwrapEvidence {
-            kind: UnwrapKind::Ordinary,
-            totality: Totality::Total,
-        });
+        let ordinary_total = || {
+            Some(UnwrapEvidence {
+                kind: UnwrapKind::Ordinary,
+                totality: Totality::Total,
+            })
+        };
         match &*expr.expr {
             syn::Expr::Path(expr_path) => {
                 let callee_name = Self::path_name(expr_path);
@@ -1231,7 +1236,8 @@ mod tests {
         // cannot attach unwrap evidence (there is no edge to attach to).
         // This verifies the path is safe and produces no spurious unwrapped
         // edge on the unrelated receiver.
-        let source = "fn maker() -> Thing { Thing }\nfn caller() -> Result<i32, E> { maker().do_thing()? }";
+        let source =
+            "fn maker() -> Thing { Thing }\nfn caller() -> Result<i32, E> { maker().do_thing()? }";
         let syntax = syn::parse_file(source).unwrap();
         let result = extract_graph(&syntax, Path::new("test.rs"), source);
         // `maker` edge exists, tagged as an ordinary propagated call (the `?`
@@ -1242,7 +1248,10 @@ mod tests {
             .iter()
             .filter(|e| e.resolution == EffectResolution::Unwrapped)
             .collect();
-        assert!(unwrapped.is_empty(), "no edge should be marked unwrapped here");
+        assert!(
+            unwrapped.is_empty(),
+            "no edge should be marked unwrapped here"
+        );
     }
 
     #[test]
@@ -1295,7 +1304,12 @@ mod tests {
         let syntax = syn::parse_file(source).unwrap();
         let result = extract_graph(&syntax, Path::new("test.rs"), source);
         // Two `f` declarations → two distinct nodes (distinct stable IDs).
-        let f_nodes: Vec<_> = result.graph.nodes.iter().filter(|n| n.name.as_deref() == Some("f")).collect();
+        let f_nodes: Vec<_> = result
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| n.name.as_deref() == Some("f"))
+            .collect();
         assert_eq!(f_nodes.len(), 2);
         assert_ne!(f_nodes[0].id, f_nodes[1].id);
     }

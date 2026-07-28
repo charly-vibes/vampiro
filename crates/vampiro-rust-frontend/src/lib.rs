@@ -194,6 +194,9 @@ fn main() -> i32 {
         assert!(!out.facades.is_empty(), "facades should be populated");
         assert!(!out.visibility.is_empty(), "visibility should be populated");
         assert_eq!(out.law_input.version, law::RUNNER_INPUT_SCHEMA_VERSION);
-        assert_eq!(out.lifecycle_facts.version, lifecycle::LIFECYCLE_FACT_SCHEMA_VERSION);
+        assert_eq!(
+            out.lifecycle_facts.version,
+            lifecycle::LIFECYCLE_FACT_SCHEMA_VERSION
+        );
     }
 }
