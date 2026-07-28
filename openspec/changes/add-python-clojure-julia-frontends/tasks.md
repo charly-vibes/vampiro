@@ -16,9 +16,9 @@
 - [x] 2.3 Run deterministic CIR/visibility/advisory conformance and negative fixtures; publish frontend/table versions and report path.
 
 ## 3. Clojure Extraction Tracer
-- [ ] 3.1 Add failing approved-version Clojure fixtures for CIR/provenance, effects, namespace visibility, reader/unknown boundaries, and private-var metadata.
-- [ ] 3.2 Implement the Clojure frontend and versioned idiom tables against only the shared CIR acceptance contract.
-- [ ] 3.3 Run deterministic CIR/visibility/REQ-V6 conformance and negative fixtures; publish frontend/table versions and report path.
+- [x] 3.1 Add failing approved-version Clojure fixtures for CIR/provenance, effects, namespace visibility, reader/unknown boundaries, and private-var metadata.
+- [x] 3.2 Implement the Clojure frontend and versioned idiom tables against only the shared CIR acceptance contract.
+- [x] 3.3 Run deterministic CIR/visibility/REQ-V6 conformance and negative fixtures; publish frontend/table versions and report path.
 
 ## 4. Julia Extraction Tracer
 - [ ] 4.1 Add failing approved-version Julia fixtures for CIR/provenance, effects, module visibility, macro/unknown boundaries, and generic-function/type ownership metadata.

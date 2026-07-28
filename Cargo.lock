@@ -1399,6 +1399,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tree-sitter-clojure"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4004884cc509449a1d78fa3e1f02b4e953d0a8065984445304795e72e885338c"
+dependencies = [
+ "cc",
+ "tree-sitter",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "tree-sitter-language"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1518,6 +1529,19 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "vampiro-clojure-frontend"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tree-sitter",
+ "tree-sitter-clojure",
+ "vampiro-cir",
+ "vampiro-frontend-harness",
 ]
 
 [[package]]
