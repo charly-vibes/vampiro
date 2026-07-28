@@ -234,7 +234,8 @@ impl std::fmt::Display for ValidatedCategory {
 /// Returns the index of the least containing filtration level
 /// (the lowest-indexed level that contains the morphism),
 /// or `None` if the morphism is not in any filtration level.
-pub fn filtration_level(edge_id: &MorphismId, filtration: &FiltrationDecl) -> Option<u32> {
+#[allow(dead_code)]
+pub(crate) fn filtration_level(edge_id: &MorphismId, filtration: &FiltrationDecl) -> Option<u32> {
     // Check from lowest to highest to find the least containing level
     for level in filtration.levels.iter() {
         if level.morphism_ids.contains(edge_id) {
