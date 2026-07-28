@@ -6,9 +6,9 @@
 - [x] 1.3 Run the focused fixture, workspace build/tests, formatting, and Clippy; record the resolved commit and API evidence in `docs/verification/depend-on-genesis-1.md`.
 
 ## 2. Shared Envelope Tracer
-- [ ] 2.1 Add a failing `vampiro check --json` conformance fixture for exact top-level keys and composition findings nested under `data`.
-- [ ] 2.2 Route the normalized composition result through `genesis::envelope::Envelope` without moving finding or analysis logic into Genesis.
-- [ ] 2.3 Run focused JSON/golden and existing result-contract tests; record the envelope version, fixture, and passing commands in `docs/verification/depend-on-genesis-2.md`.
+- [x] 2.1 Add a failing `vampiro check --json` conformance fixture for exact top-level keys and composition findings nested under `data`.
+- [x] 2.2 Route the normalized composition result through `genesis::envelope::Envelope` without moving finding or analysis logic into Genesis.
+- [x] 2.3 Run focused JSON/golden and existing result-contract tests; record the envelope version, fixture, and passing commands in `docs/verification/depend-on-genesis-2.md`.
 
 ## 3. Shared Suggestions Tracer
 - [ ] 3.1 Add failing CLI fixtures for a close typo, an unrelated token, deterministic candidate ordering, and no locally defined suggestion engine.

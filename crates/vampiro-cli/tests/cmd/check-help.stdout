@@ -1,6 +1,7 @@
 Reserved for analysis commands
 
-Usage: vampiro check
+Usage: vampiro check [OPTIONS]
 
 Options:
+  -j, --json  Output findings as JSON
   -h, --help  Print help

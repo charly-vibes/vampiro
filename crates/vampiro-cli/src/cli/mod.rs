@@ -1,4 +1,5 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
+use genesis::envelope::{Envelope, EnvelopeKind};
 
 /// A program analysis tool for verifying compliance with laws and policies.
 #[derive(Parser, Debug)]
@@ -8,13 +9,10 @@ pub struct Cli {
     pub command: Option<Commands>,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Parser, Debug)]
 pub enum Commands {
     /// Reserved for analysis commands
-    Check {
-        #[command(subcommand)]
-        command: Option<CheckCommands>,
-    },
+    Check(CheckArgs),
     /// Reserved for proof commands
     Prove {
         #[command(subcommand)]
@@ -22,14 +20,38 @@ pub enum Commands {
     },
 }
 
-#[derive(Subcommand, Debug)]
-pub enum CheckCommands {}
+#[derive(Parser, Debug)]
+pub struct CheckArgs {
+    /// Output findings as JSON
+    #[arg(long, short)]
+    pub json: bool,
+}
 
-#[derive(Subcommand, Debug)]
+#[derive(Parser, Debug)]
 pub enum ProveCommands {}
 
 impl Cli {
     pub fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
-        Ok(())
+        match &self.command {
+            Some(Commands::Check(args)) => {
+                if args.json {
+                    run_check_json()?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
     }
+}
+
+fn run_check_json() -> Result<(), Box<dyn std::error::Error>> {
+    // Vampiro constructs its own normalized findings, then passes them
+    // through Genesis at the serialization boundary.
+    let findings: Vec<serde_json::Value> = Vec::new();
+
+    let env = Envelope::success(EnvelopeKind::Check, findings, vec![], vec![]);
+
+    let json = serde_json::to_string_pretty(&env)?;
+    println!("{json}");
+    Ok(())
 }
