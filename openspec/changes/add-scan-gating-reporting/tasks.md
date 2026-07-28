@@ -10,9 +10,9 @@
 - [ ] 1.3 Run cold/warm focused integration tests proving zero compatible unchanged re-extractions and operational errors without scope broadening; attach passing commands.
 
 ## 2. Normalized Result and Rendering Tracer
-- [ ] 2.1 Add failing normalized-result, explicit `unanalyzed`, stable-dedupe, configured-severity versus `filtration_distance`, canonical-byte, and human/JSON/SARIF parity tests (REQ-15, REQ-19, REQ-24, REQ-C2).
-- [ ] 2.2 Implement one normalized result and derive all three renderers and stable IDs from it.
-- [ ] 2.3 Run parity, dedupe, canonical-byte, and core-result compatibility tests; publish the result schema/version and fixture path.
+- [x] 2.1 Add failing normalized-result, explicit `unanalyzed`, stable-dedupe, configured-severity versus `filtration_distance`, canonical-byte, and human/JSON/SARIF parity tests (REQ-15, REQ-19, REQ-24, REQ-C2).
+- [x] 2.2 Implement one normalized result and derive all three renderers and stable IDs from it.
+- [x] 2.3 Run parity, dedupe, canonical-byte, and core-result compatibility tests; publish the result schema/version and fixture path.
 
 ## 3. Policy and CI Tracer
 - [ ] 3.1 Add failing guidance/tiered/gate, below/equal threshold, valid/invalid filtration mapping, and approved-provider CI golden tests including explicit PR head/base and failed-fetch behavior (REQ-13–14, REQ-20, REQ-C2).

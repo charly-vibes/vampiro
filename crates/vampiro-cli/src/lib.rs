@@ -13,6 +13,7 @@ pub mod finding;
 
 pub mod managed;
 
+pub mod output;
 pub use cli::Cli;
 pub use config::{vampiro_config_store, Config};
 pub use exit_code::ExitCode;
