@@ -20,6 +20,7 @@ CHANGES = {
     "add-lifecycle-safety-analysis": "lifecycle-safety",
     "add-python-clojure-julia-frontends": "additional-frontends",
     "add-trust-boundary-analysis": "trust-boundary-analysis",
+    "depend-on-genesis": "cli-foundation",
 }
 
 

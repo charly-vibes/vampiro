@@ -43,5 +43,9 @@
     - [Capability delta](./roadmap/add-trust-boundary-analysis/spec.md)
     - [Design](./roadmap/add-trust-boundary-analysis/design.md)
     - [Tasks](./roadmap/add-trust-boundary-analysis/tasks.md)
+  - [`depend-on-genesis`](./roadmap/depend-on-genesis/proposal.md)
+    - [Capability delta](./roadmap/depend-on-genesis/spec.md)
+    - [Design](./roadmap/depend-on-genesis/design.md)
+    - [Tasks](./roadmap/depend-on-genesis/tasks.md)
 
 [Contributing](./contributing.md)

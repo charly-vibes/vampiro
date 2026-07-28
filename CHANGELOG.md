@@ -9,6 +9,8 @@
 ### Added
 - Approval-gated `add-trust-boundary-analysis` OpenSpec change and six matching
   Beads tickets covering 17 implementation and verification checklist items.
+- Approval-gated `depend-on-genesis` proposal for shared envelope, suggestions,
+  managed-block, and AIX infrastructure.
 
 ## [0.0.0] — 2026-07-24
 

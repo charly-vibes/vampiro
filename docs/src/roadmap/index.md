@@ -13,5 +13,6 @@
 | [`add-lifecycle-safety-analysis`](add-lifecycle-safety-analysis/proposal.md) | Active proposal | 0/14 |
 | [`add-python-clojure-julia-frontends`](add-python-clojure-julia-frontends/proposal.md) | Active proposal | 0/27 |
 | [`add-trust-boundary-analysis`](add-trust-boundary-analysis/proposal.md) | Active proposal | 0/17 |
+| [`depend-on-genesis`](depend-on-genesis/proposal.md) | Active proposal | 0/15 |
 
 Each change page includes its proposal, capability delta, design, and approval-gated tracer-bullet task plan.
