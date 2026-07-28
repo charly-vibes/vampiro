@@ -1,13 +1,13 @@
 > Implementation is blocked until the roadmap approval gate records approval of the EARS source and this proposal.
 
 ## 0. CI Provider and Tier Policy Decision Gate (HITL)
-- [ ] 0.1 Compare initial CI provider set and tiered-policy configuration shapes against PR-head/base resolution, unavailable fetch, equal-threshold, and invalid-mapping examples; record the choice in `docs/decisions/scan-policy.md`.
-- [ ] 0.2 Record supported providers, event/ref variables, tier semantics, exclusions, approver, and immutable review reference before CI/policy implementation.
+- [x] 0.1 Compare initial CI provider set and tiered-policy configuration shapes against PR-head/base resolution, unavailable fetch, equal-threshold, and invalid-mapping examples; record the choice in `docs/decisions/scan-policy.md`.
+- [x] 0.2 Record supported providers, event/ref variables, tier semantics, exclusions, approver, and immutable review reference before CI/policy implementation.
 
 ## 1. Git Scope and Incremental Cache Tracer
-- [ ] 1.1 Add failing synthetic-worktree, staged/unstaged/untracked, explicit-target/base, detached/initial/shallow/non-Git, failed-fetch, no-silent-fallback, explicit-full, and versioned cache invalidation tests (REQ-5, REQ-15, REQ-28).
-- [ ] 1.2 Implement deterministic diff scope with immutable base/target metadata and incremental full extraction with observable hit/miss/invalidation reasons.
-- [ ] 1.3 Run cold/warm focused integration tests proving zero compatible unchanged re-extractions and operational errors without scope broadening; attach passing commands.
+- [x] 1.1 Add failing synthetic-worktree, staged/unstaged/untracked, explicit-target/base, detached/initial/shallow/non-Git, failed-fetch, no-silent-fallback, explicit-full, and versioned cache invalidation tests (REQ-5, REQ-15, REQ-28).
+- [x] 1.2 Implement deterministic diff scope with immutable base/target metadata and incremental full extraction with observable hit/miss/invalidation reasons.
+- [x] 1.3 Run cold/warm focused integration tests proving zero compatible unchanged re-extractions and operational errors without scope broadening; attach passing commands.
 
 ## 2. Normalized Result and Rendering Tracer
 - [x] 2.1 Add failing normalized-result, explicit `unanalyzed`, stable-dedupe, configured-severity versus `filtration_distance`, canonical-byte, and human/JSON/SARIF parity tests (REQ-15, REQ-19, REQ-24, REQ-C2).
