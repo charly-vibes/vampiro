@@ -11,9 +11,9 @@
 - [x] 1.3 Run the empty/reference harness for all three languages; publish matrix schema and fixtures under `tests/fixtures/add-python-clojure-julia-frontends/1/` and write the reference report to `reports/conformance/additional-frontends-v1.json`.
 
 ## 2. Python Extraction Tracer
-- [ ] 2.1 Add failing approved-version Python fixtures for CIR/provenance, effect/visibility idioms, dynamic unknowns, and `__init__.py` facade metadata.
-- [ ] 2.2 Implement the Python frontend and versioned idiom tables against only the shared CIR acceptance contract.
-- [ ] 2.3 Run deterministic CIR/visibility/advisory conformance and negative fixtures; publish frontend/table versions and report path.
+- [x] 2.1 Add failing approved-version Python fixtures for CIR/provenance, effect/visibility idioms, dynamic unknowns, and `__init__.py` facade metadata.
+- [x] 2.2 Implement the Python frontend and versioned idiom tables against only the shared CIR acceptance contract.
+- [x] 2.3 Run deterministic CIR/visibility/advisory conformance and negative fixtures; publish frontend/table versions and report path.
 
 ## 3. Clojure Extraction Tracer
 - [ ] 3.1 Add failing approved-version Clojure fixtures for CIR/provenance, effects, namespace visibility, reader/unknown boundaries, and private-var metadata.
