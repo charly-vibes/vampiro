@@ -14,6 +14,7 @@
 //! - Re-exports → `FacadeDecl` entries with original paths
 
 mod extract;
+pub mod law;
 pub mod visibility;
 
 use std::path::Path;

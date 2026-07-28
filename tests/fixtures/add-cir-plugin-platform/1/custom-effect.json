@@ -1,0 +1,25 @@
+{
+  "version": "0.1.0",
+  "source_file": "custom.rs",
+  "nodes": [
+    {
+      "id": "custom-node",
+      "domain": "scalar",
+      "codomain": "scalar",
+      "effect": { "custom": "my-eff" },
+      "span": { "file": "custom.rs", "start_line": 1, "start_column": 1, "end_line": 1, "end_column": 1 },
+      "name": "custom_fn"
+    }
+  ],
+  "edges": [
+    {
+      "id": "custom-edge",
+      "source": "custom-node",
+      "target": "target",
+      "resolution": { "custom": "my-res" },
+      "provenance": "direct",
+      "span": { "file": "custom.rs", "start_line": 2, "start_column": 1, "end_line": 2, "end_column": 1 },
+      "discard_spans": []
+    }
+  ]
+}

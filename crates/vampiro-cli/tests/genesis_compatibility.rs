@@ -12,7 +12,6 @@ fn genesis_api_envelope_importable() {
         vec![],
         vec![],
     );
-    assert!(true, "genesis::envelope is importable");
 }
 
 #[test]
@@ -32,7 +31,6 @@ fn genesis_api_managed_block_importable() {
     reg.register(genesis::managed_block::BlockDef::new("WAI"));
     let injector = genesis::managed_block::BlockInjector::new(reg);
     let _ = injector;
-    assert!(true, "genesis::managed_block is importable");
 }
 
 #[test]
@@ -49,5 +47,4 @@ fn genesis_version_is_v0_1_0() {
     // This is a compile-time check since we pin by tag
     let _ = genesis::envelope::ENVELOPE_VERSION;
     let _ = genesis::envelope::CLI_VERSION;
-    assert!(true, "genesis version constants are accessible");
 }

@@ -1,0 +1,24 @@
+{
+  "name": "simple-category",
+  "objects": ["A", "B", "C"],
+  "morphisms": [
+    { "id": "id_A", "source": "A", "target": "A", "is_identity": true },
+    { "id": "id_B", "source": "B", "target": "B", "is_identity": true },
+    { "id": "id_C", "source": "C", "target": "C", "is_identity": true },
+    { "id": "f", "source": "A", "target": "B", "is_identity": false },
+    { "id": "g", "source": "B", "target": "C", "is_identity": false },
+    { "id": "h", "source": "A", "target": "C", "is_identity": false }
+  ],
+  "composition": [
+    { "first": "id_A", "second": "id_A", "result": "id_A" },
+    { "first": "id_B", "second": "id_B", "result": "id_B" },
+    { "first": "id_C", "second": "id_C", "result": "id_C" },
+    { "first": "id_A", "second": "f", "result": "f" },
+    { "first": "f", "second": "id_B", "result": "f" },
+    { "first": "id_B", "second": "g", "result": "g" },
+    { "first": "g", "second": "id_C", "result": "g" },
+    { "first": "id_A", "second": "h", "result": "h" },
+    { "first": "h", "second": "id_C", "result": "h" },
+    { "first": "f", "second": "g", "result": "h" }
+  ]
+}

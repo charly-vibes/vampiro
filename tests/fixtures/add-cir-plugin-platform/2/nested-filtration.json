@@ -1,0 +1,20 @@
+{
+  "name": "nested-filtration",
+  "levels": [
+    {
+      "name": "L0",
+      "index": 0,
+      "morphism_ids": ["id_A", "id_B", "id_C", "f", "g", "h"]
+    },
+    {
+      "name": "L1",
+      "index": 1,
+      "morphism_ids": ["id_A", "id_B", "id_C", "f", "g", "h"]
+    },
+    {
+      "name": "L2",
+      "index": 2,
+      "morphism_ids": ["id_A", "id_B", "id_C", "f", "g", "h"]
+    }
+  ]
+}

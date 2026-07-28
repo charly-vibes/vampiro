@@ -146,7 +146,6 @@ mod tests {
         // The only rendering dependency is genesis::aix
         let _ = genesis::aix::agents_block("TEST", "body");
         // If this test compiles, we're using genesis::aix, not a local renderer
-        assert!(true, "no second local renderer");
     }
 
     #[test]

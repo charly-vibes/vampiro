@@ -1,0 +1,26 @@
+{
+  "version": "0.1.0",
+  "source_file": "effects.rs",
+  "nodes": [
+    {
+      "id": "fn-1",
+      "domain": "scalar",
+      "codomain": "scalar",
+      "effect": { "recursive": "option" },
+      "span": { "file": "effects.rs", "start_line": 1, "start_column": 1, "end_line": 3, "end_column": 1 },
+      "name": "risky_fn"
+    }
+  ],
+  "edges": [
+    {
+      "id": "call-1",
+      "source": "fn-1",
+      "target": "fn-2",
+      "resolution": "unwrapped",
+      "unwrap_evidence": { "kind": "ordinary", "totality": "partial" },
+      "provenance": { "within-h": { "hops": 1 } },
+      "span": { "file": "effects.rs", "start_line": 5, "start_column": 1, "end_line": 5, "end_column": 15 },
+      "discard_spans": [{ "file": "effects.rs", "start_line": 6, "end_line": 8 }]
+    }
+  ]
+}

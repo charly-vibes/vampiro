@@ -884,6 +884,27 @@ dependencies = [
  "tempfile",
  "toml",
  "trycmd",
+ "vampiro-cir",
+]
+
+[[package]]
+name = "vampiro-cir"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "vampiro-rust-frontend"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "serde",
+ "serde_json",
+ "syn 2.0.119",
+ "tempfile",
+ "vampiro-cir",
 ]
 
 [[package]]

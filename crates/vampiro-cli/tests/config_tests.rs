@@ -16,7 +16,7 @@ fn rust_cli_foundation_2_config_discovery_xdg_fallback() {
     // XDG config should be used when no project-local config exists
     let dir = tempfile::tempdir().unwrap();
     let xdg_home = dir.path().join("xdg");
-    std::fs::create_dir_all(&xdg_home.join("vampiro")).unwrap();
+    std::fs::create_dir_all(xdg_home.join("vampiro")).unwrap();
     std::fs::write(
         xdg_home.join("vampiro").join("config.toml"),
         "scan-threads = 2\n",
@@ -35,7 +35,7 @@ fn rust_cli_foundation_2_config_precedence_project_overrides_xdg() {
 
     // XDG config
     let xdg_home = dir.path().join("xdg");
-    std::fs::create_dir_all(&xdg_home.join("vampiro")).unwrap();
+    std::fs::create_dir_all(xdg_home.join("vampiro")).unwrap();
     std::fs::write(
         xdg_home.join("vampiro").join("config.toml"),
         "scan-threads = 2\n",
