@@ -10,9 +10,9 @@
 - [x] 1.3 Run focused historical and core-result compatibility tests; publish snapshot schema/version, migration fixture path, and passing evidence.
 
 ## 2. Retry Idempotency Tracer
-- [ ] 2.1 Add failing versioned write-table conformance, unknown, unsafe-retry, idempotency-equation, and robustness/optionality cross-reference tests (REQ-T2, REQ-T5–T6, REQ-T9).
-- [ ] 2.2 Implement idempotency classification and retry findings against the published law idempotency-evidence contract without depending on prover adapters.
-- [ ] 2.3 Run focused table/property/contract tests; record table version, law evidence reference, and passing commands.
+- [x] 2.1 Add failing versioned write-table conformance, unknown, unsafe-retry, idempotency-equation, and robustness/optionality cross-reference tests (REQ-T2, REQ-T5–T6, REQ-T9).
+- [x] 2.2 Implement idempotency classification and retry findings against the published law idempotency-evidence contract without depending on prover adapters.
+- [x] 2.3 Run focused table/property/contract tests; record table version, law evidence reference, and passing commands.
 
 ## 3. Resource Linearity Tracer
 - [ ] 3.1 Add failing normal/early/error/panic fixtures for unique identity, one-to-one release, duplicate release leaving another obligation pending, transfer, mismatch, and exact `identity:unknown` diagnostics (REQ-T3, REQ-T7).
