@@ -19,6 +19,7 @@ CHANGES = {
     "add-law-and-proof-verification": "law-verification",
     "add-lifecycle-safety-analysis": "lifecycle-safety",
     "add-python-clojure-julia-frontends": "additional-frontends",
+    "add-trust-boundary-analysis": "trust-boundary-analysis",
 }
 
 
@@ -122,7 +123,7 @@ def main() -> None:
     copy_with_notice(
         ROOT / "vampiro-ears-spec.md",
         SRC / "specification" / "ears.md",
-        "> **Document status:** Draft 1.1.0, not yet approved. The source file `vampiro-ears-spec.md` is authoritative.",
+        "> **Document status:** Draft 1.2.0, not yet approved. The source file `vampiro-ears-spec.md` is authoritative.",
     )
 
     # Copy project context

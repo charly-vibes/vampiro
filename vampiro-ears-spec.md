@@ -2,10 +2,10 @@
 
 | Document control | Value |
 |---|---|
-| Document version | 1.1.0 |
+| Document version | 1.2.0 |
 | Status | Draft |
 | Owner | Project maintainers |
-| Last updated | 2026-07-24 |
+| Last updated | 2026-07-27 |
 | Approval | Not yet approved |
 | Authoritative role | Normative, authoritative specification for Vampiro behavior; in a conflict with non-normative examples or notes, the requirements in this document govern. |
 
@@ -13,6 +13,7 @@
 
 | Version | Date | Status | Change |
 |---|---|---|---|
+| 1.2.0 | 2026-07-27 | Draft | Added trust-boundary validation, refined-shape, validation-duplication, and boundary-coverage requirements from the alternate draft. |
 | 1.1.0 | 2026-07-24 | Draft | Remediated confirmed Rule of 5 findings: semantics, taxonomy, operational edge cases, measurability, traceability, and examples. |
 
 Vampiro ("vampire" — Spanish) is a cross-language CLI that
@@ -429,7 +430,7 @@ index; the summaries below are navigation aids only.
 - Modularity/reach-through detection → REQ-8.
 - Optionality / substitutability via law suites → REQ-10, REQ-18, REQ-26.
 - Robustness / effect-channel threading → REQ-3, REQ-9, REQ-11, REQ-21,
-  REQ-25.
+  REQ-25; trust-boundary validation → REQ-B1–REQ-B6.
 - Formal proof dispatch (opt-in, never required for the default gate) →
   REQ-12, REQ-16, REQ-17, REQ-26.
 - Multi-language plugin architecture and self-conformance → REQ-1, REQ-6,
@@ -499,6 +500,12 @@ implementation status.
 | REQ-T7 | Resource leaks | Exit-path discharge fixtures |
 | REQ-T8 | Facade identity ambiguity | Rename/move fixture |
 | REQ-T9 | Unknown retry coverage | Unknown-idiom diagnostic test |
+| REQ-B1 | Trust-provenance classification | Per-language source and propagation fixtures |
+| REQ-B2 | Smart-constructor recognition | Raw-to-refined constructor fixtures |
+| REQ-B3 | Boundary leaks | Untrusted-to-interior flow fixtures |
+| REQ-B4 | Validation duplication | Declared-equivalent validation fixtures |
+| REQ-B5 | Refinement confirmation | Complete, absent, stale, and incomplete coverage-evidence fixtures |
+| REQ-B6 | Unknown trust provenance | Unknown-source/propagation/refinement diagnostic fixtures |
 
 ---
 
@@ -960,7 +967,176 @@ uses for mutation testers than absorbed into the CIR.
 
 ---
 
+## Addendum B: Trust-Boundary Validation (Parse, Don't Validate)
+
+### B.0 Background & Motivation
+
+A codebase stays simple internally only if invalid values cannot reach the
+interior: not by convention, but because the interior holds shapes already
+resolved into a valid form at the edge. Under the “parse, don't validate”
+principle, a validity constraint is represented by the shape itself (for
+example, a branded type, newtype, or successful parse result), so internal
+code does not repeatedly ask whether the value is valid.
+
+This addendum does not introduce a separate checking mechanism. Parsing a raw
+external input produces a coproduct such as `Refined + ParseError`. Failing to
+eliminate that coproduct totally before the value crosses inward is the same
+failure mode that REQ-C4 formalizes for effect channels. The additional data is
+the location of the trust boundary and a trust-provenance field identifying
+whether a value has crossed a recognized refinement step. Trust provenance is
+distinct from the callee-to-caller argument provenance recorded on CIR edges.
+
+### B.1 Scope & Definitions
+
+- **Trust-boundary node**: a node whose output derives from data originating
+  outside the analyzed trust domain, such as a network request, CLI argument,
+  file or database read, environment variable, FFI call, or deserialization
+  entry point. Front-end plugins identify these nodes through versioned
+  per-language idiom tables and explicit project declarations.
+- **CIR value occurrence**: one data-bearing location to which trust provenance
+  attaches: a node parameter/output, a sum-type arm, or an edge argument slot.
+  Trust provenance never attaches once to an entire multi-arm wrapper when its
+  arms have different classifications.
+- **Raw shape**: the shape of data as received at a trust-boundary node before
+  refinement; it carries trust provenance `untrusted`.
+- **Refined shape**: a distinct shape whose constructor structurally encodes a
+  validity constraint, such as a branded/newtype wrapper or the success arm of
+  `Result<Refined, ParseError>` or `Option<Refined>`; a successfully constructed
+  value carries trust provenance `trusted`.
+- **Smart constructor**: a declared or idiom-table-recognized node that checks
+  a raw shape and returns a distinct refined shape through a `Result`, `Option`,
+  or equivalent sum-typed codomain. The caller must still eliminate every
+  outcome totally under REQ-C4 before using the refined value as trusted.
+- **Boundary-leak edge**: an edge along which an `untrusted` raw shape flows
+  into an interior node that is neither a trust-boundary node nor a recognized
+  smart constructor.
+- **Validation duplication**: a node other than a refined shape's recognized
+  smart constructor that repeats a validation proven equivalent by a declared
+  validation identity or a conformance-tested language idiom. Mere syntactic
+  similarity is insufficient evidence.
+- **Validation observation**: a CIR fact containing a stable validation
+  identity, the recognized smart constructor and refined shape to which it
+  applies, the exact source span, and recognition origin `declaration` or
+  `idiom`.
+- **Boundary class**: a stable, project-declared identifier for one partition
+  relevant to a smart constructor's validity constraint, such as below-minimum,
+  minimum, maximum, above-maximum, empty, malformed, or a declared domain-specific
+  equivalent. A confirmable smart constructor has at least one declared,
+  uniquely identified boundary class; classes are declaration data, not
+  inferred test names.
+- **Boundary-coverage evidence**: a versioned record from a configured companion
+  tool containing producer identity/version, analyzed revision, smart-constructor
+  stable identity and source/shape hash, each declared boundary-class ID, and
+  the result for that class. Evidence is current only when the revision,
+  constructor identity/hash, and complete declared class set match the analyzed
+  input.
+- **Confirmed refinement**: a refined shape whose smart constructor has
+  current boundary-coverage evidence reporting a pass for every declared
+  boundary class applicable to its raw shape.
+- **Refinement confirmation**: normalized evidence on a refined shape with
+  `status=confirmed` or `status=unknown`. `unknown` carries exactly one primary
+  reason from `{absent, malformed, unsupported-version, stale, mismatched,
+  empty-classes, duplicate-class, incomplete, unknown-class, failing}` and MAY
+  carry additional detail without changing that closed reason vocabulary.
+
+### B.2 Ubiquitous Requirements
+
+- **REQ-B1**: Front-end plugins shall classify every CIR value occurrence's
+  trust provenance as `untrusted`, `trusted`, or `unknown`, using versioned,
+  conformance-tested source, propagation, and refinement idioms per language.
+  A recognized external source occurrence SHALL be `untrusted`; a recognized
+  internal literal SHALL be `trusted`; a recognized smart constructor's
+  success-arm value SHALL be `trusted`; each non-success-arm payload and other
+  ordinary derived value SHALL be `untrusted` if any contributing occurrence
+  is `untrusted`, otherwise `unknown` if any contributor is `unknown`, otherwise
+  `trusted`.
+  A dependency path beyond the configured argument-provenance bound `H`, or a
+  conflict between matching declarations/idioms, SHALL yield `unknown` rather
+  than `trusted`. Refinement confirmation SHALL remain independent of this
+  classification.
+- **REQ-B2**: The tool shall recognize a smart-constructor node only from an
+  explicit project declaration or a conformance-tested idiom that converts a
+  raw shape to a distinct refined shape through a `Result`, `Option`, or
+  equivalent sum-typed codomain.
+
+### B.3 Event-Driven Requirements
+
+- **REQ-B3**: When an edge carries an `untrusted` raw shape into an interior
+  node that is neither a trust-boundary node nor a recognized smart constructor,
+  the tool shall raise exactly one `robustness` finding for that violating edge,
+  classified `boundary-leak` with default severity `HIGH` and deduplicated by
+  REQ-24's rule/location/shape identity.
+- **REQ-B4**: When a node repeats validation already encoded by an existing
+  refined shape's recognized smart constructor, and equivalence is established
+  by declaration or conformance-tested idiom, its frontend SHALL emit a
+  validation observation and the tool shall raise a `modularity` finding
+  classified `validation-duplication` with default severity `LOW` and
+  deduplicated by REQ-24's rule/location/shape identity.
+- **REQ-B5**: The tool shall emit `refinement_confirmation.status=confirmed`
+  only when the boundary-class declaration is non-empty and unique and current
+  evidence correlates with the constructor and reports a pass for every
+  declared class. For every other case it SHALL emit
+  `refinement_confirmation.status=unknown` with the first applicable reason in
+  the ordered closed reason vocabulary from the Refinement confirmation
+  definition. Any downstream reachability analysis SHALL report `unreachable`
+  from refinement evidence only when this status is `confirmed`.
+
+### B.4 Unwanted Behavior Requirements
+
+- **REQ-B6**: If a CIR value occurrence's trust provenance cannot be classified
+  because no source, propagation, or refinement idiom matches, declarations or
+  idioms conflict, or its dependency path exceeds `H`, the tool shall report a
+  `trust-provenance:unknown` coverage diagnostic and shall not default the
+  occurrence to `trusted`. This diagnostic has no finding axis.
+
+### B.5 Traceability Notes (Addendum B)
+
+- Trust-provenance classification and smart-constructor recognition →
+  REQ-B1, REQ-B2.
+- Boundary-leak detection, reusing REQ-C4 totality → REQ-B3.
+- Equivalent duplicate validation → REQ-B4.
+- Cross-tool refinement confirmation → REQ-B5.
+- Unclassified trust provenance → REQ-B6.
+
+---
+
 ## Appendix: Worked Examples by Axis
+
+**Boundary leak (Python)**
+```python
+# HTTP handler — a trust-boundary node
+def create_order(request):
+    qty = request.json["quantity"]      # raw, untrusted int
+    return process_order(qty)           # leaks straight to the interior
+
+def process_order(qty: int):
+    total = qty * unit_price             # no validity guarantee on qty
+    ...
+```
+`request.json["quantity"]` is `untrusted`; `process_order` is neither a
+trust-boundary node nor a recognized smart constructor, yet receives the raw
+value directly → REQ-B3 finding, axis `robustness`, classification
+`boundary-leak`.
+
+**Validation duplication (Rust)**
+```rust
+struct PositiveQty(u32);
+impl PositiveQty {
+    fn parse(raw: i64) -> Result<Self, QtyError> {
+        if raw <= 0 { return Err(QtyError::NonPositive); }
+        Ok(PositiveQty(raw as u32))
+    }
+}
+
+fn apply_discount(qty: PositiveQty, pct: f64) -> f64 {
+    if qty.0 == 0 { panic!("qty must be positive"); }  // duplicate check
+    ...
+}
+```
+Given a declared validation identity between the condition and
+`PositiveQty::parse`, `apply_discount` repeats a constraint the refined shape
+already guarantees → REQ-B4 finding, axis `modularity`, classification
+`validation-duplication`.
 
 **Composition break (Python → seam)**
 ```python

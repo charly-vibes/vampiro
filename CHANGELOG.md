@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Updated the authoritative EARS specification to Draft 1.2.0 with
+  trust-boundary validation requirements (REQ-B1–REQ-B6).
+
+### Added
+- Approval-gated `add-trust-boundary-analysis` OpenSpec change and six matching
+  Beads tickets covering 17 implementation and verification checklist items.
+
 ## [0.0.0] — 2026-07-24
 
 ### Added

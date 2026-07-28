@@ -2,15 +2,15 @@
 
 ## Purpose
 Vampiro is a cross-language static-analysis CLI that checks whether code
-composes correctly at call and module boundaries. It detects four classes of
-seam defects: structural composition mismatches, module reach-through,
-law-level substitutability failures, and discarded or inconsistent effect
-channels. It analyzes source without executing it and normalizes each
-language into a shared Composition IR (CIR).
+composes correctly at call, module, and trust boundaries. It detects structural
+composition mismatches, module reach-through, law-level substitutability
+failures, discarded or inconsistent effect channels, and unrefined external
+data crossing into trusted interiors. It analyzes source without executing it
+and normalizes each language into a shared Composition IR (CIR).
 
 The authoritative product requirements are in `vampiro-ears-spec.md`. Preserve
-its requirement IDs (`REQ-*`, `REQ-V*`, `REQ-C*`, and `REQ-T*`) in proposals,
-tests, findings, and traceability notes.
+its requirement IDs (`REQ-*`, `REQ-V*`, `REQ-C*`, `REQ-T*`, and `REQ-B*`) in
+proposals, tests, findings, and traceability notes.
 
 ## Tech Stack
 - Implementation language: Rust, organized as a Cargo workspace and exposed
@@ -92,7 +92,8 @@ compose. Its four reporting axes are:
 - `optionality`: an implementation matches an interface signature but fails
   its declared algebraic laws.
 - `robustness`: an effect, fallback, retry, or acquire/release obligation is
-  swallowed or threaded inconsistently.
+  swallowed or threaded inconsistently, or untrusted raw data crosses into the
+  interior without a recognized refinement step.
 
 The built-in visibility model is a five-level lattice from `L0 private` to
 `L4 public-stable`, but projects may declare deeper filtrations. Boundary kind
@@ -117,6 +118,9 @@ Their `filtration_distance` is separate evidence, not configured severity.
 - N+1 detection, documentation truth maintenance, and lock-order analysis are
   explicitly out of scope because they require other extraction models or
   belong to other tools.
+- Trust provenance is distinct from CIR argument provenance. Unknown, absent,
+  stale, or incomplete refinement evidence never establishes that an invalid
+  state is unreachable.
 - The repository is greenfield. `openspec/specs/` describes built truth, so do
   not copy aspirational EARS requirements there before implementation; add
   them through reviewed changes and archive them as capabilities ship.

@@ -1,7 +1,8 @@
 # Vampiro
 
 Vampiro is a planned cross-language Rust CLI for checking whether code composes
-correctly across call, module, effect, law, retry, and resource boundaries.
+correctly across call, module, effect, law, retry, resource, and trust
+boundaries.
 
 The project is currently in specification and proposal review. No application
 implementation has started. The authoritative requirements are in
@@ -35,4 +36,4 @@ python scripts/check_planning.py
 ```
 
 Implementation remains blocked until the human approval gate recorded in
-`.beads/issues.jsonl` approves EARS 1.1.0 and all eight OpenSpec proposals.
+`.beads/issues.jsonl` approves EARS 1.2.0 and every active OpenSpec proposal.

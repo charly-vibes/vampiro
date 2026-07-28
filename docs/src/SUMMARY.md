@@ -39,5 +39,9 @@
     - [Capability delta](./roadmap/add-python-clojure-julia-frontends/spec.md)
     - [Design](./roadmap/add-python-clojure-julia-frontends/design.md)
     - [Tasks](./roadmap/add-python-clojure-julia-frontends/tasks.md)
+  - [`add-trust-boundary-analysis`](./roadmap/add-trust-boundary-analysis/proposal.md)
+    - [Capability delta](./roadmap/add-trust-boundary-analysis/spec.md)
+    - [Design](./roadmap/add-trust-boundary-analysis/design.md)
+    - [Tasks](./roadmap/add-trust-boundary-analysis/tasks.md)
 
 [Contributing](./contributing.md)
