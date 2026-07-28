@@ -28,9 +28,11 @@
 > **Verification (2026-07-28):** 14 law runner-input tests pass. Runner-input schema v0.1.0. Fixtures at `tests/fixtures/add-rust-analysis-frontend/3/`. Full details in `docs/verification/add-rust-analysis-frontend-3.md`.
 
 ## 4. Lifecycle Fact Tracer
-- [ ] 4.1 Add failing extraction fixtures for write/retry facts, resource identity, acquisition/release/transfer, normal/early/error/panic exit paths, aliases, and explicit unknowns.
-- [ ] 4.2 Implement lifecycle extraction hooks without lifecycle classification or findings.
-- [ ] 4.3 Run deterministic lifecycle-consumer compatibility tests; publish the lifecycle-fact schema/version and fixture path.
+- [x] 4.1 Add failing extraction fixtures for write/retry facts, resource identity, acquisition/release/transfer, normal/early/error/panic exit paths, aliases, and explicit unknowns.
+- [x] 4.2 Implement lifecycle extraction hooks without lifecycle classification or findings.
+- [x] 4.3 Run deterministic lifecycle-consumer compatibility tests; publish the lifecycle-fact schema/version and fixture path.
+
+> **Verification (2026-07-28):** 13 lifecycle extraction tests pass. Lifecycle-fact schema v0.1.0. Fixtures at `tests/fixtures/add-rust-analysis-frontend/4/`. Full details in `docs/verification/add-rust-analysis-frontend-4.md`.
 
 ## 5. Rust Frontend Acceptance
 - [ ] 5.1 Run all Rust CIR, visibility, runner-input, lifecycle, deterministic, and negative suites plus workspace formatting and Clippy.

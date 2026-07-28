@@ -270,7 +270,8 @@ impl LawExtractor {
     fn extract_tags(&self, attrs: &[syn::Attribute]) -> Vec<String> {
         let mut tags = Vec::new();
         for attr in attrs {
-            let path_str = attr.path()
+            let path_str = attr
+                .path()
                 .segments
                 .iter()
                 .map(|s| s.ident.to_string())

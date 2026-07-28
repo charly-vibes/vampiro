@@ -1,0 +1,22 @@
+{
+  "version": "0.1.0",
+  "source_file": "writes.rs",
+  "writes": [
+    {
+      "target": "x",
+      "kind": "assignment",
+      "function": "foo",
+      "span": {
+        "file": "writes.rs",
+        "start_line": 1,
+        "start_column": 1,
+        "end_line": 1,
+        "end_column": 10
+      }
+    }
+  ],
+  "retries": [],
+  "resources": [],
+  "exit_paths": [],
+  "aliases": []
+}

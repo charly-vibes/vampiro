@@ -15,6 +15,7 @@
 
 mod extract;
 pub mod law;
+pub mod lifecycle;
 pub mod visibility;
 
 use std::path::Path;
