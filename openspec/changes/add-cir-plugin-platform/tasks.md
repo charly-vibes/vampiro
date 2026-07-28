@@ -36,6 +36,8 @@
 
 ## 4. Platform Acceptance
 *(Depends on sections 0–3. Scoped to workspace-crate integration per YAGNI decision.)*
-- [ ] 4.1 Run declaration, model, frontend trait, and integration suites plus `cargo test --workspace`, formatting, and Clippy with warnings denied.
-- [ ] 4.2 Verify exact requirement traceability and a consumer compatibility test that imports `vampiro-cir`, creates a `CirGraph`, calls `validate()`, and integrates with the CLI finding/configuration contracts.
-- [ ] 4.3 Run `openspec validate add-cir-plugin-platform --strict` and record CIR schema, plugin boundary, fixture versions, commands, and passing evidence location.
+- [x] 4.1 Run declaration, model, frontend trait, and integration suites plus `cargo test --workspace`, formatting, and Clippy with warnings denied.
+- [x] 4.2 Verify exact requirement traceability and a consumer compatibility test that imports `vampiro-cir`, creates a `CirGraph`, calls `validate()`, and integrates with the CLI finding/configuration contracts.
+- [x] 4.3 Run `openspec validate add-cir-plugin-platform --strict` and record CIR schema, plugin boundary, fixture versions, commands, and passing evidence location.
+
+> **Verification (2026-07-28):** 98 tests pass (9 new consumer compatibility tests). CIR schema v0.1.0 published, Frontend trait contract verified, depth-limit validation confirmed, CLI finding/config integration demonstrated. Full details in `docs/verification/add-cir-plugin-platform-4.md`.
