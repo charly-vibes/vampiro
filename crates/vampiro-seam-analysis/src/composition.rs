@@ -18,7 +18,7 @@
 //! [`Shape::normalize`](vampiro_cir::Shape)d shapes per the approved
 //! canonicalization contract.
 
-use vampiro_cir::{CirGraph, Shape};
+use vampiro_cir::{CirGraph, Shape, Totality, UnwrapKind};
 
 use crate::finding::Finding;
 
@@ -111,6 +111,24 @@ fn shape_covers(container: &Shape, value: &Shape) -> bool {
     }
 }
 
+/// Extract the inner type from an effect wrapper for `?` operator semantics.
+///
+/// When a `Result<T, E>` or `Option<T>` is unwrapped via the `?` operator,
+/// the value that flows to the caller is `T` (the success path). This helper
+/// extracts `T` from the outer `Parameterized` shape for composition comparison.
+fn unwrap_outer_effect(shape: &Shape) -> Option<&Shape> {
+    match shape {
+        Shape::Parameterized { base, parameters } => {
+            if base == "Result" || base == "Option" {
+                parameters.first()
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 /// The composition tracer. See module docs.
 #[derive(Debug, Default, Clone)]
 pub struct CompositionAnalyzer;
@@ -148,7 +166,21 @@ impl CompositionAnalyzer {
             if caller.codomain == Shape::Scalar {
                 continue;
             }
-            let unification = unify_shapes(&callee.codomain, &caller.codomain);
+            // For edges with Ordinary+Total unwrap evidence (e.g., `?`
+            // operator on Result/Option), the callee's effect wrapper is
+            // removed at the call site. Compare the unwrapped shape (the
+            // inner type parameter) instead of the full effect-wrapped
+            // codomain (vampiro-0j8).
+            let callee_shape = if let Some(ref ue) = edge.unwrap_evidence {
+                if ue.kind == UnwrapKind::Ordinary && ue.totality == Totality::Total {
+                    unwrap_outer_effect(&callee.codomain).unwrap_or(&callee.codomain)
+                } else {
+                    &callee.codomain
+                }
+            } else {
+                &callee.codomain
+            };
+            let unification = unify_shapes(callee_shape, &caller.codomain);
             match unification {
                 Unification::Match | Unification::OpaqueExcluded => continue,
                 Unification::Mismatch { unhandled } => {
@@ -259,7 +291,7 @@ mod tests {
 
     use vampiro_cir::{
         CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, SourceSpan,
-        StableId,
+        StableId, Totality, UnwrapEvidence, UnwrapKind,
     };
 
     fn node(id: &str, domain: Shape, codomain: Shape) -> CirNode {
@@ -376,5 +408,161 @@ mod tests {
         graph.add_node(node("callee", Shape::Scalar, rec));
         graph.add_edge(edge("e1", "caller", "callee", 7));
         assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
+    }
+
+    // --- vampiro-0j8: ? operator unwrapping ---
+
+    #[test]
+    fn try_operator_result_unwrap_no_finding() {
+        // Caller returns String, callee returns Result<String, Error>.
+        // Edge has Ordinary+Total unwrap evidence (? operator) → compare
+        // unwrapped type (String) instead of the full Result.
+        let mut graph = CirGraph::new("src/lib.rs");
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar,
+            Shape::Parameterized {
+                base: "String".into(),
+                parameters: vec![Shape::Scalar],
+            },
+        ));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar,
+            Shape::Parameterized {
+                base: "Result".into(),
+                parameters: vec![
+                    Shape::Parameterized {
+                        base: "String".into(),
+                        parameters: vec![Shape::Scalar],
+                    },
+                    Shape::Parameterized {
+                        base: "Error".into(),
+                        parameters: vec![Shape::Scalar],
+                    },
+                ],
+            },
+        ));
+        graph.add_edge(CirEdge {
+            id: StableId::new("e1"),
+            source: StableId::new("caller"),
+            target: StableId::new("callee"),
+            resolution: EffectResolution::Unwrapped,
+            unwrap_evidence: Some(UnwrapEvidence {
+                kind: UnwrapKind::Ordinary,
+                totality: Totality::Total,
+            }),
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "src/lib.rs".into(),
+                start_line: 3,
+                start_column: 5,
+                end_line: 3,
+                end_column: 20,
+            },
+            discard_spans: Vec::new(),
+        });
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert!(
+            findings.is_empty(),
+            "? operator unwraps Result -> inner value, no mismatch"
+        );
+    }
+
+    #[test]
+    fn try_operator_option_unwrap_no_finding() {
+        // Caller returns f64, callee returns Option<f64>.
+        // Edge has Ordinary+Total unwrap evidence → compare unwrapped type.
+        let mut graph = CirGraph::new("src/lib.rs");
+        graph.add_node(node("caller", Shape::Scalar, Shape::Scalar));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar,
+            Shape::Parameterized {
+                base: "Option".into(),
+                parameters: vec![Shape::Scalar],
+            },
+        ));
+        graph.add_edge(CirEdge {
+            id: StableId::new("e1"),
+            source: StableId::new("caller"),
+            target: StableId::new("callee"),
+            resolution: EffectResolution::Unwrapped,
+            unwrap_evidence: Some(UnwrapEvidence {
+                kind: UnwrapKind::Ordinary,
+                totality: Totality::Total,
+            }),
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "src/lib.rs".into(),
+                start_line: 3,
+                start_column: 5,
+                end_line: 3,
+                end_column: 20,
+            },
+            discard_spans: Vec::new(),
+        });
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert!(
+            findings.is_empty(),
+            "? operator unwraps Option -> inner value, no mismatch"
+        );
+    }
+
+    #[test]
+    fn try_operator_real_mismatch_still_fires() {
+        // Caller returns String, callee returns Result<i32, Error>.
+        // Edge has Ordinary+Total unwrap → compare i32 vs String → mismatch.
+        let mut graph = CirGraph::new("src/lib.rs");
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar,
+            Shape::Parameterized {
+                base: "String".into(),
+                parameters: vec![Shape::Scalar],
+            },
+        ));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar,
+            Shape::Parameterized {
+                base: "Result".into(),
+                parameters: vec![
+                    Shape::Scalar,
+                    Shape::Parameterized {
+                        base: "Error".into(),
+                        parameters: vec![Shape::Scalar],
+                    },
+                ],
+            },
+        ));
+        graph.add_edge(CirEdge {
+            id: StableId::new("e1"),
+            source: StableId::new("caller"),
+            target: StableId::new("callee"),
+            resolution: EffectResolution::Unwrapped,
+            unwrap_evidence: Some(UnwrapEvidence {
+                kind: UnwrapKind::Ordinary,
+                totality: Totality::Total,
+            }),
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "src/lib.rs".into(),
+                start_line: 3,
+                start_column: 5,
+                end_line: 3,
+                end_column: 20,
+            },
+            discard_spans: Vec::new(),
+        });
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            1,
+            "i32 != String should still produce composition finding"
+        );
     }
 }
