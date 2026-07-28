@@ -70,7 +70,9 @@ fn collect_rs_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
 }
 
 fn collect_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
-    for entry in std::fs::read_dir(dir).map_err(|e| format!("failed to read dir {}: {e}", dir.display()))? {
+    for entry in
+        std::fs::read_dir(dir).map_err(|e| format!("failed to read dir {}: {e}", dir.display()))?
+    {
         let entry = entry.map_err(|e| format!("failed to read entry: {e}"))?;
         let path = entry.path();
         if path.is_dir() {
@@ -115,10 +117,7 @@ fn run_check(args: &CheckArgs) -> Result<(), Box<dyn std::error::Error>> {
 
         // Filter findings to only those from this file (analysis may reference
         // other files via test fixture paths, etc.)
-        let own_findings: Vec<_> = findings
-            .into_iter()
-            .filter(|f| f.path == *file)
-            .collect();
+        let own_findings: Vec<_> = findings.into_iter().filter(|f| f.path == *file).collect();
         let own_diagnostics: Vec<_> = diagnostics
             .into_iter()
             .filter(|d| d.path == *file)
@@ -259,14 +258,11 @@ mod tests {
     #[test]
     fn collect_rs_files_multiple_paths() {
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
-        let file = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/minimal.rs"
-        );
+        let file = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/minimal.rs");
         let paths = vec![PathBuf::from(dir), PathBuf::from(file)];
         let files = collect_rs_files(&paths).unwrap();
         assert!(!files.is_empty());
         // Dedup should handle the duplicate
-        assert!(files.len() >= 1);
+        assert!(!files.is_empty());
     }
 }

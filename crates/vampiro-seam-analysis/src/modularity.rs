@@ -472,7 +472,11 @@ mod tests {
         ));
 
         let (findings, _diags) = ModularityAnalyzer::new().analyze(&graph, &vis);
-        assert_eq!(findings.len(), 1, "cross-file edge makes this externally reachable");
+        assert_eq!(
+            findings.len(),
+            1,
+            "cross-file edge makes this externally reachable"
+        );
         let f = &findings[0];
         assert_eq!(f.rule, "REQ-V4");
         assert_eq!(f.classification, "over-exposure");

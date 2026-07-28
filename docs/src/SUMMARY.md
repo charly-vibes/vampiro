@@ -47,5 +47,9 @@
     - [Capability delta](./roadmap/depend-on-genesis/spec.md)
     - [Design](./roadmap/depend-on-genesis/design.md)
     - [Tasks](./roadmap/depend-on-genesis/tasks.md)
+  - [`upgrade-genesis`](./roadmap/upgrade-genesis/proposal.md)
+    - [Capability delta](./roadmap/upgrade-genesis/spec.md)
+    - [Design](./roadmap/upgrade-genesis/design.md)
+    - [Tasks](./roadmap/upgrade-genesis/tasks.md)
 
 [Contributing](./contributing.md)

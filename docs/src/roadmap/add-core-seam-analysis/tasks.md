@@ -3,18 +3,18 @@
 > Implementation is blocked until the roadmap approval gate records approval of the EARS source and this proposal.
 
 ## 0. Shape Canonicalization Decision Gate (HITL)
-- [ ] 0.1 Compare structural normalization/hash alternatives against unions, opaque shapes, stable dedupe inputs, cross-version fixtures, and collision handling; record the choice in `docs/decisions/shape-canonicalization.md`.
-- [ ] 0.2 Record compatibility/version policy, rejected alternatives, approver, and immutable review reference before analysis implementation.
+- [x] 0.1 Compare structural normalization/hash alternatives against unions, opaque shapes, stable dedupe inputs, cross-version fixtures, and collision handling; record the choice in `docs/decisions/shape-canonicalization.md`.
+- [x] 0.2 Record compatibility/version policy, rejected alternatives, approver, and immutable review reference before analysis implementation.
 
 ## 1. Composition Tracer
-- [ ] 1.1 Add failing structural-unification, union-arm, opaque-shape exclusion, and side-by-side mismatch-evidence tests (REQ-7, REQ-23).
-- [ ] 1.2 Implement coarse structural normalization/unification under the approved canonicalization contract and preserve opaque edges for non-composition checks.
-- [ ] 1.3 Run focused unit/property tests plus one Rust frontend E2E negative fixture; record expected finding fields and passing command output.
+- [x] 1.1 Add failing structural-unification, union-arm, opaque-shape exclusion, and side-by-side mismatch-evidence tests (REQ-7, REQ-23).
+- [x] 1.2 Implement coarse structural normalization/unification under the approved canonicalization contract and preserve opaque edges for non-composition checks.
+- [x] 1.3 Run focused unit/property tests plus one Rust frontend E2E negative fixture; record expected finding fields and passing command output.
 
 ## 2. Modularity Tracer
-- [ ] 2.1 Add failing advisory/enforced, arbitrary-depth visibility, Rust over-exposure, facade-leak, and plugin-diagnostic fixtures (REQ-8, REQ-V3–V4, REQ-V7, REQ-C5).
-- [ ] 2.2 Implement language-neutral visibility/facade reachability, exactly-one-axis modularity findings, and enforced-unreachable plugin diagnostics outside findings.
-- [ ] 2.3 Run focused fixtures plus a Rust facade E2E test; record finding/diagnostic schemas and passing evidence.
+- [x] 2.1 Add failing advisory/enforced, arbitrary-depth visibility, Rust over-exposure, facade-leak, and plugin-diagnostic fixtures (REQ-8, REQ-V3–V4, REQ-V7, REQ-C5).
+- [x] 2.2 Implement language-neutral visibility/facade reachability, exactly-one-axis modularity findings, and enforced-unreachable plugin diagnostics outside findings.
+- [x] 2.3 Run focused fixtures plus a Rust facade E2E test; record finding/diagnostic schemas and passing evidence.
 
 ## 3. Effect Handling Tracer
 - [ ] 3.1 Add failing direct result/option/throws discard-line, nested/custom effect, ancestor-boundary, ordinary partial/total unwrap, and panic/force-unwrap fixtures (REQ-9, REQ-25, REQ-C4).

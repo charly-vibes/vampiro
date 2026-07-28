@@ -25,6 +25,18 @@ The platform SHALL contract frontends to extract, without execution, CIR nodes w
 - **WHEN** a callee result reaches a caller argument through more than `H` local bindings
 - **THEN** the recorded chain ends with an explicit over-bound/unknown marker rather than asserting no provenance
 
+#### Scenario: Shape extraction fails
+- **WHEN** a callable's domain or codomain shape cannot be extracted (fully dynamic, untyped, no annotations)
+- **THEN** the shape is `opaque` and the node is excluded from composition-break checking but included in modularity- and robustness-break checking
+
+#### Scenario: Effect channel overflow is rejected
+- **WHEN** a frontend produces an effect channel with more than 64 recursive nesting levels
+- **THEN** the graph is rejected with a resource-limit error and the frontend is not registered
+
+#### Scenario: Shape overflow is rejected
+- **WHEN** a frontend produces a shape structure with more than 64 recursive nesting levels
+- **THEN** the graph is rejected with a resource-limit error and the frontend is not registered
+
 ### Requirement: Visibility extraction is a platform contract
 The platform SHALL require every frontend to classify each declaration's visibility level and boundary kind using a versioned, conformance-tested language visibility idiom table that is independent of its effect-resolution table. Source requirements: REQ-V1, REQ-V2.
 
@@ -33,7 +45,7 @@ The platform SHALL require every frontend to classify each declaration's visibil
 - **THEN** visibility conformance is versioned and rerun without changing the effect-table version
 
 ### Requirement: Declarative categories and filtrations are extensible and valid
-The system SHALL accept each category as a finite declaration of objects, explicitly declared identity morphisms, finite non-identity morphism generators, and a decidable composition table. Validation SHALL reject any missing identity before constructing finite closure, SHALL NOT synthesize a missing identity, SHALL reject undefined/non-closed composites, and SHALL exhaustively check identities and associativity over the resulting table. It SHALL accept finite filtrations (default L0–L4), exhaustively verify every level is a wide subcategory nested in its successor, and compute the least containing level `sev(e)` for a finding edge. Source requirements: REQ-C1, REQ-C2, REQ-C3, REQ-C8, REQ-C9.
+The system SHALL accept each category as a finite declaration of objects, explicitly declared identity morphisms, finite non-identity morphism generators, and a decidable composition table. Validation SHALL reject any missing identity before constructing finite closure, SHALL NOT synthesize a missing identity, SHALL reject undefined/non-closed composites, and SHALL exhaustively check identities and associativity over the resulting table. It SHALL accept finite filtrations (default L0–L4), exhaustively verify every level is a wide subcategory nested in its successor, and compute the least containing level `filtration_level(e)` for a finding edge (distinct from `Severity::sev()`, which maps severity to a numeric value). Source requirements: REQ-C1, REQ-C2, REQ-C3, REQ-C8, REQ-C9.
 
 #### Scenario: Invalid filtration is rejected
 - **WHEN** a project declares a level that is not a subcategory of its successor
@@ -45,7 +57,11 @@ The system SHALL accept each category as a finite declaration of objects, explic
 
 #### Scenario: Valid filtration computes distance evidence
 - **WHEN** a finding edge first belongs to filtration level `G3`
-- **THEN** finding evidence contains user-facing `filtration_distance = 3`, equal to `sev(e)`, separately from configured severity
+- **THEN** finding evidence contains user-facing `filtration_distance = 3`, equal to `filtration_level(e)`, separately from configured severity
+
+#### Scenario: Declaration exceeds resource limit
+- **WHEN** a category declaration's closure exceeds the configured resource limit (node count, edge count, or depth)
+- **THEN** the declaration is rejected as a configuration error, not validated partially
 
 ### Requirement: Plugins pass reproducible structural conformance
 Before implementation, the system SHALL select and document plugin packaging/ABI and serialization/schema-version policy. It SHALL load a frontend or resolver only after compatibility fixtures and a versioned suite produce byte-for-byte identical canonical UTF-8 serialized results and load manifests under unchanged tool, plugin, configuration, and platform versions, and verify frontend identity/composition preservation and naturality on shared abstract diagrams. Source requirements: REQ-6, REQ-29, REQ-C10.
@@ -57,6 +73,10 @@ Before implementation, the system SHALL select and document plugin packaging/ABI
 #### Scenario: Failed conformance does not load
 - **WHEN** any deterministic, functoriality, naturality, or contract fixture fails
 - **THEN** that plugin is not registered or used for source extraction
+
+#### Scenario: Version mismatch is detected
+- **WHEN** a plugin's schema version does not match the platform's expected CIR schema version
+- **THEN** the plugin is rejected with a version-mismatch diagnostic
 
 ### Requirement: Unknown idioms and plugin conflicts fail safely
 The system SHALL classify unmatched wrapper and unwrap patterns as `unknown` with an idiom-review diagnostic, and SHALL reject both plugins that conflict on the same fixture. Source requirements: REQ-21, REQ-22.
