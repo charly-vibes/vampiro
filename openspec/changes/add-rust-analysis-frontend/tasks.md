@@ -35,6 +35,8 @@
 > **Verification (2026-07-28):** 13 lifecycle extraction tests pass. Lifecycle-fact schema v0.1.0. Fixtures at `tests/fixtures/add-rust-analysis-frontend/4/`. Full details in `docs/verification/add-rust-analysis-frontend-4.md`.
 
 ## 5. Rust Frontend Acceptance
-- [ ] 5.1 Run all Rust CIR, visibility, runner-input, lifecycle, deterministic, and negative suites plus workspace formatting and Clippy.
-- [ ] 5.2 Verify each published milestone independently satisfies its named platform consumer contract and generic IDs remain conformance references.
-- [ ] 5.3 Run `openspec validate add-rust-analysis-frontend --strict` and record parser decision, schema/table versions, commands, and passing evidence location.
+- [x] 5.1 Run all Rust CIR, visibility, runner-input, lifecycle, deterministic, and negative suites plus workspace formatting and Clippy.
+- [x] 5.2 Verify each published milestone independently satisfies its named platform consumer contract and generic IDs remain conformance references.
+- [x] 5.3 Run `openspec validate add-rust-analysis-frontend --strict` and record parser decision, schema/table versions, commands, and passing evidence location.
+
+> **Verification (2026-07-28):** All 5 milestones verified. 174 tests pass. 5 contracts published. Full details in `docs/verification/add-rust-analysis-frontend-5.md`.
