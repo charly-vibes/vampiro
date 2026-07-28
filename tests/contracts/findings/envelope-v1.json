@@ -1,0 +1,26 @@
+{
+  "version": "v1",
+  "change": "add-rust-cli-foundation",
+  "tracer": "finding-envelope",
+  "contract": {
+    "finding": {
+      "fields": {
+        "rule": "String — rule identifier",
+        "path": "PathBuf — file path",
+        "line-range-start": "usize — first line (1-indexed)",
+        "line-range-end": "usize — last line (1-indexed, inclusive)",
+        "severity": "enum: error, warning, note",
+        "axis": "enum: correctness, security, performance, style, safety, reliability",
+        "filtration-distance": "Option<u32> — default = Some(sev(severity))"
+      },
+      "filtration-formula": "sev(e) maps severity to u32: Error→3, Warning→2, Note→1"
+    },
+    "key-convention": "kebab-case",
+    "serde": "serde_json with rename_all = kebab-case, flatten for line-range"
+  },
+  "verification": {
+    "tests-passed": 7,
+    "test-filter": "rust_cli_foundation_3",
+    "evidence": "docs/verification/add-rust-cli-foundation-3.md"
+  }
+}

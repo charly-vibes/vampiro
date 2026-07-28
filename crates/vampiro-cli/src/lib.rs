@@ -8,6 +8,7 @@
 pub mod cli;
 pub mod config;
 pub mod exit_code;
+pub mod finding;
 
 pub use cli::Cli;
 pub use config::{load_config, Config, ConfigError};

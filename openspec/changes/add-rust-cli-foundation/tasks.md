@@ -13,9 +13,9 @@
 - [x] 2.3 Run `cargo test --workspace rust_cli_foundation_2` and workspace quality commands; publish `cli-config-exit/v1` at `tests/contracts/cli/config-exit-v1.json` and record evidence in `docs/verification/add-rust-cli-foundation-2.md`.
 
 ## 3. Finding Envelope Tracer
-- [ ] 3.1 Add failing construction/serialization-boundary tests requiring rule, path, exact line range, configured severity, exactly one axis, and optional independent `filtration_distance = sev(e)`.
-- [ ] 3.2 Implement the shared finding envelope and empty successor adapters without reporting, law, lifecycle, or scan behavior.
-- [ ] 3.3 Run `cargo test --workspace rust_cli_foundation_3`; publish `finding-envelope/v1` at `tests/contracts/findings/envelope-v1.json`, verify REQ-4 ownership plus REQ-5/REQ-12 references, and record evidence in `docs/verification/add-rust-cli-foundation-3.md`.
+- [x] 3.1 Add failing construction/serialization-boundary tests requiring rule, path, exact line range, configured severity, exactly one axis, and optional independent `filtration_distance = sev(e)`.
+- [x] 3.2 Implement the shared finding envelope and empty successor adapters without reporting, law, lifecycle, or scan behavior.
+- [x] 3.3 Run `cargo test --workspace rust_cli_foundation_3`; publish `finding-envelope/v1` at `tests/contracts/findings/envelope-v1.json`, verify REQ-4 ownership plus REQ-5/REQ-12 references, and record evidence in `docs/verification/add-rust-cli-foundation-3.md`.
 
 ## 4. Foundation Acceptance
 - [ ] 4.1 Run unit, integration, doc, and command snapshot suites plus workspace formatting and Clippy.
