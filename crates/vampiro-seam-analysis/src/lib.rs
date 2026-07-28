@@ -20,9 +20,13 @@ use vampiro_cir::CirGraph;
 
 pub mod composition;
 pub mod finding;
+pub mod modularity;
+pub mod visibility;
 
 pub use composition::{unify_shapes, CompositionAnalyzer, Unification};
-pub use finding::{Axis, Evidence, Finding, Severity};
+pub use finding::{Axis, Diagnostic, Evidence, Finding, Severity};
+pub use modularity::ModularityAnalyzer;
+pub use visibility::{BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts};
 
 /// Run the currently-implemented analysis slices over `graph` and return the
 /// findings.
@@ -32,5 +36,21 @@ pub use finding::{Axis, Evidence, Finding, Severity};
 pub fn analyze(graph: &CirGraph) -> Vec<Finding> {
     let mut findings = Vec::new();
     findings.extend(CompositionAnalyzer::new().analyze(graph));
+    // The modularity tracer requires visibility facts (REQ-V1), which are not
+    // part of the CIR graph itself. Call `ModularityAnalyzer::analyze` with
+    // visibility facts directly when running the full seam analysis.
     findings
+}
+
+/// Run all implemented analysis slices that consume only the CIR graph.
+/// Modularity analysis (which requires visibility facts) is run separately
+/// via [`ModularityAnalyzer::analyze`].
+pub fn analyze_with_visibility(
+    graph: &CirGraph,
+    vis: &VisibilityFacts,
+) -> (Vec<Finding>, Vec<Diagnostic>) {
+    let mut findings = analyze(graph);
+    let (mod_findings, mod_diags) = ModularityAnalyzer::new().analyze(graph, vis);
+    findings.extend(mod_findings);
+    (findings, mod_diags)
 }

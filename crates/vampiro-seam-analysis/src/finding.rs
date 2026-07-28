@@ -1,3 +1,4 @@
+#![allow(clippy::needless_update)]
 //! The normalized finding contract (REQ-4, EARS v1.3.0).
 //!
 //! Findings are the atomic unit of analysis output. Each finding identifies a
@@ -120,6 +121,36 @@ pub enum Evidence {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         unhandled: Vec<Shape>,
     },
+    /// REQ-8 / REQ-V3: an edge crosses a visibility boundary the caller is
+    /// not permitted to cross. The target's level, boundary kind, and the
+    /// boundary crossed are named.
+    ReachThrough {
+        /// The target declaration's lattice level.
+        target_level: String,
+        /// The target declaration's boundary kind.
+        target_boundary: String,
+        /// A human-readable description of the boundary crossed.
+        boundary_crossed: String,
+    },
+    /// REQ-V4: a declaration at `enforced-open` is reachable from outside its
+    /// package but is marked internal-by-convention. The problem is that the
+    /// item is reachable at all, not that a caller reached it improperly.
+    OverExposure {
+        /// The declaration's lattice level.
+        target_level: String,
+        /// Why the declaration was classified internal-by-convention.
+        convention: String,
+    },
+    /// REQ-V7: a facade re-exports a symbol whose underlying declaration sits
+    /// at a deeper (more hidden) level than the facade's own `L4` level.
+    FacadeLeak {
+        /// The facade module path.
+        facade_scope: String,
+        /// The re-exported symbol name.
+        exported_name: String,
+        /// The underlying declaration's lattice level.
+        underlying_level: String,
+    },
 }
 
 /// One reported issue (REQ-4).
@@ -142,6 +173,10 @@ pub struct Finding {
     pub filtration_distance: Option<u32>,
     /// Rule-specific evidence.
     pub evidence: Evidence,
+    /// The finding classification (e.g. `reach-through`, `over-exposure`,
+    /// `facade-leak`, `composition-break`). Sub-classifies the rule within the
+    /// axis.
+    pub classification: String,
 }
 
 impl Finding {
@@ -166,8 +201,26 @@ impl Finding {
                 callee_produced: callee_produced.normalize(),
                 unhandled: unhandled.into_iter().map(|s| s.normalize()).collect(),
             },
+            classification: "composition-break".into(),
         }
     }
+}
+
+/// A diagnostic is NOT a finding (REQ-V3, EARS finding taxonomy). Diagnostics
+/// carry no severity and no axis; they report plugin or operational issues
+/// (e.g. `boundary:enforced-unreachable` flags a frontend plugin that reported
+/// an enforced boundary crossing, which cannot occur in valid source).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Diagnostic {
+    /// The diagnostic identifier (e.g. `"boundary:enforced-unreachable"`).
+    pub diagnostic: String,
+    /// The file path where the diagnostic was raised.
+    pub path: PathBuf,
+    /// The exact line range.
+    #[serde(flatten)]
+    pub line_range: LineRange,
+    /// Human-readable context and remediation guidance.
+    pub detail: String,
 }
 
 #[cfg(test)]
@@ -224,6 +277,7 @@ mod tests {
         assert_eq!(f.rule, "REQ-7");
         assert_eq!(f.severity, Severity::Medium);
         assert_eq!(f.axis, Axis::Composition);
+        assert_eq!(f.classification, "composition-break");
         assert_eq!(f.line_range, LineRange::new(10, 12));
         assert!(f.filtration_distance.is_none());
         // Evidence carries both shapes side by side (REQ-7).
