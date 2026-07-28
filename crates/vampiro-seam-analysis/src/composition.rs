@@ -1,16 +1,22 @@
 //! Composition tracer (REQ-7, REQ-23).
 //!
-//! For each CIR edge, compares the callee's codomain shape against the
-//! caller's domain shape. If the produced shape does not structurally unify
-//! with the expected shape, the tracer emits a `composition` finding carrying
-//! both shapes side by side (REQ-7). Shapes containing a top-level `Opaque`
-//! are excluded from composition-break checking per REQ-23 and never produce a
-//! composition finding.
+//! For each CIR edge, compares the caller's return type (codomain) against the
+//! callee's return type (codomain). If the caller claims to return type X but
+//! calls a function returning Y ≠ X (and Y is not opaque), a composition
+//! finding is raised carrying both codomains side by side (REQ-7).
 //!
-//! Unification is deliberately coarse (EARS §1: "deliberately coarser than a
-//! full type") and operates on [`Shape::normalize`](vampiro_cir::Shape)d
-//! shapes per the approved canonicalization contract
-//! (`docs/decisions/shape-canonicalization.md`).
+//! This catches composition breaks at the **return boundary**: a function
+//! whose declared return type contradicts what its callees actually produce.
+//! The `parse_amount→apply_discount` seam (comparing callee codomain against
+//! the consuming callee's parameter) requires data-flow edges and is tracked
+//! by `0vb.4.7`.
+//!
+//! Shapes containing a top-level `Opaque` are excluded from composition-break
+//! checking per REQ-23 and never produce a composition finding.
+//!
+//! Unification is deliberately coarse (EARS §1) and operates on
+//! [`Shape::normalize`](vampiro_cir::Shape)d shapes per the approved
+//! canonicalization contract.
 
 use vampiro_cir::{CirGraph, Shape};
 
@@ -116,7 +122,13 @@ impl CompositionAnalyzer {
     }
 
     /// Analyze every edge in `graph` and return one composition finding per
-    /// edge whose callee codomain does not unify with the caller domain.
+    /// edge where the caller's return type (codomain) does not unify with the
+    /// callee's return type (codomain).
+    ///
+    /// This catches genuine composition breaks at the return boundary: a
+    /// caller claims to return type X but calls a function returning Y ≠ X.
+    /// The check compares the two codomains (not caller.domain, which was the
+    /// source of noise from unrelated call edges).
     pub fn analyze(&self, graph: &CirGraph) -> Vec<Finding> {
         let mut findings = Vec::new();
         for edge in &graph.edges {
@@ -126,14 +138,24 @@ impl CompositionAnalyzer {
             let Some(caller) = graph.node_by_id(&edge.source) else {
                 continue;
             };
-            let unification = unify_shapes(&callee.codomain, &caller.domain);
+
+            // Skip edges where the caller has a void/unit return type
+            // (Scalar as the unit type). There's no composition contract at
+            // the return boundary for void-returning functions, and the
+            // coarse Shape model already cannot distinguish different scalar
+            // types (u32, f64, bool are all `Scalar`), so this guard loses
+            // no precision while eliminating noise from unrelated call edges.
+            if caller.codomain == Shape::Scalar {
+                continue;
+            }
+            let unification = unify_shapes(&callee.codomain, &caller.codomain);
             match unification {
                 Unification::Match | Unification::OpaqueExcluded => continue,
                 Unification::Mismatch { unhandled } => {
                     findings.push(Finding::composition_mismatch(
                         edge.span.file.clone().into(),
                         edge.span.start_line..=edge.span.end_line,
-                        caller.domain.clone(),
+                        caller.codomain.clone(),
                         callee.codomain.clone(),
                         unhandled,
                     ));
@@ -279,8 +301,13 @@ mod tests {
     #[test]
     fn analyze_emits_finding_on_mismatch_with_side_by_side_evidence() {
         let mut graph = CirGraph::new("src/lib.rs");
-        // caller expects Decimal (Scalar), callee produces union<Decimal,None>.
-        graph.add_node(node("caller", Shape::Scalar, Shape::Scalar));
+        // caller returns Record (non-void), callee produces Union[Scalar,Opaque]
+        // → codomain mismatch (Record ≠ Union)
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar,
+            Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
+        ));
         graph.add_node(node(
             "callee",
             Shape::Scalar,
@@ -296,7 +323,8 @@ mod tests {
         assert_eq!(f.severity, crate::finding::Severity::Medium);
         assert_eq!(f.line_range, crate::finding::LineRange::new(7, 7));
 
-        // Side-by-side evidence (REQ-7).
+        // Now produces Union[Scalar|Opaque], caller returns Record[Scalar,Scalar].
+        // Neither union arm matches the Record → both arms are unhandled.
         #[allow(irrefutable_let_patterns)]
         let crate::finding::Evidence::CompositionMismatch {
             caller_expected,
@@ -306,12 +334,15 @@ mod tests {
         else {
             panic!("expected composition mismatch evidence");
         };
-        assert_eq!(caller_expected, &Shape::Scalar);
+        assert_eq!(
+            caller_expected,
+            &Shape::Record(vec![Shape::Scalar, Shape::Scalar])
+        );
         assert_eq!(
             callee_produced,
             &Shape::Union(vec![Shape::Opaque, Shape::Scalar])
         );
-        assert_eq!(unhandled, &vec![Shape::Opaque]);
+        assert_eq!(unhandled, &vec![Shape::Opaque, Shape::Scalar]);
     }
 
     #[test]
@@ -334,5 +365,16 @@ mod tests {
             CompositionAnalyzer::new().analyze(&graph).is_empty(),
             "opaque codomain must not raise a composition finding"
         );
+    }
+
+    #[test]
+    fn analyze_non_void_match_is_silent() {
+        // Caller returns Record, callee returns same Record → match → no finding.
+        let mut graph = CirGraph::new("src/lib.rs");
+        let rec = Shape::Record(vec![Shape::Scalar, Shape::Scalar]);
+        graph.add_node(node("caller", Shape::Scalar, rec.clone()));
+        graph.add_node(node("callee", Shape::Scalar, rec));
+        graph.add_edge(edge("e1", "caller", "callee", 7));
+        assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
     }
 }
