@@ -1494,6 +1494,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "vampiro-lifecycle-analysis"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "vampiro-cir",
+ "vampiro-seam-analysis",
+]
+
+[[package]]
 name = "vampiro-rust-frontend"
 version = "0.1.0"
 dependencies = [

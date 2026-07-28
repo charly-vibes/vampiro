@@ -15,11 +15,11 @@
 - [x] 2.3 Run focused table/property/contract tests; record table version, law evidence reference, and passing commands.
 
 ## 3. Resource Linearity Tracer
-- [ ] 3.1 Add failing normal/early/error/panic fixtures for unique identity, one-to-one release, duplicate release leaving another obligation pending, transfer, mismatch, and exact `identity:unknown` diagnostics (REQ-T3, REQ-T7).
-- [ ] 3.2 Implement identity-based exit-path matching, transfer, duplicate-release non-discharge, resource-leak findings, and unknown coverage evidence.
-- [ ] 3.3 Run focused control-flow and Rust lifecycle-fact compatibility tests; record expected finding/diagnostic evidence and passing commands.
+- [x] 3.1 Add failing normal/early/error/panic fixtures for unique identity, one-to-one release, duplicate release leaving another obligation pending, transfer, mismatch, and exact `identity:unknown` diagnostics (REQ-T3, REQ-T7).
+- [x] 3.2 Implement identity-based exit-path matching, transfer, duplicate-release non-discharge, resource-leak findings, and unknown coverage evidence.
+- [x] 3.3 Run focused control-flow and Rust lifecycle-fact compatibility tests; record expected finding/diagnostic evidence and passing commands.
 
 ## 4. Lifecycle Acceptance
-- [ ] 4.1 Run history, retry, resource, negative-table, contract, and relevant frontend E2E suites without requiring completed scan workflows.
-- [ ] 4.2 Verify REQ-T1–T9 traceability and compatibility only with published CIR, core-result, law-evidence, and Rust lifecycle-fact contracts.
-- [ ] 4.3 Run workspace formatting/Clippy and `openspec validate add-lifecycle-safety-analysis --strict`; record contract versions, commands, and evidence location.
+- [x] 4.1 Run history, retry, resource, negative-table, contract, and relevant frontend E2E suites without requiring completed scan workflows.
+- [x] 4.2 Verify REQ-T1–T9 traceability and compatibility only with published CIR, core-result, law-evidence, and Rust lifecycle-fact contracts.
+- [x] 4.3 Run workspace formatting/Clippy and `openspec validate add-lifecycle-safety-analysis --strict`; record contract versions, commands, and evidence location.

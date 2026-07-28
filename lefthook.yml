@@ -57,3 +57,5 @@ pre-push:
         To bypass (WIP only): git push --no-verify
 
         See docs/verification/dogfood-1.md for triage guide.
+    dont-check:
+      run: dont check

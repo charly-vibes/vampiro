@@ -103,17 +103,14 @@ impl FacadeSnapshot {
 
     /// Look up an item by qualified name.
     pub fn get(&self, name: &str) -> Option<&FacadeItem> {
-        self.name_index
-            .get(name)
-            .and_then(|&i| self.items.get(i))
+        self.name_index.get(name).and_then(|&i| self.items.get(i))
     }
 
     /// Rebuild the name index (call after deserialization).
     pub fn rebuild_index(&mut self) {
         self.name_index.clear();
         for (i, item) in self.items.iter().enumerate() {
-            self.name_index
-                .insert(item.qualified_name.clone(), i);
+            self.name_index.insert(item.qualified_name.clone(), i);
         }
     }
 
@@ -123,7 +120,9 @@ impl FacadeSnapshot {
             return Some(item);
         }
         // Search aliases
-        self.items.iter().find(|item| item.aliases.contains(&name.to_string()))
+        self.items
+            .iter()
+            .find(|item| item.aliases.contains(&name.to_string()))
     }
 
     /// Return the set of all qualified names.
@@ -184,14 +183,12 @@ impl FacadeHistoryAnalyzer {
             // Try to find the item in the old snapshot:
             // 1. By qualified name directly
             // 2. By any of the new item's aliases (it was renamed)
-            let old_item = older
-                .resolve_name(&new_item.qualified_name)
-                .or_else(|| {
-                    new_item
-                        .aliases
-                        .iter()
-                        .find_map(|alias| older.resolve_name(alias))
-                });
+            let old_item = older.resolve_name(&new_item.qualified_name).or_else(|| {
+                new_item
+                    .aliases
+                    .iter()
+                    .find_map(|alias| older.resolve_name(alias))
+            });
 
             let old_item = match old_item {
                 Some(item) => item,
@@ -282,10 +279,7 @@ impl From<std::io::Error> for FacadeHistoryError {
 mod tests {
     use super::*;
 
-    fn make_snapshot(
-        commit: &str,
-        items: Vec<(&str, &str, &str)>,
-    ) -> FacadeSnapshot {
+    fn make_snapshot(commit: &str, items: Vec<(&str, &str, &str)>) -> FacadeSnapshot {
         // items: (qualified_name, shape_description, alias?)
         let mut snap = FacadeSnapshot::new(commit);
         for (name, desc, alias) in items {
@@ -366,10 +360,7 @@ mod tests {
     #[test]
     fn breaking_shape_change_produces_finding() {
         // REQ-T4: shape change without migration raises breaking-change finding.
-        let older = make_snapshot(
-            "abc",
-            vec![("a::foo", "() -> u32", "")],
-        );
+        let older = make_snapshot("abc", vec![("a::foo", "() -> u32", "")]);
         let mut newer = FacadeSnapshot::new("def");
         newer.add_item(FacadeItem::new(
             "a::foo",
@@ -407,10 +398,7 @@ mod tests {
         let older = make_snapshot("abc", vec![("a::foo", "() -> u32", "")]);
         let newer = make_snapshot(
             "def",
-            vec![
-                ("a::foo", "() -> u32", ""),
-                ("a::bar", "() -> bool", ""),
-            ],
+            vec![("a::foo", "() -> u32", ""), ("a::bar", "() -> bool", "")],
         );
 
         let results = analyzer().compare(&older, &newer);
@@ -426,17 +414,11 @@ mod tests {
     #[test]
     fn breaking_change_with_migration_produces_migrated_result() {
         let mut migrations = HashMap::new();
-        migrations.insert(
-            "a::foo".to_string(),
-            "breaking-change-v0.2.0".to_string(),
-        );
+        migrations.insert("a::foo".to_string(), "breaking-change-v0.2.0".to_string());
         let analyzer = FacadeHistoryAnalyzer::new(migrations);
 
         let older = make_snapshot("abc", vec![("a::foo", "() -> u32", "")]);
-        let newer = make_snapshot(
-            "def",
-            vec![("a::foo", "(&str) -> u64", "")],
-        );
+        let newer = make_snapshot("def", vec![("a::foo", "(&str) -> u64", "")]);
 
         let results = analyzer.compare(&older, &newer);
         assert_eq!(results.len(), 1);
@@ -489,7 +471,10 @@ mod tests {
         newer.add_item(item);
 
         let ambiguous = analyzer().find_ambiguous(&older, &newer);
-        assert!(ambiguous.is_empty(), "expected no ambiguous, got: {ambiguous:?}");
+        assert!(
+            ambiguous.is_empty(),
+            "expected no ambiguous, got: {ambiguous:?}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -509,9 +494,9 @@ mod tests {
         let newer = make_snapshot(
             "def",
             vec![
-                ("a::foo", "() -> u32", ""),           // unchanged
-                ("a::bar", "(&str) -> u64", ""),        // breaking change
-                ("a::baz", "(u32) -> bool", ""),        // unchanged
+                ("a::foo", "() -> u32", ""),     // unchanged
+                ("a::bar", "(&str) -> u64", ""), // breaking change
+                ("a::baz", "(u32) -> bool", ""), // unchanged
             ],
         );
 
@@ -553,8 +538,14 @@ mod tests {
 
         assert_eq!(deserialized.commit_sha, "abc123");
         assert_eq!(deserialized.items.len(), 2);
-        assert_eq!(deserialized.get("my_crate::foo").unwrap().qualified_name, "my_crate::foo");
-        assert_eq!(deserialized.get("my_crate::bar").unwrap().qualified_name, "my_crate::bar");
+        assert_eq!(
+            deserialized.get("my_crate::foo").unwrap().qualified_name,
+            "my_crate::foo"
+        );
+        assert_eq!(
+            deserialized.get("my_crate::bar").unwrap().qualified_name,
+            "my_crate::bar"
+        );
     }
 
     // -----------------------------------------------------------------------

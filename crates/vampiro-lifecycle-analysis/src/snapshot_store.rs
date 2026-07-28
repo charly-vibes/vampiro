@@ -4,8 +4,8 @@
 //! `.vampiro/snapshots/v0.1.0/<commit-sha>.json` following the approved
 //! storage contract from `docs/decisions/lifecycle-storage.md`.
 
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::facade_history::{FacadeHistoryError, FacadeSnapshot};
 
@@ -28,10 +28,12 @@ impl SnapshotStore {
         let root = base_path.join(".vampiro").join("snapshots");
         let version_dir = root.join(SNAPSHOT_DIR_VERSION);
         if !version_dir.exists() {
-            fs::create_dir_all(&version_dir)
-                .map_err(|e| FacadeHistoryError::IoError(
-                    std::io::Error::new(e.kind(), format!("failed to create {version_dir:?}: {e}"))
-                ))?;
+            fs::create_dir_all(&version_dir).map_err(|e| {
+                FacadeHistoryError::IoError(std::io::Error::new(
+                    e.kind(),
+                    format!("failed to create {version_dir:?}: {e}"),
+                ))
+            })?;
         }
         Ok(SnapshotStore { root })
     }
@@ -51,17 +53,18 @@ impl SnapshotStore {
     pub fn write_snapshot(&self, snapshot: &FacadeSnapshot) -> Result<(), FacadeHistoryError> {
         let version_dir = self.version_dir();
         if !version_dir.exists() {
-            fs::create_dir_all(&version_dir)
-                .map_err(|e| FacadeHistoryError::IoError(
-                    std::io::Error::new(e.kind(), format!("failed to create {version_dir:?}: {e}"))
-                ))?;
+            fs::create_dir_all(&version_dir).map_err(|e| {
+                FacadeHistoryError::IoError(std::io::Error::new(
+                    e.kind(),
+                    format!("failed to create {version_dir:?}: {e}"),
+                ))
+            })?;
         }
 
         let path = self.snapshot_path(&snapshot.commit_sha);
-        let json = serde_json::to_string_pretty(snapshot)
-            .map_err(|e| FacadeHistoryError::IoError(
-                std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-            ))?;
+        let json = serde_json::to_string_pretty(snapshot).map_err(|e| {
+            FacadeHistoryError::IoError(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        })?;
         fs::write(&path, json.as_bytes())?;
         Ok(())
     }
@@ -75,10 +78,9 @@ impl SnapshotStore {
             return Err(FacadeHistoryError::NoSnapshot(commit_sha.to_string()));
         }
         let data = fs::read_to_string(&path)?;
-        let mut snapshot: FacadeSnapshot = serde_json::from_str(&data)
-            .map_err(|e| FacadeHistoryError::IoError(
-                std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-            ))?;
+        let mut snapshot: FacadeSnapshot = serde_json::from_str(&data).map_err(|e| {
+            FacadeHistoryError::IoError(std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+        })?;
         snapshot.rebuild_index();
         Ok(snapshot)
     }
@@ -121,7 +123,7 @@ impl SnapshotStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::facade_history::{FacadeItem, hash_shape};
+    use crate::facade_history::{hash_shape, FacadeItem};
 
     #[test]
     fn store_creates_directory() {
@@ -136,18 +138,20 @@ mod tests {
         let store = SnapshotStore::new(dir.path()).unwrap();
 
         let mut snap = FacadeSnapshot::new("abc123def456");
-        snap.add_item(FacadeItem::new(
-            "my_crate::foo",
-            hash_shape("() -> u32"),
-            "() -> u32",
-        ).with_source("src/lib.rs", 42));
+        snap.add_item(
+            FacadeItem::new("my_crate::foo", hash_shape("() -> u32"), "() -> u32")
+                .with_source("src/lib.rs", 42),
+        );
 
         store.write_snapshot(&snap).unwrap();
 
         let loaded = store.read_snapshot("abc123def456").unwrap();
         assert_eq!(loaded.commit_sha, "abc123def456");
         assert_eq!(loaded.items.len(), 1);
-        assert_eq!(loaded.get("my_crate::foo").unwrap().qualified_name, "my_crate::foo");
+        assert_eq!(
+            loaded.get("my_crate::foo").unwrap().qualified_name,
+            "my_crate::foo"
+        );
     }
 
     #[test]
@@ -181,11 +185,7 @@ mod tests {
         store.write_snapshot(&snap1).unwrap();
 
         let mut snap2 = FacadeSnapshot::new("abc");
-        snap2.add_item(FacadeItem::new(
-            "x",
-            hash_shape("() -> u32"),
-            "() -> u32",
-        ));
+        snap2.add_item(FacadeItem::new("x", hash_shape("() -> u32"), "() -> u32"));
         store.write_snapshot(&snap2).unwrap();
 
         let loaded = store.read_snapshot("abc").unwrap();

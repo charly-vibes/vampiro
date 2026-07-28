@@ -301,7 +301,10 @@ mod tests {
     #[test]
     fn idempotency_class_display() {
         assert_eq!(IdempotencyClass::Idempotent.to_string(), "idempotent");
-        assert_eq!(IdempotencyClass::NonIdempotent.to_string(), "non-idempotent");
+        assert_eq!(
+            IdempotencyClass::NonIdempotent.to_string(),
+            "non-idempotent"
+        );
         assert_eq!(IdempotencyClass::Unknown.to_string(), "unknown");
     }
 }

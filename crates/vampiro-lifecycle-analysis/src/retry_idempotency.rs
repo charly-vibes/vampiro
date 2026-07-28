@@ -248,8 +248,8 @@ mod tests {
     fn mixed_idempotent_and_non_idempotent() {
         let analyzer = RetryIdempotencyAnalyzer::with_builtin_table();
         let facts = vec![
-            make_fact("src/a.rs", 10, "fn_a", "set"),           // idempotent
-            make_fact("src/b.rs", 20, "fn_b", "insert"),         // non-idempotent
+            make_fact("src/a.rs", 10, "fn_a", "set"),    // idempotent
+            make_fact("src/b.rs", 20, "fn_b", "insert"), // non-idempotent
             make_fact("src/c.rs", 30, "fn_c", "custom_unknown"), // unknown
         ];
 
