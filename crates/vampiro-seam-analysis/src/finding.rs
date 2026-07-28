@@ -202,6 +202,23 @@ pub enum Evidence {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         adapters: Vec<String>,
     },
+    /// REQ-B3: untrusted data flows into a node that is neither a
+    /// trust-boundary source nor a recognized smart constructor.
+    ///
+    /// Carries the source node name, source stable identity, the edge that
+    /// carries the untrusted data, and the target node identity and name.
+    BoundaryLeak {
+        /// The source node's stable identity.
+        source: String,
+        /// The source node's display name.
+        source_name: String,
+        /// The edge's stable identity.
+        edge_id: String,
+        /// The target node's stable identity.
+        target: String,
+        /// The target node's display name.
+        target_name: String,
+    },
 }
 
 /// One reported issue (REQ-4).

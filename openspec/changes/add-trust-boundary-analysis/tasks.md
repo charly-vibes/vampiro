@@ -10,9 +10,9 @@
 - [x] 1.3 Run focused schema round-trip, plugin conformance, canonical-byte, and Rust E2E tests; publish schema/idiom versions and fixture paths as the consumer contract.
 
 ## 2. Boundary-Leak Tracer
-- [ ] 2.1 Add failing Rust E2E fixtures for direct and propagated raw flow into an interior node, flow into a recognized smart constructor, totally handled refinement outcomes, and unknown provenance (REQ-B3, REQ-C4).
-- [ ] 2.2 Implement language-neutral boundary-leak analysis so only proven `untrusted` flow into a non-boundary, non-constructor interior node emits exactly one default-`HIGH` robustness `boundary-leak` finding per violating edge, with REQ-24 deduplication and source, edge, and target evidence.
-- [ ] 2.3 Run focused positive/negative tests plus normalized-result compatibility; verify constructor flow and `unknown` produce no false boundary-leak finding and remain visible in diagnostics.
+- [x] 2.1 Add failing Rust E2E fixtures for direct and propagated raw flow into an interior node, flow into a recognized smart constructor, totally handled refinement outcomes, and unknown provenance (REQ-B3, REQ-C4).
+- [x] 2.2 Implement language-neutral boundary-leak analysis so only proven `untrusted` flow into a non-boundary, non-constructor interior node emits exactly one default-`HIGH` robustness `boundary-leak` finding per violating edge, with REQ-24 deduplication and source, edge, and target evidence.
+- [x] 2.3 Run focused positive/negative tests plus normalized-result compatibility; verify constructor flow and `unknown` produce no false boundary-leak finding and remain visible in diagnostics.
 
 ## 3. Validation-Duplication Tracer
 - [ ] 3.1 Add failing CIR round-trip, Rust extraction/conformance, declaration/idiom, and E2E fixtures for validation observations, equivalent repeated validation, the recognized constructor itself, merely similar syntax, and unrelated constraints (REQ-B4).

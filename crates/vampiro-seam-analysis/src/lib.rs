@@ -19,12 +19,14 @@
 
 use vampiro_cir::CirGraph;
 
+pub mod boundary_leak;
 pub mod composition;
 pub mod effects;
 pub mod finding;
 pub mod modularity;
 pub mod redundancy;
 
+pub use boundary_leak::BoundaryLeakAnalyzer;
 pub use composition::{unify_shapes, CompositionAnalyzer, Unification};
 pub use effects::EffectHandlingAnalyzer;
 pub use finding::{Axis, Diagnostic, Evidence, Finding, Severity};
