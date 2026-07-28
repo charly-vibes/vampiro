@@ -344,6 +344,7 @@ mod tests {
             .validation_observations
             .push(crate::ValidationObservation::new(
                 "validate_user",
+                "rust",
                 crate::StableId::new("User::new"),
                 "User",
                 crate::SourceSpan {

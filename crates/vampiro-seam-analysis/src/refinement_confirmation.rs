@@ -140,6 +140,13 @@ impl std::fmt::Display for RefinementReason {
 
 /// Import and correlate evidence against the analyzed revision and constructor.
 ///
+/// Checks are performed in the ordered vocabulary defined in
+/// `docs/decisions/trust-boundary-contract.md` §8. The first applicable reason
+/// wins — earlier checks short-circuit later ones.
+///
+/// Project configuration MUST be validated for duplicate class IDs and
+/// empty class sets before calling this function.
+///
 /// # Arguments
 ///
 /// * `evidence_json` - Optional JSON string with the evidence payload.
@@ -148,6 +155,8 @@ impl std::fmt::Display for RefinementReason {
 /// * `current_constructor_id` - The smart constructor's stable identity.
 /// * `current_source_hash` - SHA-256 hex hash of the constructor source.
 /// * `current_shape_hash` - SHA-256 hex hash of the constructor's refined shape.
+///   **Warning:** The three `current_*` parameters must be passed in order.
+///   Swapping `source_hash` and `shape_hash` silently produces incorrect results.
 /// * `declared_classes` - The set of declared boundary-class IDs.
 ///
 /// # Returns
@@ -577,6 +586,33 @@ mod tests {
     }
 
     // --- Priority order: first applicable reason wins ---
+
+    #[test]
+    fn priority_incomplete_beats_unknown_class() {
+        // Evidence has both a missing declared class AND an undeclared class.
+        // Incomplete (step 8) fires before UnknownClass (step 9).
+        let json = make_evidence_json(
+            "v0.1.0",
+            "abc123",
+            "User::new",
+            "src_hash",
+            "shape_hash",
+            vec![
+                ("extra-class", "passing", None), // undeclared
+                ("req-body", "passing", None),    // declared
+            ],
+        );
+        let result = correlate_evidence(
+            Some(&json),
+            "abc123",
+            "User::new",
+            "src_hash",
+            "shape_hash",
+            &make_declared(&["req-body", "req-headers"]), // req-headers missing from evidence
+        );
+        assert_eq!(result.status, RefinementStatus::Unknown);
+        assert_eq!(result.reason, Some(RefinementReason::Incomplete));
+    }
 
     #[test]
     fn first_applicable_reason_wins_absent_before_malformed() {

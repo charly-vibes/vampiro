@@ -1,16 +1,16 @@
 //! Boundary-leak analysis: flags untrusted data flowing into interior nodes
-//! that are not trust-boundary sources or recognized smart constructors.
+//! that are not trust-boundary sources.
 //!
 //! A boundary leak occurs when:
 //! 1. An edge carries `trust_provenance = Untrusted`
 //! 2. The target node is NOT a trust-boundary source
-//! 3. The target node is NOT a recognized smart constructor
 //!
 //! Trust-boundary sources are nodes that produce untrusted data without
 //! consuming untrusted input (the data enters the system at that point).
-//! Smart constructors consume untrusted data and produce a refined (trusted)
-//! output. Both are determined from the CIR graph's trust provenance
-//! annotations alone — no frontend-specific idiom knowledge is needed.
+//! Smart constructors are NOT recognized in the general case — they require
+//! explicit project configuration or conformance-idiom matching (future
+//! addition). Without configuration, any edge carrying untrusted data into
+//! an interior node IS a boundary leak.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -119,40 +119,6 @@ impl BoundaryLeakAnalyzer {
         }
 
         sources
-    }
-
-    /// Identify smart constructors: nodes whose output is `Trusted` but that
-    /// have at least one incoming edge carrying `Untrusted` trust provenance.
-    /// This means the node refines untrusted data into trusted data.
-    ///
-    /// Note: In the general case without project configuration, we cannot
-    /// determine if a node is an intentional smart constructor or a normal
-    /// node that unsafely trusts its input. This identification is currently
-    /// not used in `analyze` — smart constructor recognition requires
-    /// explicit configuration or conformance-idom matching (future addition).
-    #[allow(dead_code)]
-    fn identify_smart_constructors(&self, graph: &CirGraph) -> HashSet<vampiro_cir::StableId> {
-        let mut constructors = HashSet::new();
-
-        // Find all nodes that receive untrusted input
-        let mut untrusted_receivers: HashSet<&vampiro_cir::StableId> = HashSet::new();
-        for edge in &graph.edges {
-            if edge.trust_provenance == TrustProvenance::Untrusted {
-                untrusted_receivers.insert(&edge.target);
-            }
-        }
-
-        for node in &graph.nodes {
-            // Node produces trusted output
-            if node.trust_provenance == TrustProvenance::Trusted {
-                // But receives untrusted input -> it refines untrusted data
-                if untrusted_receivers.contains(&node.id) {
-                    constructors.insert(node.id.clone());
-                }
-            }
-        }
-
-        constructors
     }
 }
 

@@ -16,6 +16,16 @@ use std::path::PathBuf;
 use crate::finding::{Axis, Evidence, Finding, Severity};
 
 /// Analyzer for validation-duplication findings (REQ-B4).
+///
+/// Groups observations by stable validation identity. The first observation
+/// encountered per identity is treated as the "primary" constructor check;
+/// all subsequent observations with the same identity emit findings.
+///
+/// **Limitation:** Insertion order matters. Frontends that emit observations
+/// in arbitrary order may produce incorrect primary/duplicate assignments.
+/// A future improvement should use the constructor's declared source span
+/// (from configuration) to determine which location is the authoritative
+/// constructor check, rather than assuming first-in-vector.
 #[derive(Debug, Default)]
 pub struct ValidationDuplicationAnalyzer;
 
@@ -100,6 +110,7 @@ mod tests {
     ) -> ValidationObservation {
         ValidationObservation {
             identity: identity.into(),
+            frontend_id: "rust".into(),
             constructor_id: StableId::new(constructor),
             refined_shape: shape.into(),
             span: SourceSpan {
