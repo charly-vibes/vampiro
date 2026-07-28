@@ -11,5 +11,5 @@ pub mod exit_code;
 pub mod finding;
 
 pub use cli::Cli;
-pub use config::{load_config, Config, ConfigError};
+pub use config::{load_config, load_config_with_xdg, Config, ConfigError};
 pub use exit_code::ExitCode;

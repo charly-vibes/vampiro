@@ -18,6 +18,6 @@
 - [x] 3.3 Run `cargo test --workspace rust_cli_foundation_3`; publish `finding-envelope/v1` at `tests/contracts/findings/envelope-v1.json`, verify REQ-4 ownership plus REQ-5/REQ-12 references, and record evidence in `docs/verification/add-rust-cli-foundation-3.md`.
 
 ## 4. Foundation Acceptance
-- [ ] 4.1 Run unit, integration, doc, and command snapshot suites plus workspace formatting and Clippy.
-- [ ] 4.2 Run `cargo test --workspace rust_cli_foundation_4` to verify successor compatibility with `cli-config-exit/v1` and `finding-envelope/v1`; record the report in `docs/verification/add-rust-cli-foundation-4.md`.
-- [ ] 4.3 Run `openspec validate add-rust-cli-foundation --strict` and confirm no analysis, serialization, proof, CI-generation, or gating behavior is claimed.
+- [x] 4.1 Run unit, integration, doc, and command snapshot suites plus workspace formatting and Clippy.
+- [x] 4.2 Run `cargo test --workspace rust_cli_foundation_4` to verify successor compatibility with `cli-config-exit/v1` and `finding-envelope/v1`; record the report in `docs/verification/add-rust-cli-foundation-4.md`.
+- [x] 4.3 Run `openspec validate add-rust-cli-foundation --strict` and confirm no analysis, serialization, proof, CI-generation, or gating behavior is claimed.

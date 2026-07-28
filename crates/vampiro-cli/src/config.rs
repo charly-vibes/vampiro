@@ -41,6 +41,24 @@ impl std::error::Error for ConfigError {}
 /// Returns `Ok(Config::default())` if no config file is found — missing
 /// config is not an error.
 pub fn load_config(project_root: Option<&Path>) -> Result<Config, ConfigError> {
+    load_config_impl(project_root, None)
+}
+
+/// Like `load_config` but allows overriding the XDG config home for testing.
+///
+/// Pass `Some(path)` to override `XDG_CONFIG_HOME` with a specific directory,
+/// or `None` to use the environment variable or default `~/.config`.
+pub fn load_config_with_xdg(
+    project_root: Option<&Path>,
+    xdg_config_home: Option<&Path>,
+) -> Result<Config, ConfigError> {
+    load_config_impl(project_root, xdg_config_home)
+}
+
+fn load_config_impl(
+    project_root: Option<&Path>,
+    xdg_override: Option<&Path>,
+) -> Result<Config, ConfigError> {
     let root = project_root.map_or_else(
         || std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf()),
         |p| p.to_path_buf(),
@@ -53,7 +71,11 @@ pub fn load_config(project_root: Option<&Path>) -> Result<Config, ConfigError> {
     }
 
     // 2. Try XDG config
-    if let Some(xdg_path) = xdg_config_path() {
+    let xdg_base = xdg_override
+        .map(|p| p.to_path_buf())
+        .or_else(xdg_config_path_from_env);
+    if let Some(xdg_base) = xdg_base {
+        let xdg_path = xdg_base.join("vampiro").join("config.toml");
         if xdg_path.exists() {
             return load_from_file(&xdg_path);
         }
@@ -69,25 +91,22 @@ fn load_from_file(path: &Path) -> Result<Config, ConfigError> {
     toml::from_str(&content).map_err(|e| ConfigError::InvalidFormat(e.to_string()))
 }
 
-/// Resolve the XDG config path for vampiro.
+/// Resolve the XDG config home directory from environment.
 ///
-/// Uses `$XDG_CONFIG_HOME/vampiro/config.toml` if set and non-empty,
-/// otherwise falls back to `~/.config/vampiro/config.toml`.
+/// Uses `$XDG_CONFIG_HOME` if set and non-empty, otherwise `~/.config`.
 /// Returns `None` if `HOME` is unset and `XDG_CONFIG_HOME` is not provided.
-fn xdg_config_path() -> Option<std::path::PathBuf> {
-    // Use XDG_CONFIG_HOME if set to a non-empty value, otherwise ~/.config
-    let base = if let Ok(val) = std::env::var("XDG_CONFIG_HOME") {
+fn xdg_config_path_from_env() -> Option<std::path::PathBuf> {
+    if let Ok(val) = std::env::var("XDG_CONFIG_HOME") {
         if val.is_empty() {
             let home = std::env::var("HOME").ok()?;
-            std::path::PathBuf::from(home).join(".config")
+            Some(std::path::PathBuf::from(home).join(".config"))
         } else {
-            std::path::PathBuf::from(val)
+            Some(std::path::PathBuf::from(val))
         }
     } else {
         let home = std::env::var("HOME").ok()?;
-        std::path::PathBuf::from(home).join(".config")
-    };
-    Some(base.join("vampiro").join("config.toml"))
+        Some(std::path::PathBuf::from(home).join(".config"))
+    }
 }
 
 #[cfg(test)]
