@@ -1,9 +1,9 @@
 > Implementation is blocked until the roadmap approval gate approves this proposal and Genesis publishes tag `v0.1.0` with the required modules.
 
 ## 1. Genesis Dependency and API Tracer
-- [ ] 1.1 Add a failing compatibility fixture requiring Genesis tag `v0.1.0` and public `envelope`, `suggestions`, `managed_block`, and `aix` APIs from the Rust workspace skeleton.
-- [ ] 1.2 Add the exact tagged Git dependency and minimal imports needed to make the compatibility fixture pass; keep Vampiro domain logic outside Genesis.
-- [ ] 1.3 Run the focused fixture, workspace build/tests, formatting, and Clippy; record the resolved commit and API evidence in `docs/verification/depend-on-genesis-1.md`.
+- [x] 1.1 Add a failing compatibility fixture requiring Genesis tag `v0.1.0` and public `envelope`, `suggestions`, `managed_block`, and `aix` APIs from the Rust workspace skeleton.
+- [x] 1.2 Add the exact tagged Git dependency and minimal imports needed to make the compatibility fixture pass; keep Vampiro domain logic outside Genesis.
+- [x] 1.3 Run the focused fixture, workspace build/tests, formatting, and Clippy; record the resolved commit and API evidence in `docs/verification/depend-on-genesis-1.md`.
 
 ## 2. Shared Envelope Tracer
 - [ ] 2.1 Add a failing `vampiro check --json` conformance fixture for exact top-level keys and composition findings nested under `data`.

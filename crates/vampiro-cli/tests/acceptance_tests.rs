@@ -17,7 +17,10 @@ fn rust_cli_foundation_4_contract_cli_config_exit_exists() {
         .join("contracts")
         .join("cli")
         .join("config-exit-v1.json");
-    assert!(path.exists(), "config-exit-v1.json should exist at {path:?}");
+    assert!(
+        path.exists(),
+        "config-exit-v1.json should exist at {path:?}"
+    );
 
     let content = std::fs::read_to_string(&path).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
