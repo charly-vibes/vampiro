@@ -1,0 +1,78 @@
+{
+  "version": "0.1.0",
+  "source_file": "facade-metadata.py",
+  "facades": [
+    {
+      "name": "run",
+      "source_module": ".core",
+      "kind": "re_export",
+      "span": {
+        "file": "facade-metadata.py",
+        "start_line": 6,
+        "start_column": 1,
+        "end_line": 6,
+        "end_column": 30
+      }
+    },
+    {
+      "name": "configure",
+      "source_module": ".core",
+      "kind": "re_export",
+      "span": {
+        "file": "facade-metadata.py",
+        "start_line": 6,
+        "start_column": 1,
+        "end_line": 6,
+        "end_column": 30
+      }
+    },
+    {
+      "name": "Helper",
+      "source_module": ".utils",
+      "kind": "re_export",
+      "span": {
+        "file": "facade-metadata.py",
+        "start_line": 7,
+        "start_column": 1,
+        "end_line": 7,
+        "end_column": 40
+      }
+    },
+    {
+      "name": "format_result",
+      "source_module": ".utils",
+      "kind": "re_export",
+      "span": {
+        "file": "facade-metadata.py",
+        "start_line": 7,
+        "start_column": 1,
+        "end_line": 7,
+        "end_column": 40
+      }
+    },
+    {
+      "name": "Result",
+      "source_module": ".types",
+      "kind": "re_export",
+      "span": {
+        "file": "facade-metadata.py",
+        "start_line": 8,
+        "start_column": 1,
+        "end_line": 8,
+        "end_column": 35
+      }
+    },
+    {
+      "name": "Config",
+      "source_module": ".types",
+      "kind": "re_export",
+      "span": {
+        "file": "facade-metadata.py",
+        "start_line": 8,
+        "start_column": 1,
+        "end_line": 8,
+        "end_column": 35
+      }
+    }
+  ]
+}

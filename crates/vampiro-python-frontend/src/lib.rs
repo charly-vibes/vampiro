@@ -13,9 +13,38 @@
 //! - Facade metadata → `__init__`.py re-exports
 
 mod extract;
+pub mod facade;
+pub mod law;
+pub mod lifecycle;
 
+pub use facade::FacadeDecl;
+pub use law::LawRunnerInput;
+pub use lifecycle::LifecycleFacts;
+use std::collections::HashMap;
 use std::path::Path;
-use vampiro_cir::{CirError, CirGraph, Frontend};
+use vampiro_cir::{CirError, CirGraph, Frontend, StableId};
+pub use visibility::Visibility;
+
+mod visibility;
+
+/// The complete extraction output from the Python frontend.
+///
+/// Bundles the CIR graph with the additional contract data that the
+/// language-neutral [`Frontend`] trait cannot express. Produced by
+/// [`PythonFrontend::extract_full`].
+#[derive(Debug, Clone)]
+pub struct ExtractionOutput {
+    /// The extracted CIR graph.
+    pub graph: CirGraph,
+    /// Facade declarations (re-exports) at each module level.
+    pub facades: Vec<FacadeDecl>,
+    /// Visibility map: node stable ID → visibility level.
+    pub visibility: HashMap<StableId, Visibility>,
+    /// Law runner-input data (tagged functions, generator refs, etc.).
+    pub law_input: LawRunnerInput,
+    /// Lifecycle facts (writes, retries, resources, exit paths, aliases).
+    pub lifecycle_facts: LifecycleFacts,
+}
 
 /// The Python language frontend.
 ///
@@ -41,6 +70,38 @@ impl Frontend for PythonFrontend {
         let root = tree.root_node();
         let graph = extract::extract_graph(root, source, path);
         Ok(graph)
+    }
+}
+
+impl PythonFrontend {
+    /// Extract the full CIR and contract surface from Python source.
+    ///
+    /// Returns the graph plus law runner input, lifecycle facts, facade
+    /// metadata, and visibility that the [`Frontend`] trait cannot carry.
+    pub fn extract_full(&self, source: &str, path: &Path) -> Result<ExtractionOutput, CirError> {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_python::LANGUAGE.into())
+            .map_err(|e| CirError::Extraction(format!("failed to set Python language: {e}")))?;
+
+        let tree = parser
+            .parse(source, None)
+            .ok_or_else(|| CirError::Extraction("failed to parse Python source".into()))?;
+
+        let root = tree.root_node();
+        let graph = extract::extract_graph(root, source, path);
+        let law_input = law::extract_law_input(root, source, path);
+        let lifecycle_facts = lifecycle::extract_lifecycle_facts(root, source, path);
+        let facades = facade::extract_facade_metadata(root, source, path);
+        let visibility = HashMap::new();
+
+        Ok(ExtractionOutput {
+            graph,
+            facades: facades.facades,
+            visibility,
+            law_input,
+            lifecycle_facts,
+        })
     }
 }
 

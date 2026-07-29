@@ -1,0 +1,84 @@
+{
+  "version": "0.1.0",
+  "source_file": "lifecycle-facts.py",
+  "writes": [
+    {
+      "target": "content",
+      "kind": "assignment",
+      "function": "read_file",
+      "span": {
+        "file": "lifecycle-facts.py",
+        "start_line": 14,
+        "start_column": 9,
+        "end_line": 14,
+        "end_column": 16
+      }
+    },
+    {
+      "target": "last_error",
+      "kind": "assignment",
+      "function": "retry_operation",
+      "span": {
+        "file": "lifecycle-facts.py",
+        "start_line": 28,
+        "start_column": 13,
+        "end_line": 28,
+        "end_column": 23
+      }
+    }
+  ],
+  "retries": [
+    {
+      "kind": "for_loop",
+      "function": "retry_operation",
+      "has_break_with_value": true,
+      "has_continue": true,
+      "span": {
+        "file": "lifecycle-facts.py",
+        "start_line": 27,
+        "start_column": 5,
+        "end_line": 33,
+        "end_column": 6
+      }
+    }
+  ],
+  "resources": [
+    {
+      "variable": "f",
+      "type_name": "file",
+      "kind": "context_manager",
+      "span": {
+        "file": "lifecycle-facts.py",
+        "start_line": 13,
+        "start_column": 10,
+        "end_line": 13,
+        "end_column": 11
+      }
+    }
+  ],
+  "exit_paths": [
+    {
+      "kind": "return",
+      "function": "read_file",
+      "span": {
+        "file": "lifecycle-facts.py",
+        "start_line": 15,
+        "start_column": 5,
+        "end_line": 15,
+        "end_column": 18
+      }
+    },
+    {
+      "kind": "return",
+      "function": "write_file",
+      "span": {
+        "file": "lifecycle-facts.py",
+        "start_line": 22,
+        "start_column": 5,
+        "end_line": 22,
+        "end_column": 18
+      }
+    }
+  ],
+  "aliases": []
+}

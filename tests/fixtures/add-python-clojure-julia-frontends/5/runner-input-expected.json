@@ -1,0 +1,81 @@
+{
+  "version": "0.1.0",
+  "source_file": "runner-input.py",
+  "tagged_fns": [
+    {
+      "name": "add",
+      "tags": [],
+      "params": [
+        { "name": "a", "type_name": "int", "is_serializable": true },
+        { "name": "b", "type_name": "int", "is_serializable": true }
+      ],
+      "return_type": "int",
+      "span": {
+        "file": "runner-input.py",
+        "start_line": 12,
+        "start_column": 1,
+        "end_line": 13,
+        "end_column": 1
+      }
+    },
+    {
+      "name": "greet",
+      "tags": [],
+      "params": [
+        { "name": "name", "type_name": "str", "is_serializable": true }
+      ],
+      "return_type": "str",
+      "span": {
+        "file": "runner-input.py",
+        "start_line": 15,
+        "start_column": 1,
+        "end_line": 16,
+        "end_column": 1
+      }
+    },
+    {
+      "name": "process",
+      "tags": [],
+      "params": [
+        { "name": "items", "type_name": "list[str]", "is_serializable": true }
+      ],
+      "return_type": "Optional[str]",
+      "span": {
+        "file": "runner-input.py",
+        "start_line": 18,
+        "start_column": 1,
+        "end_line": 21,
+        "end_column": 1
+      }
+    },
+    {
+      "name": "count_up_to",
+      "tags": [],
+      "params": [
+        { "name": "n", "type_name": "int", "is_serializable": true }
+      ],
+      "return_type": "",
+      "span": {
+        "file": "runner-input.py",
+        "start_line": 23,
+        "start_column": 1,
+        "end_line": 26,
+        "end_column": 1
+      }
+    }
+  ],
+  "serializable_values": [],
+  "generator_refs": [
+    {
+      "name": "count_up_to",
+      "kind": "generator",
+      "span": {
+        "file": "runner-input.py",
+        "start_line": 23,
+        "start_column": 1,
+        "end_line": 26,
+        "end_column": 1
+      }
+    }
+  ]
+}
