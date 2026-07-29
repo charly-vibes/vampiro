@@ -74,5 +74,5 @@ All three tests pass with 0 fixtures needed (the assertions are on generated tex
 ## Immutable Review Reference
 
 This decision is recorded in git as `docs/decisions/law-backends.md`.  
-Commit: `TBD` (will be filled after push).  
+Commit: `55f44dd`.  
 Any future changes to backends, versions, or process boundaries require a new decision document and HITL approval.
