@@ -36,11 +36,11 @@
 - [x] 6.3 Run Clojure runner, lifecycle snapshot, and REQ-V6 E2E tests; record contract versions and passing evidence.
 
 ## 7. Julia Law/Lifecycle/Core Integration Tracer
-- [ ] 7.1 Add failing Julia fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and type-piracy findings against published consumer contracts.
-- [ ] 7.2 Implement the registered Julia runner and lifecycle facts without language-specific engine branches.
-- [ ] 7.3 Run Julia runner, lifecycle snapshot, and REQ-V5 E2E tests; record contract versions and passing evidence.
+- [x] 7.1 Add failing Julia fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and type-piracy findings against published consumer contracts.
+- [x] 7.2 Implement the registered Julia runner and lifecycle facts without language-specific engine branches.
+- [x] 7.3 Run Julia runner, lifecycle snapshot, and REQ-V5 E2E tests; record contract versions and passing evidence.
 
 ## 8. Cross-Language Acceptance
-- [ ] 8.1 Run all deterministic, negative, advisory, runner, lifecycle, and multi-language integration suites plus workspace formatting and Clippy.
-- [ ] 8.2 Verify requirement traceability, all three conformance reports, and compatibility with the named CIR, core-result, law-evidence/runner, and lifecycle contracts.
-- [ ] 8.3 Run `openspec validate add-python-clojure-julia-frontends --strict` and record parser decisions, contract/table versions, commands, and evidence location.
+- [x] 8.1 Run all deterministic, negative, advisory, runner, lifecycle, and multi-language integration suites plus workspace formatting and Clippy.
+- [x] 8.2 Verify requirement traceability, all three conformance reports, and compatibility with the named CIR, core-result, law-evidence/runner, and lifecycle contracts.
+- [x] 8.3 Run `openspec validate add-python-clojure-julia-frontends --strict` and record parser decisions, contract/table versions, commands, and evidence location.
