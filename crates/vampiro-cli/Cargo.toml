@@ -29,3 +29,6 @@ vampiro-rust-frontend = { path = "../vampiro-rust-frontend" }
 tempfile = "3.27.0"
 trycmd = "0.15"
 vampiro-cir = { path = "../vampiro-cir" }
+vampiro-python-frontend = { path = "../vampiro-python-frontend" }
+vampiro-clojure-frontend = { path = "../vampiro-clojure-frontend" }
+vampiro-julia-frontend = { path = "../vampiro-julia-frontend" }
