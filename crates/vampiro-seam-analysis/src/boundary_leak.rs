@@ -150,7 +150,6 @@ mod tests {
             },
             name: Some(name.into()),
             trust_provenance: trust,
-
         }
     }
 

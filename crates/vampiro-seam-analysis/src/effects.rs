@@ -251,7 +251,6 @@ mod tests {
             span: span("src/lib.rs", line),
             name: Some(id.into()),
             trust_provenance: Default::default(),
-
         }
     }
 

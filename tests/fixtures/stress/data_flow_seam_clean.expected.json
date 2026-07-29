@@ -1,0 +1,6 @@
+{
+  "version": "v1",
+  "fixture": "data_flow_seam_clean",
+  "description": "Clean baseline for data_flow_seam: total.codomain = Scalar matches apply_discount.domain_slot(0) = Scalar → zero findings.",
+  "expected_findings": []
+}

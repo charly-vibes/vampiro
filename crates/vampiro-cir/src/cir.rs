@@ -681,11 +681,19 @@ mod tests {
         assert_eq!(deserialized.edges.len(), 2);
         // e1 has slot=Some(0) preserved
         // edges are not indexed, so check via iteration
-        let e1_from_edges: Vec<&CirEdge> = deserialized.edges.iter().filter(|e| e.id.as_str() == "e1").collect();
+        let e1_from_edges: Vec<&CirEdge> = deserialized
+            .edges
+            .iter()
+            .filter(|e| e.id.as_str() == "e1")
+            .collect();
         assert_eq!(e1_from_edges.len(), 1);
         assert_eq!(e1_from_edges[0].slot, Some(0));
         // e2 has slot=None preserved
-        let e2_from_edges: Vec<&CirEdge> = deserialized.edges.iter().filter(|e| e.id.as_str() == "e2").collect();
+        let e2_from_edges: Vec<&CirEdge> = deserialized
+            .edges
+            .iter()
+            .filter(|e| e.id.as_str() == "e2")
+            .collect();
         assert_eq!(e2_from_edges.len(), 1);
         assert_eq!(e2_from_edges[0].slot, None);
     }

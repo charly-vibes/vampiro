@@ -241,7 +241,6 @@ mod tests {
             span: span(line),
             name: Some(name.into()),
             trust_provenance: Default::default(),
-
         }
     }
 
@@ -457,7 +456,6 @@ mod tests {
             },
             name: Some("caller".into()),
             trust_provenance: Default::default(),
-
         });
         graph.add_edge(edge("e1", "caller", "exposed", 2));
 

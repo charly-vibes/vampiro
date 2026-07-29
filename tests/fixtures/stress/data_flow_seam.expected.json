@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "fixture": "data_flow_seam",
+  "description": "Slot-boundary composition break: total.codomain = Scalar does not match apply_discount.domain_slot(0) = Record([Scalar,Scalar]). One finding expected from the slot-boundary check.",
+  "expected_findings": [
+    {
+      "rule": "REQ-7",
+      "axis": "composition",
+      "classification": "composition-break",
+      "severity": "medium"
+    }
+  ]
+}

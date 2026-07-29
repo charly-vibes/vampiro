@@ -163,7 +163,6 @@ fn process_lambda(
         span,
         name: Some(name),
         trust_provenance: TrustProvenance::default(),
-
     };
 
     graph.add_node(cir_node);
@@ -233,7 +232,6 @@ fn process_function_definition(
         span: span.clone(),
         name: Some(name.clone()),
         trust_provenance: TrustProvenance::default(),
-
     };
 
     graph.add_node(cir_node);
@@ -281,7 +279,6 @@ fn process_class_definition(
         span,
         name: Some(name),
         trust_provenance: TrustProvenance::default(),
-
     };
 
     graph.add_node(cir_node);

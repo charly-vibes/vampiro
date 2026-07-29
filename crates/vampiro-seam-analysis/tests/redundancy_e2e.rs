@@ -32,7 +32,6 @@ fn node(id: &str, domain: Shape, codomain: Shape, line: usize) -> CirNode {
         span: span(line),
         name: Some(id.into()),
         trust_provenance: Default::default(),
-
     }
 }
 

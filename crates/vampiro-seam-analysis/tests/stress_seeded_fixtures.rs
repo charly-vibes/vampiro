@@ -65,7 +65,6 @@ fn node(id: &str, file: &str, line: usize, domain: Shape, codomain: Shape) -> Ci
         span: span(file, line),
         name: Some(id.into()),
         trust_provenance: Default::default(),
-
     }
 }
 
@@ -292,6 +291,19 @@ fn over_exposure_graph() -> (CirGraph, VisibilityFacts) {
     (g, vis)
 }
 
+/// Run the real frontend + analyzer on a fixture file, returning findings.
+fn analyze_source_file(fixture_name: &str) -> Vec<Finding> {
+    let path = fixture_path(&format!("{fixture_name}.rs"));
+    let source = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
+    let out = RustFrontend
+        .extract_full(&source, &path)
+        .unwrap_or_else(|e| panic!("frontend extraction of {fixture_name} failed: {e}"));
+    let vis = vampiro_rust_frontend::visibility_adapter::to_visibility_facts(&out);
+    let (findings, _diags) = analyze_with_visibility(&out.graph, &vis);
+    findings
+}
+
 // ---------------------------------------------------------------------------
 // Soundness: every seeded defect is detected, with exactly the pinned set.
 // ---------------------------------------------------------------------------
@@ -336,6 +348,14 @@ fn fixtures_are_sound() {
         assert_eq!(name, "over_exposure");
         assert_findings_match("over_exposure", &findings, &expected);
     }
+
+    // --- data-flow seam (slot-boundary check, vampiro-yvx) ---
+    {
+        let findings = analyze_source_file("data_flow_seam");
+        let (name, expected) = load_expected("data_flow_seam");
+        assert_eq!(name, "data_flow_seam");
+        assert_findings_match("data_flow_seam", &findings, &expected);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -363,4 +383,13 @@ fn fixtures_are_precise() {
         diags.is_empty(),
         "clean baseline must produce zero diagnostics; got: {diags:#?}"
     );
+
+    // --- data-flow seam clean baseline ---
+    {
+        let findings = analyze_source_file("data_flow_seam_clean");
+        assert!(
+            findings.is_empty(),
+            "data_flow_seam clean baseline must produce zero findings; got: {findings:#?}"
+        );
+    }
 }

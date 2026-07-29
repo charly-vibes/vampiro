@@ -475,7 +475,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn slot_mismatch_emits_finding() {
         // Callee domain = Record[Scalar, Scalar] (2-param function).
         // Slot 0 expects Scalar. Caller returns Record[Scalar,Scalar] and
@@ -490,7 +489,7 @@ mod tests {
         graph.add_node(node(
             "callee",
             Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
-            rec.clone(),  // same codomain as caller → return-boundary match
+            rec.clone(), // same codomain as caller → return-boundary match
         ));
         graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(0)));
         let findings = CompositionAnalyzer::new().analyze(&graph);

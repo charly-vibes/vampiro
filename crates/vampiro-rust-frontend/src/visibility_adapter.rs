@@ -100,7 +100,7 @@ pub fn to_visibility_facts(out: &ExtractionOutput) -> VisibilityFacts {
 
     /// Returns `true` if a `::`-joined module path contains a test-module segment.
     fn module_path_contains_test_segment(module_path: &str) -> bool {
-        module_path.split("::").any(|seg| is_test_module(seg))
+        module_path.split("::").any(is_test_module)
     }
 
     // Map facades to language-neutral re-exports. Match by name to find the

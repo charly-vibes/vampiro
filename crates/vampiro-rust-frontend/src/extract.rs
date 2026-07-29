@@ -364,7 +364,6 @@ impl<'src> Extractor<'src> {
             span,
             name: Some(name.clone()),
             trust_provenance: Default::default(),
-
         };
 
         self.graph.add_node(node);
@@ -786,13 +785,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
             // composition analyzer can compare each argument's shape
             // against the callee's expected domain at that parameter.
             if call.args.is_empty() {
-                self.add_call_edge(
-                    &callee_name,
-                    span,
-                    EffectResolution::Propagated,
-                    None,
-                    None,
-                );
+                self.add_call_edge(&callee_name, span, EffectResolution::Propagated, None, None);
             } else {
                 for (i, _arg) in call.args.iter().enumerate() {
                     self.add_call_edge(
@@ -822,7 +815,13 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         // edge with slot=None for the receiver.
         let total_args = 1 + call.args.len(); // receiver + explicit args
         if total_args == 1 {
-            self.add_call_edge(&callee_name, span, resolution.clone(), evidence.clone(), None);
+            self.add_call_edge(
+                &callee_name,
+                span,
+                resolution.clone(),
+                evidence.clone(),
+                None,
+            );
         } else {
             // Receiver at slot 0
             self.add_call_edge(&callee_name, span, resolution.clone(), None, Some(0));
@@ -988,12 +987,30 @@ mod tests {
         let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 2);
         assert_eq!(result.graph.edges.len(), 2);
-        let slot0_edge = result.graph.edges.iter().find(|e| e.slot == Some(0)).unwrap();
-        let slot1_edge = result.graph.edges.iter().find(|e| e.slot == Some(1)).unwrap();
-        assert_ne!(slot0_edge.id, slot1_edge.id, "different slot edges should have different IDs");
+        let slot0_edge = result
+            .graph
+            .edges
+            .iter()
+            .find(|e| e.slot == Some(0))
+            .unwrap();
+        let slot1_edge = result
+            .graph
+            .edges
+            .iter()
+            .find(|e| e.slot == Some(1))
+            .unwrap();
+        assert_ne!(
+            slot0_edge.id, slot1_edge.id,
+            "different slot edges should have different IDs"
+        );
         // Both edges should target the same callee
         assert_eq!(
-            result.graph.node_by_id(&slot0_edge.target).unwrap().name.as_deref(),
+            result
+                .graph
+                .node_by_id(&slot0_edge.target)
+                .unwrap()
+                .name
+                .as_deref(),
             Some("add")
         );
     }

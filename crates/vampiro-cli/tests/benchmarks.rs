@@ -51,9 +51,9 @@ fn generate_rust_source(n_fns: usize, path: &Path) {
     // Generate function chain — write directly to file (no intermediate String)
     for i in 0..n_fns {
         if i < n_fns - 1 {
-            write!(f, "fn f{i:06}() -> u32 {{ f{:06}() + 1 }}\n", i + 1).unwrap();
+            writeln!(f, "fn f{i:06}() -> u32 {{ f{:06}() + 1 }}", i + 1).unwrap();
         } else {
-            write!(f, "fn f{i:06}() -> u32 {{ 0 }}\n").unwrap();
+            writeln!(f, "fn f{i:06}() -> u32 {{ 0 }}").unwrap();
         }
     }
 

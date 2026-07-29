@@ -65,7 +65,6 @@ fn process_node(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
-
             });
             *node_counter += 1;
             // Extract call edges from body
@@ -94,7 +93,6 @@ fn process_node(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
-
             });
             *node_counter += 1;
         }
@@ -113,7 +111,6 @@ fn process_node(
                 span,
                 name: Some(name),
                 trust_provenance: TrustProvenance::default(),
-
             });
             *node_counter += 1;
             // Recurse into module body
@@ -146,7 +143,6 @@ fn process_node(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
-
             });
             *node_counter += 1;
         }
@@ -196,7 +192,6 @@ fn process_node(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
-
             });
             *node_counter += 1;
             let mut c = node.walk();
