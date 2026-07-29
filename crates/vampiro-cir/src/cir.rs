@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use crate::effect::{EffectChannel, EffectResolution, UnwrapEvidence};
 use crate::error::{CirError, NodeRole};
 use crate::provenance::{DiscardSpan, Provenance, SourceSpan, StableId};
@@ -83,6 +85,13 @@ pub struct CirGraph {
     /// validation identity.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub validation_observations: Vec<crate::ValidationObservation>,
+    /// Node index for O(1) lookups by StableId.
+    /// Built automatically from `nodes` — not serialized.
+    #[serde(skip)]
+    node_index: HashMap<StableId, usize>,
+    /// Edge ID set for O(1) dedup checks in add_edge.
+    #[serde(skip)]
+    edge_ids: HashSet<StableId>,
 }
 
 impl CirGraph {
@@ -94,26 +103,43 @@ impl CirGraph {
             nodes: Vec::new(),
             edges: Vec::new(),
             validation_observations: Vec::new(),
+            node_index: HashMap::new(),
+            edge_ids: HashSet::new(),
         }
+    }
+
+    /// Rebuild the node and edge indices from the current vectors.
+    fn rebuild_index(&mut self) {
+        self.node_index = self
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (n.id.clone(), i))
+            .collect();
+        self.edge_ids = self.edges.iter().map(|e| e.id.clone()).collect();
     }
 
     /// Add a node to the graph.
     pub fn add_node(&mut self, node: CirNode) {
+        let idx = self.nodes.len();
+        self.node_index.insert(node.id.clone(), idx);
         self.nodes.push(node);
     }
 
     /// Add an edge to the graph.
+    ///
+    /// Silently ignores duplicate edges (same StableId already present).
     pub fn add_edge(&mut self, edge: CirEdge) {
-        self.edges.push(edge);
+        if self.edge_ids.insert(edge.id.clone()) {
+            self.edges.push(edge);
+        }
     }
 
     /// Find a node by its stable ID.
     ///
-    /// Performs an O(n) linear scan. Callers that issue many lookups should
-    /// build their own `HashMap<&StableId, &CirNode>` index rather than call
-    /// this repeatedly.
+    /// Uses a node index for O(1) lookup.
     pub fn node_by_id(&self, id: &StableId) -> Option<&CirNode> {
-        self.nodes.iter().find(|n| n.id == *id)
+        self.node_index.get(id).map(|&idx| &self.nodes[idx])
     }
 
     /// Validate the graph's internal invariants.
@@ -187,7 +213,8 @@ impl CirGraph {
 
     /// Deserialize a `CirGraph` from a JSON string, with validation.
     pub fn from_json(json: &str) -> Result<Self, CirError> {
-        let graph: CirGraph = serde_json::from_str(json)?;
+        let mut graph: CirGraph = serde_json::from_str(json)?;
+        graph.rebuild_index();
         graph.validate()?;
         Ok(graph)
     }
@@ -249,7 +276,7 @@ mod tests {
 
         // Round-trip through JSON
         let json = serde_json::to_string_pretty(&graph).unwrap();
-        let deserialized: CirGraph = serde_json::from_str(&json).unwrap();
+        let deserialized: CirGraph = CirGraph::from_json(&json).unwrap();
 
         assert_eq!(deserialized.version, "0.1.0");
         assert_eq!(deserialized.source_file, "src/lib.rs");

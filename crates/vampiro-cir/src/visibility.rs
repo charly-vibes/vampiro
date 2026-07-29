@@ -5,6 +5,8 @@
 //! layer consumes these facts to check modularity (REQ-8, REQ-V3–V4, REQ-V7,
 //! REQ-C5) without depending on any particular language's syntax.
 
+use std::collections::HashMap;
+
 use crate::StableId;
 use serde::{Deserialize, Serialize};
 
@@ -123,6 +125,10 @@ pub struct VisibilityFacts {
     pub nesting: Vec<(String, String)>,
     /// Facade re-exports at each module level.
     pub facades: Vec<FacadeReexport>,
+    /// Node index for O(1) fact lookup by StableId.
+    /// Built automatically from facts — not serialized.
+    #[serde(skip)]
+    fact_index: HashMap<StableId, usize>,
 }
 
 impl VisibilityFacts {
@@ -133,11 +139,14 @@ impl VisibilityFacts {
             facts: Vec::new(),
             nesting: Vec::new(),
             facades: Vec::new(),
+            fact_index: HashMap::new(),
         }
     }
 
     /// Add a per-node visibility fact.
     pub fn add_fact(&mut self, fact: VisibilityFact) {
+        let idx = self.facts.len();
+        self.fact_index.insert(fact.node.clone(), idx);
         self.facts.push(fact);
     }
 
@@ -153,7 +162,7 @@ impl VisibilityFacts {
 
     /// Look up the visibility fact for a node.
     pub fn fact_for(&self, node: &StableId) -> Option<&VisibilityFact> {
-        self.facts.iter().find(|f| &f.node == node)
+        self.fact_index.get(node).map(|&i| &self.facts[i])
     }
 
     /// Check if `caller_scope` can reach `target_scope` via nesting ancestors

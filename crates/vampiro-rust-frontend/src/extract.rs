@@ -32,6 +32,9 @@ pub struct ExtractionResult {
 /// `source` is the original source text, used to compute content-sensitive
 /// stable identities (see [`StableId`](vampiro_cir::StableId)).
 pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> ExtractionResult {
+    // Pre-index source lines once for O(1) line lookups in make_id
+    // instead of scanning all lines on every source_slice call.
+    let lines_cache: Vec<&str> = source.lines().collect();
     let mut extractor = Extractor {
         graph: CirGraph::new(path.to_string_lossy()),
         nodes: HashMap::new(),
@@ -42,6 +45,7 @@ pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> Extractio
         visibility: HashMap::new(),
         doc_hidden_stack: Vec::new(),
         source,
+        lines_cache,
     };
     visit::visit_file(&mut extractor, syntax);
     ExtractionResult {
@@ -73,7 +77,10 @@ struct Extractor<'src> {
     #[allow(dead_code)]
     doc_hidden_stack: Vec<bool>,
     /// The original source text, used for content-sensitive stable IDs.
+    #[allow(dead_code)]
     source: &'src str,
+    /// Pre-indexed source lines for O(1) line lookups in make_id.
+    lines_cache: Vec<&'src str>,
 }
 
 impl<'src> Extractor<'src> {
@@ -138,17 +145,17 @@ impl<'src> Extractor<'src> {
     }
 
     /// Slice the source lines `[start_line, end_line]` (1-indexed, inclusive).
+    ///
+    /// Uses a pre-built line index for O(k) access where k = end_line - start_line,
+    /// avoiding O(source_line_count) scans on every call.
     fn source_slice(&self, start_line: usize, end_line: usize) -> String {
-        self.source
-            .lines()
-            .enumerate()
-            .filter(|(i, _)| {
-                let line = i + 1;
-                line >= start_line && line <= end_line
-            })
-            .map(|(_, l)| l)
-            .collect::<Vec<_>>()
-            .join("\n")
+        // 1-indexed to 0-indexed, clamped to line count.
+        let start = start_line.saturating_sub(1);
+        let end = end_line.min(self.lines_cache.len());
+        if start >= end || start >= self.lines_cache.len() {
+            return String::new();
+        }
+        self.lines_cache[start..end].join("\n")
     }
 
     /// Extract a shape from a syn type.
@@ -596,9 +603,6 @@ impl<'src> Extractor<'src> {
         }
 
         let edge_id = self.make_id(&format!("call_{callee_name}"), &span);
-        if self.graph.edges.iter().any(|e| e.id == edge_id) {
-            return;
-        }
 
         let source_id = match self
             .current_function
