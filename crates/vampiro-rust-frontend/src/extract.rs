@@ -448,7 +448,7 @@ impl<'src> Extractor<'src> {
                 if let syn::Expr::Path(expr_path) = &*call.func {
                     let callee_name = Self::path_name(expr_path);
                     if let Some(node_id) = self.resolve_node(&callee_name) {
-                        if let Some(node) = self.graph.node_by_id(&node_id) {
+                        if let Some(node) = self.graph.node_by_id(node_id) {
                             return Some(node.codomain.clone());
                         }
                     }

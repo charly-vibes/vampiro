@@ -57,6 +57,14 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
         return Unification::Match;
     }
 
+    // Coarse shape model: a Scalar value (literal) matches a Ref(Scalar)
+    // parameter (&str, &T) because Rust auto-refs literals at call sites.
+    // This eliminates the dominant false-positive class in the slot-boundary
+    // check (produced=Scalar vs expected=Ref(Scalar)).
+    if produced == Shape::Scalar && expected == Shape::Ref(Box::new(Shape::Scalar)) {
+        return Unification::Match;
+    }
+
     // Produced union, expected non-union: the caller handles the arms it
     // matches; the rest are unhandled → composition break (the parse_amount
     // case from the EARS worked example).
@@ -321,6 +329,27 @@ mod tests {
         );
     }
 
+    // --- coarse model: Scalar matches Ref(Scalar) (vampiro-51v.3) ---
+
+    #[test]
+    fn unify_scalar_matches_ref_scalar() {
+        // String literal (Scalar) passed where &str (Ref(Scalar)) expected.
+        assert_eq!(
+            unify_shapes(&Shape::Scalar, &Shape::Ref(Box::new(Shape::Scalar))),
+            Unification::Match
+        );
+    }
+
+    #[test]
+    fn unify_ref_scalar_does_not_match_scalar() {
+        // Reverse direction: &str (Ref(Scalar)) returned where String
+        // (Scalar) expected — real mismatch, requires .to_string().
+        assert_eq!(
+            unify_shapes(&Shape::Ref(Box::new(Shape::Scalar)), &Shape::Scalar),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+    }
+
     // --- analyzer end to end over a hand-built CIR graph ---
 
     use vampiro_cir::{
@@ -495,7 +524,25 @@ mod tests {
             Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
             rec.clone(), // same codomain as caller → return-boundary match
         ));
-        graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(0)));
+        graph.add_edge(CirEdge {
+            id: StableId::new("e1"),
+            source: StableId::new("caller"),
+            target: StableId::new("callee"),
+            resolution: EffectResolution::Propagated,
+            unwrap_evidence: None,
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "src/lib.rs".into(),
+                start_line: 7,
+                start_column: 5,
+                end_line: 7,
+                end_column: 20,
+            },
+            discard_spans: Vec::new(),
+            trust_provenance: Default::default(),
+            slot: Some(0),
+            arg_shape: Some(rec.clone()), // passes Record where Scalar expected
+        });
         let findings = CompositionAnalyzer::new().analyze(&graph);
         assert_eq!(findings.len(), 1, "expected 1 SlotMismatch finding");
         let f = &findings[0];
@@ -526,7 +573,25 @@ mod tests {
         let callee_domain = Shape::Record(vec![inner_rec.clone(), Shape::Scalar]);
         graph.add_node(node("caller", Shape::Scalar, Shape::Scalar));
         graph.add_node(node("callee", callee_domain, Shape::Scalar));
-        graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(0)));
+        graph.add_edge(CirEdge {
+            id: StableId::new("e1"),
+            source: StableId::new("caller"),
+            target: StableId::new("callee"),
+            resolution: EffectResolution::Propagated,
+            unwrap_evidence: None,
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "src/lib.rs".into(),
+                start_line: 7,
+                start_column: 5,
+                end_line: 7,
+                end_column: 20,
+            },
+            discard_spans: Vec::new(),
+            trust_provenance: Default::default(),
+            slot: Some(0),
+            arg_shape: Some(Shape::Scalar), // passes Scalar where Record expected
+        });
         let findings = CompositionAnalyzer::new().analyze(&graph);
         assert_eq!(findings.len(), 1);
         #[allow(irrefutable_let_patterns)]
