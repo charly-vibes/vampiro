@@ -50,7 +50,12 @@ fn process_node(
             let name =
                 find_decl_name(node, source).unwrap_or(binding_name.unwrap_or("<anonymous>"));
             let span = node_span(node, file_path);
-            let id = StableId::new(format!("jl:{}:{}", file_path, name));
+            // Disambiguate anonymous functions with a counter.
+            let id = if name == "<anonymous>" {
+                StableId::new(format!("jl:{}:{}:fn_{}", file_path, name, *node_counter))
+            } else {
+                StableId::new(format!("jl:{}:{}", file_path, name))
+            };
             let effect = detect_julia_effect(node, source);
             graph.add_node(CirNode {
                 id: id.clone(),
