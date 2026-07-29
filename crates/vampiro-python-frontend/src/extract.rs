@@ -57,6 +57,7 @@ fn process_node(
                 edge_counter,
                 call_depth,
                 is_async,
+                None,
             );
         }
         "decorated_definition" => {
@@ -77,6 +78,7 @@ fn process_node(
                         edge_counter,
                         call_depth,
                         is_async,
+                        None,
                     );
                 } else if child.kind() == "class_definition" {
                     let _ = process_class_definition(
@@ -201,6 +203,7 @@ fn process_function_definition(
     edge_counter: &mut u64,
     call_depth: u32,
     is_async: bool,
+    class_name: Option<&str>,
 ) {
     let name = node
         .child_by_field_name("name")
@@ -208,7 +211,11 @@ fn process_function_definition(
         .unwrap_or_else(|| "<anonymous>".to_string());
 
     let span = node_span(node, file_path);
-    let id = StableId::new(format!("py:{}:{}", file_path, name));
+    let qualified = match class_name {
+        Some(cls) => format!("{}:{}", cls, name),
+        None => name.clone(),
+    };
+    let id = StableId::new(format!("py:{}:{}", file_path, qualified));
 
     // Determine effect from body
     let effect = detect_function_effect(node, source, is_async);
@@ -261,7 +268,8 @@ fn process_class_definition(
         .unwrap_or_else(|| "<anonymous>".to_string());
 
     let span = node_span(node, file_path);
-    let id = StableId::new(format!("py:{}:{}", file_path, name));
+    let cls_name = name.clone();
+    let id = StableId::new(format!("py:{}:{}", file_path, cls_name));
 
     let cir_node = CirNode {
         id: id.clone(),
@@ -295,6 +303,7 @@ fn process_class_definition(
                         edge_counter,
                         call_depth,
                         is_async,
+                        Some(&cls_name),
                     );
                 }
                 "decorated_definition" => {
@@ -312,6 +321,7 @@ fn process_class_definition(
                                 edge_counter,
                                 call_depth,
                                 is_async,
+                                Some(&cls_name),
                             );
                         }
                     }
