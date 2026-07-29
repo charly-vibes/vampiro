@@ -7,9 +7,11 @@
 //!
 //! This catches composition breaks at the **return boundary**: a function
 //! whose declared return type contradicts what its callees actually produce.
-//! The `parse_amount→apply_discount` seam (comparing callee codomain against
-//! the consuming callee's parameter) requires data-flow edges and is tracked
-//! by `0vb.4.7`.
+//! The `parse_amount→apply_discount` seam (comparing a value shape against the
+//! callee's expected parameter shape) is handled by the **slot-boundary check**:
+//! for edges with a known `slot`, the caller's codomain is compared against
+//! `callee.domain[slot]` using the same `unify_shapes` primitive (see
+//! [`domain_slot`](vampiro_cir::Shape::domain_slot)).
 //!
 //! Shapes containing a top-level `Opaque` are excluded from composition-break
 //! checking per REQ-23 and never produce a composition finding.
@@ -139,14 +141,19 @@ impl CompositionAnalyzer {
         Self
     }
 
-    /// Analyze every edge in `graph` and return one composition finding per
-    /// edge where the caller's return type (codomain) does not unify with the
-    /// callee's return type (codomain).
+    /// Analyze every edge in `graph` and return composition findings.
     ///
-    /// This catches genuine composition breaks at the return boundary: a
-    /// caller claims to return type X but calls a function returning Y ≠ X.
-    /// The check compares the two codomains (not caller.domain, which was the
-    /// source of noise from unrelated call edges).
+    /// Two independent checks run on every edge:
+    ///
+    /// 1. **Return-boundary check** (REQ-7): compares the callee's codomain
+    ///    against the caller's codomain. Catches the case where a caller
+    ///    claims to return X but a callee produces Y ≠ X (the original
+    ///    composition check).
+    /// 2. **Slot-boundary check** (REQ-7 extension): for edges with a known
+    ///    argument slot, compares the caller's codomain (the value flowing
+    ///    in) against the callee's expected domain at that slot. This catches
+    ///    the `parse_amount→apply_discount` seam where a value flows into a
+    ///    wrong-shaped parameter.
     pub fn analyze(&self, graph: &CirGraph) -> Vec<Finding> {
         let mut findings = Vec::new();
         for edge in &graph.edges {
@@ -157,33 +164,31 @@ impl CompositionAnalyzer {
                 continue;
             };
 
+            // --- Return-boundary check (unchanged) ---
+            //
             // Skip edges where the caller has a void/unit return type
             // (Scalar as the unit type). There's no composition contract at
             // the return boundary for void-returning functions, and the
             // coarse Shape model already cannot distinguish different scalar
             // types (u32, f64, bool are all `Scalar`), so this guard loses
             // no precision while eliminating noise from unrelated call edges.
-            if caller.codomain == Shape::Scalar {
-                continue;
-            }
-            // For edges with Ordinary+Total unwrap evidence (e.g., `?`
-            // operator on Result/Option), the callee's effect wrapper is
-            // removed at the call site. Compare the unwrapped shape (the
-            // inner type parameter) instead of the full effect-wrapped
-            // codomain (vampiro-0j8).
-            let callee_shape = if let Some(ref ue) = edge.unwrap_evidence {
-                if ue.kind == UnwrapKind::Ordinary && ue.totality == Totality::Total {
-                    unwrap_outer_effect(&callee.codomain).unwrap_or(&callee.codomain)
+            if caller.codomain != Shape::Scalar {
+                // For edges with Ordinary+Total unwrap evidence (e.g., `?`
+                // operator on Result/Option), the callee's effect wrapper is
+                // removed at the call site. Compare the unwrapped shape (the
+                // inner type parameter) instead of the full effect-wrapped
+                // codomain (vampiro-0j8).
+                let callee_shape = if let Some(ref ue) = edge.unwrap_evidence {
+                    if ue.kind == UnwrapKind::Ordinary && ue.totality == Totality::Total {
+                        unwrap_outer_effect(&callee.codomain).unwrap_or(&callee.codomain)
+                    } else {
+                        &callee.codomain
+                    }
                 } else {
                     &callee.codomain
-                }
-            } else {
-                &callee.codomain
-            };
-            let unification = unify_shapes(callee_shape, &caller.codomain);
-            match unification {
-                Unification::Match | Unification::OpaqueExcluded => continue,
-                Unification::Mismatch { unhandled } => {
+                };
+                let unification = unify_shapes(callee_shape, &caller.codomain);
+                if let Unification::Mismatch { unhandled } = unification {
                     findings.push(Finding::composition_mismatch(
                         edge.span.file.clone().into(),
                         edge.span.start_line..=edge.span.end_line,
@@ -191,6 +196,32 @@ impl CompositionAnalyzer {
                         callee.codomain.clone(),
                         unhandled,
                     ));
+                }
+            }
+
+            // --- Slot-boundary check (new) ---
+            //
+            // For edges with a known slot, compare the caller's codomain
+            // (the value being passed) against the callee's expected domain
+            // at that slot. Unlike the return-boundary check, we do NOT skip
+            // Scalar codomains — Scalar here represents a primitive value
+            // being passed, not void/unit.
+            if let Some(slot) = edge.slot {
+                if let Some(expected) = callee.domain.domain_slot(slot) {
+                    if !matches!(expected, Shape::Opaque) {
+                        match unify_shapes(&caller.codomain, expected) {
+                            Unification::Match | Unification::OpaqueExcluded => {}
+                            Unification::Mismatch { .. } => {
+                                findings.push(Finding::slot_mismatch(
+                                    edge.span.file.clone().into(),
+                                    edge.span.start_line..=edge.span.end_line,
+                                    slot,
+                                    expected.clone(),
+                                    caller.codomain.clone(),
+                                ));
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -313,6 +344,16 @@ mod tests {
     }
 
     fn edge(id: &str, source: &str, target: &str, line: usize) -> CirEdge {
+        edge_with_slot(id, source, target, line, None)
+    }
+
+    fn edge_with_slot(
+        id: &str,
+        source: &str,
+        target: &str,
+        line: usize,
+        slot: Option<u32>,
+    ) -> CirEdge {
         CirEdge {
             id: StableId::new(id),
             source: StableId::new(source),
@@ -329,7 +370,7 @@ mod tests {
             },
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
-            slot: None,
+            slot,
         }
     }
 
@@ -409,6 +450,110 @@ mod tests {
         let rec = Shape::Record(vec![Shape::Scalar, Shape::Scalar]);
         graph.add_node(node("caller", Shape::Scalar, rec.clone()));
         graph.add_node(node("callee", Shape::Scalar, rec));
+        graph.add_edge(edge("e1", "caller", "callee", 7));
+        assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
+    }
+
+    // --- vampiro-51v: slot-boundary check ---
+
+    #[test]
+    fn slot_match_produces_no_finding() {
+        // Callee domain = Record[Scalar, Scalar] (a 2-param function where
+        // each param is Scalar). Slot 0 expects Scalar. Caller returns Scalar
+        // and passes it at slot 0 → match → no findings.
+        // Caller's codomain is Scalar (void), so return-boundary check skips.
+        let mut graph = CirGraph::new("src/lib.rs");
+        graph.add_node(node("caller", Shape::Scalar, Shape::Scalar));
+        graph.add_node(node(
+            "callee",
+            Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
+            Shape::Scalar,
+        ));
+        graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(0)));
+        assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
+        assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
+    }
+
+    #[test]
+    #[test]
+    fn slot_mismatch_emits_finding() {
+        // Callee domain = Record[Scalar, Scalar] (2-param function).
+        // Slot 0 expects Scalar. Caller returns Record[Scalar,Scalar] and
+        // passes it at slot 0, but the slot expects Scalar → mismatch.
+        // Both codomains match (both return Scalar) so return-boundary
+        // produces no finding.
+        let mut graph = CirGraph::new("src/lib.rs");
+        let rec = Shape::Record(vec![Shape::Scalar, Shape::Scalar]);
+        // caller returns Record (non-void), domain is irrelevant
+        graph.add_node(node("caller", Shape::Scalar, rec.clone()));
+        // callee has 2 Scalar params (Record domain), returns Scalar
+        graph.add_node(node(
+            "callee",
+            Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
+            rec.clone(),  // same codomain as caller → return-boundary match
+        ));
+        graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(0)));
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(findings.len(), 1, "expected 1 SlotMismatch finding");
+        let f = &findings[0];
+        assert_eq!(f.rule, "REQ-7");
+        assert_eq!(f.classification, "composition-break");
+        #[allow(irrefutable_let_patterns)]
+        let crate::finding::Evidence::SlotMismatch {
+            slot,
+            callee_expected,
+            caller_produced,
+        } = &f.evidence
+        else {
+            panic!("expected SlotMismatch evidence, got: {:?}", f.evidence);
+        };
+        assert_eq!(*slot, 0);
+        assert_eq!(*callee_expected, Shape::Scalar);
+        assert_eq!(*caller_produced, rec);
+    }
+
+    #[test]
+    fn slot_mismatch_multi_param_callee() {
+        // Callee domain = Record[Record[Scalar,Scalar], Scalar].
+        // Caller returns Scalar, callee returns Scalar (return-boundary match).
+        // Caller passes Scalar at slot 0, but callee expects Record at
+        // that slot → slot mismatch finding.
+        let mut graph = CirGraph::new("src/lib.rs");
+        let inner_rec = Shape::Record(vec![Shape::Scalar, Shape::Scalar]);
+        let callee_domain = Shape::Record(vec![inner_rec.clone(), Shape::Scalar]);
+        graph.add_node(node("caller", Shape::Scalar, Shape::Scalar));
+        graph.add_node(node("callee", callee_domain, Shape::Scalar));
+        graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(0)));
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(findings.len(), 1);
+        #[allow(irrefutable_let_patterns)]
+        let crate::finding::Evidence::SlotMismatch { .. } = &findings[0].evidence
+        else {
+            panic!("expected SlotMismatch evidence for slot 0");
+        };
+    }
+
+    #[test]
+    fn slot_mismatch_slot_1_passes() {
+        // Callee domain = Record[Scalar, Record[Scalar,Scalar]].
+        // Caller returns Record[Scalar,Scalar], callee codomain = same Record
+        // (return-boundary match). Caller passes Record at slot 1 → match.
+        let mut graph = CirGraph::new("src/lib.rs");
+        let inner_rec = Shape::Record(vec![Shape::Scalar, Shape::Scalar]);
+        let callee_domain = Shape::Record(vec![Shape::Scalar, inner_rec.clone()]);
+        graph.add_node(node("caller", Shape::Scalar, inner_rec.clone()));
+        graph.add_node(node("callee", callee_domain, inner_rec));
+        graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(1)));
+        assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
+    }
+
+    #[test]
+    fn slot_no_slot_edge_skips_slot_check() {
+        // Edge without a slot should not produce a slot-boundary finding.
+        // The return-boundary check still runs.
+        let mut graph = CirGraph::new("src/lib.rs");
+        graph.add_node(node("caller", Shape::Scalar, Shape::Scalar));
+        graph.add_node(node("callee", Shape::Scalar, Shape::Scalar));
         graph.add_edge(edge("e1", "caller", "callee", 7));
         assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
     }

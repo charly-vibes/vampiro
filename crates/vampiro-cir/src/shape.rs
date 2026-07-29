@@ -132,6 +132,25 @@ impl Shape {
         // Truncate to 128 bits (16 bytes) and hex-encode.
         to_hex_lower(&digest[..16])
     }
+
+    /// Extract the expected shape at a parameter slot position.
+    ///
+    /// Returns `None` when the shape is not slot-indexable (Scalar, Opaque,
+    /// Bottom, Union), when the slot index is out of bounds, or when the
+    /// shape provides no parameter structure.
+    ///
+    /// - `Record(fields)`: index into the fields by position.
+    /// - `Function(dom, _)`: the domain is itself the parameter shape;
+    ///   returns the domain for slot 0, or `None` for higher slots.
+    /// - `Parameterized { parameters, .. }`: index into parameters.
+    pub fn domain_slot(&self, slot: u32) -> Option<&Shape> {
+        match self {
+            Shape::Record(fields) => fields.get(slot as usize),
+            Shape::Function(dom, _) if slot == 0 => Some(dom.as_ref()),
+            Shape::Parameterized { parameters, .. } => parameters.get(slot as usize),
+            _ => None,
+        }
+    }
 }
 
 /// Lowercase hex encoding of a byte slice (no external `hex` dependency).

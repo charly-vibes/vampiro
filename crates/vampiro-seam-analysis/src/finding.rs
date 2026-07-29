@@ -138,6 +138,18 @@ pub enum Evidence {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         unhandled: Vec<Shape>,
     },
+    /// REQ-7 extension: a caller's codomain (produced value) does not
+    /// structurally unify with the callee's expected domain at a specific
+    /// parameter slot. This catches the `parse_amount→apply_discount` seam
+    /// where a value flows into the wrong-shaped parameter.
+    SlotMismatch {
+        /// The callee parameter slot (0-based).
+        slot: u32,
+        /// The shape the callee expected at this parameter slot.
+        callee_expected: Shape,
+        /// The shape the caller's codomain produced (flowing into that slot).
+        caller_produced: Shape,
+    },
     /// REQ-8 / REQ-V3: an edge crosses a visibility boundary the caller is
     /// not permitted to cross. The target's level, boundary kind, and the
     /// boundary crossed are named.
@@ -284,6 +296,32 @@ impl Finding {
                 caller_expected: caller_expected.normalize(),
                 callee_produced: callee_produced.normalize(),
                 unhandled: unhandled.into_iter().map(|s| s.normalize()).collect(),
+            },
+            classification: "composition-break".into(),
+        }
+    }
+
+    /// Build a slot-boundary mismatch finding (REQ-7 extension) with default
+    /// severity (`MEDIUM`) and the slot, callee expected shape, and caller
+    /// produced shape.
+    pub fn slot_mismatch(
+        path: PathBuf,
+        line_range: impl Into<LineRange>,
+        slot: u32,
+        callee_expected: Shape,
+        caller_produced: Shape,
+    ) -> Self {
+        Finding {
+            rule: "REQ-7".into(),
+            path,
+            line_range: line_range.into(),
+            severity: Severity::Medium,
+            axis: Axis::Composition,
+            filtration_distance: None,
+            evidence: Evidence::SlotMismatch {
+                slot,
+                callee_expected: callee_expected.normalize(),
+                caller_produced: caller_produced.normalize(),
             },
             classification: "composition-break".into(),
         }
