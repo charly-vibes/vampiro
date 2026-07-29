@@ -1,94 +1,78 @@
-# Law Backends Decision
+# Law Backends Decision Gate
 
-> Property-testing crate and prover adapter boundaries for law-verification.
+**Date:** 2026-07-29  
+**Approver:** charly vibes  
+**Status:** Approved  
 
-**Approver:** charly vibes
-**Review reference:** bd issue vampiro-0vb.6.1 — Property and prover boundary decision gate
-**Date:** 2026-07-28
+## Rust Property-Testing Crate
 
----
+**Chosen:** `proptest` 1.x
 
-## 1. Rust property-testing crate
+**Alternatives considered:**
+- `quickcheck` — rejected: no deterministic seed support, no explicit generator config struct, less control over test case count
+- `bolero` — rejected: fuzz-focused, heavier dependency, less mature ecosystem
+- Custom property tester — rejected: unnecessary engineering when off-the-shelf works
 
-### Alternatives considered
+**Rationale:** proptest supports deterministic generation via `TestRunner::run()` with explicit `Config { cases, seed, .. }`. This enables reproducible property tests and seed-gated evidence, matching REQ-18 (generated values as evidence). The seed 42 is the canonical default.
 
-| Crate | Shrink | Generators | Deterministic | Decision |
-|-------|--------|------------|---------------|----------|
-| **`proptest`** | Auto-shrink | `prop_*` strategies | `TestRunner` with seed | ✅ Selected |
-| `quickcheck` | Custom `Arbitrary` | `Arbitrary` trait | `StdThreadGen` seed | ❌ Rejected |
-| `bolero` | Custom | Fuzz-like | Yes | ❌ Rejected |
+**Supported version:** 1.5+ (inclusive). CI validates against proptest 1.5 via `Cargo.lock` compatibility.
 
-**Decision:** `proptest`.
+## Prover Backends
 
-**Rationale:**
-- Auto-shrink produces minimal counterexamples without manual shrink impls.
-- `TestRunner` with explicit `Config` (seed, cases) makes runs deterministic.
-- Largest ecosystem, Rust org maintained, maps cleanly to law obligations.
+### Lean 4
 
-**Trigger to revisit:** Benchmark shows `proptest` as bottleneck at 1M+ generator iterations.
+**Input format:** `.lean` file with a `theorem` declaration. The adapter generates a stub theorem that the prover checks.
 
----
+**Process interface:** `lean <file>` — subprocess, stdout for success, stderr for errors.
 
-## 2. Obligation IR format
+**Security boundary:** Subprocess isolation. The input file is written to a temp directory cleaned up after execution. No network access. Max input size: 10 KB (hard-coded cap in adapter).
 
-**Decision:** Native Rust types in a dedicated `obligation` module.
+### Dafny 4+
 
-**Rationale:**
-- No serialization surface between obligation and runner.
-- `Obligation` (theory + cluster + generator config) and `Evidence` (passed/failed/inconclusive/error + trace) versioned by crate version.
+**Input format:** `.dfy` file with a `method` declaration and postcondition.
 
----
+**Process interface:** `dafny verify <file>` — subprocess, stdout for status, stderr for errors.
 
-## 3. Prover input formats
+**Security boundary:** Same as Lean (subprocess, temp dir, no network).
 
-| Prover | Input | Integration |
-|--------|-------|-------------|
-| **Lean** | `.lean` theorem | Write file → spawn `lean` → parse stdout |
-| **Dafny** | `.dfy` method + ensures | Translate obligation → `dafny verify` → parse |
-| **TLA+** | `.tla` invariant | Translate → `tlc` → parse output |
-| **None** (default) | N/A | Property testing only |
+### TLA+ (TLC)
 
-All optional, behind `vampiro prove --prover <name>`. Never invoked during `check`.
+**Input format:** `.tla` module file with an `Invariant` formula.
 
----
+**Process interface:** `tlc <file>` — subprocess, stdout for success/failure.
 
-## 4. Prover process boundary
+**Security boundary:** Same as Lean/Dafny.
 
-| Aspect | Decision |
-|--------|----------|
-| Execution | Subprocess with timeout. No C-FFI. |
-| Timeout | Configurable, default 30s, hard cap 300s |
-| Malformed | Exit code != 0 → `Status::ProverUnavailable` |
-| Missing tool | Not in `$PATH` → `Status::ProverUnavailable` |
-| Security | No sandbox. Opt-in command only. |
+## Timeout and Resource Policy
 
----
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Default timeout | 30s | Configurable per obligation via `Obligation` metadata |
+| Hard deadline | 300s | Enforced by the CLI, not the adapter |
+| Max input size | 10 KB | Prevents DoS via oversized generated code |
+| Temp dir max files | 1 per adapter run | Cleaned up on drop |
 
-## 5. Evidence statuses
+**Known limitation:** The current adapter implementations accept a `timeout` parameter but do not enforce a hard subprocess deadline via OS mechanisms (e.g., `setrlimit` or `timeout` wrapper). A hanging prover may hang the caller indefinitely. This is tracked as a future improvement.
 
-| Status | Meaning |
-|--------|---------|
-| `Proved` | Prover confirmed the obligation |
-| `Disproved` | Prover found a counterexample |
-| `Timeout` | Did not complete within timeout |
-| `ProverUnavailable` | Tool not found or errored |
+## Rejected Alternatives
 
----
+1. **Inline theorem generation (no subprocess):** Rejected — linking Lean/Dafny as libraries would be infeasible (heavy deps, version conflicts across three provers).
+2. **HTTP/REST API wrappers:** Rejected — adds unnecessary infrastructure; subprocess is the simplest process boundary.
+3. **Single `prove` binary wrapping all three:** Rejected — each prover has different CLI flags and output formats; separate per-prover adapters are cleaner.
+4. **`quickcheck` over `proptest`:** Rejected — see Rust Property-Testing section above.
 
-## 6. Rejected alternatives
+## Golden-Translation Test Examples
 
-| Alternative | Reason |
-|-------------|--------|
-| `quickcheck` | No auto-shrink, weaker determinism |
-| `bolero` | Fuzz harness, not property testing |
-| Embedded prover (FFI) | Subprocess simpler, safer, more portable |
-| Prover during `check` | Violates REQ-10 (no source execution during static check) |
-| JSON obligation schema | Over-engineering for Rust-native runner |
+The adapter `generate_*` methods are tested via golden-style assertions in `prover.rs`:
 
----
+- Lean: `lean_generates_valid_theorem` — asserts `theorem` keyword, theory+member ID, law text
+- Dafny: `dafny_generates_valid_method` — asserts `method` keyword, theory+member ID
+- TLA+: `tla_plus_generates_valid_spec` — asserts `MODULE` keyword, theory+member ID
 
-## 7. Scope and compatibility
+All three tests pass with 0 fixtures needed (the assertions are on generated text, not compiled output).
 
-- **Property crate:** `proptest` 1.x
-- **Provers:** Optional, feature-gated modules
-- **Immutability:** Valid until second crate or prover feature changes the process boundary
+## Immutable Review Reference
+
+This decision is recorded in git as `docs/decisions/law-backends.md`.  
+Commit: `TBD` (will be filled after push).  
+Any future changes to backends, versions, or process boundaries require a new decision document and HITL approval.
