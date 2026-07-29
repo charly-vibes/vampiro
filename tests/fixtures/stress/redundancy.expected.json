@@ -1,0 +1,25 @@
+{
+  "version": "v1",
+  "fixture": "redundancy",
+  "description": "Seeded redundancy mismatch (REQ-11): a consumer receives data from two branches with different codomain shapes (Record[Scalar,Scalar] vs Parameterized{Option,[Scalar]}) and no adapter reconciles them. The coarse composition tracer additionally flags each mismatched branch edge (REQ-7).",
+  "expected_findings": [
+    {
+      "rule": "REQ-7",
+      "axis": "composition",
+      "classification": "composition-break",
+      "severity": "medium"
+    },
+    {
+      "rule": "REQ-7",
+      "axis": "composition",
+      "classification": "composition-break",
+      "severity": "medium"
+    },
+    {
+      "rule": "REQ-11",
+      "axis": "robustness",
+      "classification": "redundancy-mismatch",
+      "severity": "medium"
+    }
+  ]
+}

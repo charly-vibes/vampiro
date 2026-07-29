@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "fixture": "composition",
+  "description": "Seeded composition break (REQ-7): caller codomain Record[Scalar,Scalar] does not unify with callee codomain Parameterized{Option,[Scalar]}.",
+  "expected_findings": [
+    {
+      "rule": "REQ-7",
+      "axis": "composition",
+      "classification": "composition-break",
+      "severity": "medium"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "version": "v1",
+  "fixture": "clean",
+  "description": "Precision baseline — vampiro must report zero findings.",
+  "expected_findings": []
+}

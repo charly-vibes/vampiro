@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "fixture": "swallowed_effect",
+  "description": "Seeded swallowed effect (REQ-9): the caller discards a Result effect channel without handling it.",
+  "expected_findings": [
+    {
+      "rule": "REQ-9",
+      "axis": "robustness",
+      "classification": "swallowed-effect",
+      "severity": "medium"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "fixture": "over_exposure",
+  "description": "Seeded over-exposure (REQ-V4): a #[doc(hidden)] pub fn at L3 EnforcedOpen is reachable from a cross-file caller.",
+  "expected_findings": [
+    {
+      "rule": "REQ-V4",
+      "axis": "modularity",
+      "classification": "over-exposure",
+      "severity": "medium"
+    }
+  ]
+}
