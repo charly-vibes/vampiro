@@ -29,6 +29,12 @@ impl LawRunner for RustPropertyRunner {
     }
 
     fn run(&self, input: &RunnerInput) -> Vec<LawResult> {
+        // Only process obligations for the language this runner supports.
+        // Non-matching languages return empty (caller should dispatch to
+        // the correct language runner or report RunnerUnsupported).
+        if input.language != self.language() {
+            return Vec::new();
+        }
         input.obligations.iter().map(run_obligation).collect()
     }
 }
@@ -80,11 +86,6 @@ fn generate_values_for_law(_law: &str) -> impl Strategy<Value = (i32, i32)> {
     (0..100i32, 0..100i32)
 }
 
-/// Evaluate a law equation against generated values (tracer placeholder).
-///
-/// For the tracer milestone, this always returns `Ok(())` for commutative
-/// and identity laws — they are structurally satisfied by the random data.
-/// A full runner would deserialize the values and call the actual function.
 /// Evaluate a law equation against generated values (tracer placeholder).
 ///
 /// For the tracer milestone, this always returns `Ok(())` for commutative
@@ -240,10 +241,10 @@ mod tests {
     }
 
     #[test]
-    fn non_rust_language_returns_evidence() {
-        // REQ-10, REQ-C6: runner should produce Evidence (not panic) even
-        // when the language doesn't match, since the runner is registered
-        // by language match.
+    fn non_rust_language_returns_empty() {
+        // REQ-10, REQ-C6: runner should return no results for languages
+        // it doesn't support. The caller dispatches to the correct
+        // language runner or reports RunnerUnsupported.
         let runner = RustPropertyRunner;
         let input = RunnerInput {
             schema_version: CONTRACT_VERSION.to_string(),
@@ -255,7 +256,7 @@ mod tests {
             values: None,
         };
         let results = runner.run(&input);
-        assert_eq!(results.len(), 1);
+        assert_eq!(results.len(), 0);
     }
 
     #[test]

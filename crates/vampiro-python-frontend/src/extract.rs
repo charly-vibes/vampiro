@@ -403,7 +403,7 @@ fn process_call_expression(
                     };
 
                     let edge = CirEdge {
-                        id: StableId::new(format!("py:edge:{}", caller_id)),
+                        id: StableId::new(format!("py:edge:{}", *edge_counter)),
                         source: caller_id.clone(),
                         target: callee_id,
                         resolution: EffectResolution::Propagated,

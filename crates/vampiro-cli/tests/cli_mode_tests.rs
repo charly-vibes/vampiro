@@ -220,7 +220,7 @@ fn check_property(a: i32, b: i32) -> bool {
         "static check must exit 0 (would panic if it executed law code); stderr: {:?}",
         String::from_utf8_lossy(&output.stderr)
     );
-    dir.close().unwrap();
+    // TempDir drops here — no explicit close needed
 }
 
 // ---------------------------------------------------------------------------
