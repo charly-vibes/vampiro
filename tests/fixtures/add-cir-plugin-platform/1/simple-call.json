@@ -4,16 +4,16 @@
   "nodes": [
     {
       "id": "caller",
-      "domain": "scalar",
-      "codomain": "scalar",
+      "domain": {"scalar": "unit"},
+      "codomain": {"scalar": "unit"},
       "effect": "plain",
       "span": { "file": "test.rs", "start_line": 1, "start_column": 1, "end_line": 1, "end_column": 10 },
       "name": "caller_fn"
     },
     {
       "id": "callee",
-      "domain": "scalar",
-      "codomain": "scalar",
+      "domain": {"scalar": "unit"},
+      "codomain": {"scalar": "unit"},
       "effect": "plain",
       "span": { "file": "test.rs", "start_line": 2, "start_column": 1, "end_line": 2, "end_column": 10 },
       "name": "callee_fn"

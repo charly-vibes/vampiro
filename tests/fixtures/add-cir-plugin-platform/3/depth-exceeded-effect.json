@@ -4,8 +4,8 @@
   "nodes": [
     {
       "id": "deep-node",
-      "domain": "scalar",
-      "codomain": "scalar",
+      "domain": {"scalar": "unit"},
+      "codomain": {"scalar": "unit"},
       "effect": {
         "recursive": {
           "recursive": {

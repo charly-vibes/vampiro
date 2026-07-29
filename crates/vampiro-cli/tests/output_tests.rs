@@ -1,6 +1,7 @@
 //! Tests for the normalized result and renderers (REQ-15, REQ-19, REQ-24, REQ-C2).
 
 use std::path::PathBuf;
+use vampiro_cir::ScalarKind;
 use vampiro_cli::output::{
     render_human, render_json, render_sarif, ScanResult, ScanResultMetadata, ScopeKind,
 };
@@ -11,8 +12,8 @@ fn sample_finding() -> Finding {
     Finding::composition_mismatch(
         PathBuf::from("src/lib.rs"),
         10..=12,
-        vampiro_cir::Shape::Scalar,
-        vampiro_cir::Shape::Union(vec![vampiro_cir::Shape::Scalar, vampiro_cir::Shape::Opaque]),
+        vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+        vampiro_cir::Shape::Union(vec![vampiro_cir::Shape::Scalar(ScalarKind::Unit), vampiro_cir::Shape::Opaque]),
         vec![vampiro_cir::Shape::Opaque],
     )
 }
@@ -64,15 +65,15 @@ fn stable_dedup_id_differs_for_different_findings() {
     let f1 = Finding::composition_mismatch(
         PathBuf::from("src/lib.rs"),
         10..=12,
-        vampiro_cir::Shape::Scalar,
-        vampiro_cir::Shape::Scalar,
+        vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+        vampiro_cir::Shape::Scalar(ScalarKind::Unit),
         vec![],
     );
     let f2 = Finding::composition_mismatch(
         PathBuf::from("src/lib.rs"),
         20..=22,
-        vampiro_cir::Shape::Scalar,
-        vampiro_cir::Shape::Scalar,
+        vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+        vampiro_cir::Shape::Scalar(ScalarKind::Unit),
         vec![],
     );
 

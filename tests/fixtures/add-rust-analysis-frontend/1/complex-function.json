@@ -6,16 +6,16 @@
       "id": "process:complex.rs:1",
       "domain": {
         "record": [
-          "scalar",
+          {"scalar": "unit"},
           {
-            "ref": "scalar"
+            "ref": {"scalar": "unit"}
           }
         ]
       },
       "codomain": {
         "parameterized": {
           "base": "Result",
-          "parameters": ["scalar", "scalar"]
+          "parameters": [{"scalar": "unit"}, {"scalar": "unit"}]
         }
       },
       "effect": "result",

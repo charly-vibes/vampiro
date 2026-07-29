@@ -6,7 +6,7 @@
 /// and test byte reproducibility.
 use serde::Deserialize;
 use std::path::Path;
-use vampiro_cir::{
+use vampiro_cir::{ScalarKind, 
     CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, Provenance,
     Shape, SourceSpan,
 };
@@ -53,8 +53,8 @@ impl Frontend for MockValidFrontend {
         let mut graph = CirGraph::new(source);
         let caller = CirNode {
             id: "caller".into(),
-            domain: Shape::Scalar,
-            codomain: Shape::Scalar,
+            domain: Shape::Scalar(ScalarKind::Unit),
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Plain,
             span: SourceSpan {
                 file: "src/lib.rs".into(),
@@ -65,11 +65,12 @@ impl Frontend for MockValidFrontend {
             },
             name: Some("caller_fn".into()),
             trust_provenance: Default::default(),
+            is_test: false,
         };
         let callee = CirNode {
             id: "callee".into(),
-            domain: Shape::Scalar,
-            codomain: Shape::Scalar,
+            domain: Shape::Scalar(ScalarKind::Unit),
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Plain,
             span: SourceSpan {
                 file: "src/lib.rs".into(),
@@ -80,6 +81,7 @@ impl Frontend for MockValidFrontend {
             },
             name: Some("callee_fn".into()),
             trust_provenance: Default::default(),
+            is_test: false,
         };
         let edge = CirEdge {
             id: "call-1".into(),
@@ -123,8 +125,8 @@ impl Frontend for MockDepthExceededEffectFrontend {
         }
         let node = CirNode {
             id: "deep-node".into(),
-            domain: Shape::Scalar,
-            codomain: Shape::Scalar,
+            domain: Shape::Scalar(ScalarKind::Unit),
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: deep_effect,
             span: SourceSpan {
                 file: "deep.rs".into(),
@@ -135,6 +137,7 @@ impl Frontend for MockDepthExceededEffectFrontend {
             },
             name: Some("deep_fn".into()),
             trust_provenance: Default::default(),
+            is_test: false,
         };
         graph.add_node(node);
         // The frontend produces the graph, but it should be rejected by validate()
@@ -153,14 +156,14 @@ impl Frontend for MockDepthExceededShapeFrontend {
 
     fn extract(&self, _source: &str, _path: &Path) -> Result<CirGraph, CirError> {
         let mut graph = CirGraph::new("deep.rs");
-        let mut deep_shape = Shape::Scalar;
+        let mut deep_shape = Shape::Scalar(ScalarKind::Unit);
         for _ in 0..(vampiro_cir::shape::MAX_SHAPE_DEPTH + 1) {
             deep_shape = Shape::Record(vec![deep_shape]);
         }
         let node = CirNode {
             id: "deep-node".into(),
             domain: deep_shape,
-            codomain: Shape::Scalar,
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Plain,
             span: SourceSpan {
                 file: "deep.rs".into(),
@@ -171,6 +174,7 @@ impl Frontend for MockDepthExceededShapeFrontend {
             },
             name: Some("deep_fn".into()),
             trust_provenance: Default::default(),
+            is_test: false,
         };
         graph.add_node(node);
         Ok(graph)

@@ -5,7 +5,7 @@
 // and the closed severity vocabulary is {low, medium, high}.
 
 use std::path::PathBuf;
-use vampiro_cir::Shape;
+use vampiro_cir::{ScalarKind, Shape};
 use vampiro_cli::finding::{Axis, Evidence, Finding, Severity};
 
 #[test]
@@ -15,8 +15,8 @@ fn finding_composition_mismatch_construction() {
     let finding = Finding::composition_mismatch(
         PathBuf::from("src/main.rs"),
         10..=15,
-        Shape::Scalar,
-        Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
         vec![Shape::Opaque],
     );
 
@@ -35,8 +35,8 @@ fn finding_serialization() {
     let finding = Finding::composition_mismatch(
         PathBuf::from("src/main.rs"),
         10..=15,
-        Shape::Scalar,
-        Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
         vec![Shape::Opaque],
     );
 
@@ -62,8 +62,8 @@ fn finding_deserialization() {
     let finding = Finding::composition_mismatch(
         PathBuf::from("src/main.rs"),
         10..=15,
-        Shape::Scalar,
-        Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
         vec![Shape::Opaque],
     );
 
@@ -101,8 +101,8 @@ fn evidence_carries_side_by_side_shapes() {
     let finding = Finding::composition_mismatch(
         PathBuf::from("src/lib.rs"),
         1..=1,
-        Shape::Scalar,
-        Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
         vec![Shape::Opaque],
     );
     #[allow(irrefutable_let_patterns)]
@@ -114,7 +114,7 @@ fn evidence_carries_side_by_side_shapes() {
     else {
         panic!("expected composition mismatch evidence");
     };
-    assert_eq!(caller_expected, &Shape::Scalar);
+    assert_eq!(caller_expected, &Shape::Scalar(ScalarKind::Unit));
     assert_ne!(caller_expected, callee_produced);
     assert_eq!(unhandled, &vec![Shape::Opaque]);
 }

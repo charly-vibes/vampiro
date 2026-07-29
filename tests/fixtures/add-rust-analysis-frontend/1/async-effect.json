@@ -4,8 +4,8 @@
   "nodes": [
     {
       "id": "fetch:async.rs:1",
-      "domain": "scalar",
-      "codomain": "scalar",
+      "domain": {"scalar": "unit"},
+      "codomain": {"scalar": "unit"},
       "effect": {
         "recursive": "result"
       },

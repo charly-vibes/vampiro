@@ -4,8 +4,8 @@
   "nodes": [
     {
       "id": "fn-1",
-      "domain": "scalar",
-      "codomain": "scalar",
+      "domain": {"scalar": "unit"},
+      "codomain": {"scalar": "unit"},
       "effect": { "recursive": "option" },
       "span": { "file": "effects.rs", "start_line": 1, "start_column": 1, "end_line": 3, "end_column": 1 },
       "name": "risky_fn"

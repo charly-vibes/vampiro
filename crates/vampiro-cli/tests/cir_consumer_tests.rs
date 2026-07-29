@@ -7,7 +7,7 @@
 /// 3. Produce findings using the CLI finding contract
 /// 4. Load configuration using the CLI config contract
 use std::path::PathBuf;
-use vampiro_cir::{
+use vampiro_cir::{ScalarKind, 
     CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, Provenance,
     Shape, SourceSpan,
 };
@@ -26,8 +26,8 @@ impl Frontend for ConsumerTestFrontend {
         let mut graph = CirGraph::new(source);
         let node = CirNode {
             id: "fn-main".into(),
-            domain: Shape::Scalar,
-            codomain: Shape::Scalar,
+            domain: Shape::Scalar(ScalarKind::Unit),
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Plain,
             span: SourceSpan {
                 file: source.into(),
@@ -38,6 +38,7 @@ impl Frontend for ConsumerTestFrontend {
             },
             name: Some("main".into()),
             trust_provenance: Default::default(),
+            is_test: false,
         };
         graph.add_node(node);
         Ok(graph)
@@ -51,8 +52,8 @@ fn consumer_imports_cir_and_constructs_graph() {
 
     let caller = CirNode {
         id: "caller".into(),
-        domain: Shape::Scalar,
-        codomain: Shape::Scalar,
+        domain: Shape::Scalar(ScalarKind::Unit),
+        codomain: Shape::Scalar(ScalarKind::Unit),
         effect: EffectChannel::Plain,
         span: SourceSpan {
             file: "src/lib.rs".into(),
@@ -63,11 +64,12 @@ fn consumer_imports_cir_and_constructs_graph() {
         },
         name: Some("caller".into()),
         trust_provenance: Default::default(),
+        is_test: false,
     };
     let callee = CirNode {
         id: "callee".into(),
-        domain: Shape::Scalar,
-        codomain: Shape::Scalar,
+        domain: Shape::Scalar(ScalarKind::Unit),
+        codomain: Shape::Scalar(ScalarKind::Unit),
         effect: EffectChannel::Plain,
         span: SourceSpan {
             file: "src/lib.rs".into(),
@@ -78,6 +80,7 @@ fn consumer_imports_cir_and_constructs_graph() {
         },
         name: Some("callee".into()),
         trust_provenance: Default::default(),
+        is_test: false,
     };
     let edge = CirEdge {
         id: "call-1".into(),
@@ -115,8 +118,8 @@ fn consumer_validates_graph() {
 
     let node = CirNode {
         id: "n1".into(),
-        domain: Shape::Scalar,
-        codomain: Shape::Scalar,
+        domain: Shape::Scalar(ScalarKind::Unit),
+        codomain: Shape::Scalar(ScalarKind::Unit),
         effect: EffectChannel::Plain,
         span: SourceSpan {
             file: "test.rs".into(),
@@ -127,6 +130,7 @@ fn consumer_validates_graph() {
         },
         name: None,
         trust_provenance: Default::default(),
+        is_test: false,
     };
     graph.add_node(node);
 
@@ -141,8 +145,8 @@ fn consumer_detects_invalid_graph() {
 
     let node = CirNode {
         id: "n1".into(),
-        domain: Shape::Scalar,
-        codomain: Shape::Scalar,
+        domain: Shape::Scalar(ScalarKind::Unit),
+        codomain: Shape::Scalar(ScalarKind::Unit),
         effect: EffectChannel::Plain,
         span: SourceSpan {
             file: "test.rs".into(),
@@ -153,6 +157,7 @@ fn consumer_detects_invalid_graph() {
         },
         name: None,
         trust_provenance: Default::default(),
+        is_test: false,
     };
     let edge = CirEdge {
         id: "e1".into(),
@@ -213,8 +218,8 @@ fn consumer_uses_cli_finding_contract() {
     let finding = Finding::composition_mismatch(
         PathBuf::from("src/lib.rs"),
         10..=15,
-        Shape::Scalar,
-        Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
         vec![Shape::Opaque],
     );
 
@@ -244,8 +249,8 @@ fn consumer_round_trips_cir_via_json() {
 
     let node = CirNode {
         id: "n1".into(),
-        domain: Shape::Scalar,
-        codomain: Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
+        domain: Shape::Scalar(ScalarKind::Unit),
+        codomain: Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
         effect: EffectChannel::Option,
         span: SourceSpan {
             file: "consumer_test.rs".into(),
@@ -256,6 +261,7 @@ fn consumer_round_trips_cir_via_json() {
         },
         name: Some("consumer_fn".into()),
         trust_provenance: Default::default(),
+        is_test: false,
     };
     graph.add_node(node);
 
@@ -267,7 +273,7 @@ fn consumer_round_trips_cir_via_json() {
     assert_eq!(deserialized.nodes[0].effect, EffectChannel::Option);
     assert_eq!(
         deserialized.nodes[0].codomain,
-        Shape::Record(vec![Shape::Scalar, Shape::Scalar])
+        Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)])
     );
 }
 
@@ -280,8 +286,8 @@ fn consumer_from_json_validates() {
         "nodes": [
             {
                 "id": "n1",
-                "domain": "scalar",
-                "codomain": "scalar",
+                "domain": {"scalar": "unit"},
+                "codomain": {"scalar": "unit"},
                 "effect": "plain",
                 "span": {
                     "file": "test.rs",

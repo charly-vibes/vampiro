@@ -4,8 +4,8 @@
   "nodes": [
     {
       "id": "caller",
-      "domain": "scalar",
-      "codomain": "scalar",
+      "domain": {"scalar": "unit"},
+      "codomain": {"scalar": "unit"},
       "effect": "plain",
       "span": {
         "file": "src/lib.rs",
@@ -18,8 +18,8 @@
     },
     {
       "id": "callee",
-      "domain": "scalar",
-      "codomain": "scalar",
+      "domain": {"scalar": "unit"},
+      "codomain": {"scalar": "unit"},
       "effect": "plain",
       "span": {
         "file": "src/lib.rs",

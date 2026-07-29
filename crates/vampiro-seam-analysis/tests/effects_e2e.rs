@@ -7,7 +7,7 @@
 //! (discard detection is a separate enhancement). This E2E test constructs the
 //! graph programmatically to validate the analyzer + evidence + output format.
 
-use vampiro_cir::{
+use vampiro_cir::{ScalarKind, 
     CirEdge, CirGraph, CirNode, DiscardSpan, EffectChannel, EffectResolution, Provenance,
     SourceSpan, StableId, Totality, UnwrapEvidence, UnwrapKind,
 };
@@ -30,12 +30,13 @@ fn span(line: usize) -> SourceSpan {
 fn node(id: &str, effect: EffectChannel, line: usize) -> CirNode {
     CirNode {
         id: sid(id),
-        domain: vampiro_cir::Shape::Scalar,
-        codomain: vampiro_cir::Shape::Scalar,
+        domain: vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+        codomain: vampiro_cir::Shape::Scalar(ScalarKind::Unit),
         effect,
         span: span(line),
         name: Some(id.into()),
         trust_provenance: Default::default(),
+        is_test: false,
     }
 }
 

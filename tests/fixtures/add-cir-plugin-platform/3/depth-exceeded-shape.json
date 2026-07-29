@@ -134,7 +134,7 @@
                                                                                                                                                                                                                                                                     "record": [
                                                                                                                                                                                                                                                                       {
                                                                                                                                                                                                                                                                         "record": [
-                                                                                                                                                                                                                                                                          "scalar"
+                                                                                                                                                                                                                                                                          {"scalar": "unit"}
                                                                                                                                                                                                                                                                         ]
                                                                                                                                                                                                                                                                       }
                                                                                                                                                                                                                                                                     ]
@@ -265,7 +265,7 @@
           }
         ]
       },
-      "codomain": "scalar",
+      "codomain": {"scalar": "unit"},
       "effect": "plain",
       "span": {
         "file": "deep.rs",

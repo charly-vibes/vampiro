@@ -3,7 +3,7 @@
 //! Constructs a CIR graph with multiple branches feeding a consumer node with
 //! mismatched codomain shapes (REQ-11, REQ-C7).
 
-use vampiro_cir::{
+use vampiro_cir::{ScalarKind, 
     CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
     StableId,
 };
@@ -32,6 +32,7 @@ fn node(id: &str, domain: Shape, codomain: Shape, line: usize) -> CirNode {
         span: span(line),
         name: Some(id.into()),
         trust_provenance: Default::default(),
+        is_test: false,
     }
 }
 
@@ -57,25 +58,25 @@ fn redundancy_e2e_two_branches_mismatch() {
     // primary -> FullRecord (Record[Scalar, Scalar])
     graph.add_node(node(
         "primary_source_fetch",
-        Shape::Scalar,
-        Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
         1,
     ));
     // cache -> Option<f64> (Parameterized{Option, [Scalar]})
     graph.add_node(node(
         "cache_get",
-        Shape::Scalar,
+        Shape::Scalar(ScalarKind::Unit),
         Shape::Parameterized {
             base: "Option".into(),
-            parameters: vec![Shape::Scalar],
+            parameters: vec![Shape::Scalar(ScalarKind::Unit)],
         },
         5,
     ));
     // use -> expects (f64, String) = Record[Scalar, Scalar]
     graph.add_node(node(
         "use_data",
-        Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
-        Shape::Scalar,
+        Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+        Shape::Scalar(ScalarKind::Unit),
         10,
     ));
     graph.add_edge(edge("e1", "primary_source_fetch", "use_data", 3));
@@ -110,7 +111,7 @@ fn redundancy_e2e_two_branches_mismatch() {
     assert_eq!(branch_shapes.len(), 2);
     assert_eq!(
         *expected_shape,
-        Shape::Record(vec![Shape::Scalar, Shape::Scalar])
+        Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)])
     );
     assert!(adapters.is_empty(), "no adapters should be found");
 }
@@ -118,23 +119,23 @@ fn redundancy_e2e_two_branches_mismatch() {
 #[test]
 fn redundancy_e2e_three_branches() {
     let mut graph = CirGraph::new("src/lib.rs");
-    graph.add_node(node("a", Shape::Scalar, Shape::Scalar, 1));
+    graph.add_node(node("a", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 1));
     graph.add_node(node(
         "b",
-        Shape::Scalar,
-        Shape::Union(vec![Shape::Scalar, Shape::Scalar]),
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
         5,
     ));
     graph.add_node(node(
         "c",
-        Shape::Scalar,
+        Shape::Scalar(ScalarKind::Unit),
         Shape::Parameterized {
             base: "Option".into(),
-            parameters: vec![Shape::Scalar],
+            parameters: vec![Shape::Scalar(ScalarKind::Unit)],
         },
         9,
     ));
-    graph.add_node(node("use", Shape::Scalar, Shape::Scalar, 15));
+    graph.add_node(node("use", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 15));
     graph.add_edge(edge("e1", "a", "use", 3));
     graph.add_edge(edge("e2", "b", "use", 7));
     graph.add_edge(edge("e3", "c", "use", 11));
@@ -160,9 +161,9 @@ fn redundancy_e2e_three_branches() {
 #[test]
 fn redundancy_e2e_all_same_no_finding() {
     let mut graph = CirGraph::new("src/lib.rs");
-    graph.add_node(node("a", Shape::Scalar, Shape::Scalar, 1));
-    graph.add_node(node("b", Shape::Scalar, Shape::Scalar, 5));
-    graph.add_node(node("use", Shape::Scalar, Shape::Scalar, 10));
+    graph.add_node(node("a", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 1));
+    graph.add_node(node("b", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 5));
+    graph.add_node(node("use", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 10));
     graph.add_edge(edge("e1", "a", "use", 3));
     graph.add_edge(edge("e2", "b", "use", 7));
 

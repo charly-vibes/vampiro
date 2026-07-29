@@ -4,8 +4,8 @@
   "nodes": [
     {
       "id": "custom-node",
-      "domain": "scalar",
-      "codomain": "scalar",
+      "domain": {"scalar": "unit"},
+      "codomain": {"scalar": "unit"},
       "effect": { "custom": "my-eff" },
       "span": { "file": "custom.rs", "start_line": 1, "start_column": 1, "end_line": 1, "end_column": 1 },
       "name": "custom_fn"
