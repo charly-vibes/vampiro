@@ -210,11 +210,10 @@ mod tests {
         let frontend = PythonFrontend;
         let source = "def process(data: list[str]) -> str:\n    return ','.join(data)";
         let graph = frontend.extract(source, Path::new("lib.py")).unwrap();
-        // One function + one method call (via attribute) = 1 node, 1 edge
+        // One function = 1 node, 0 edges (method call to ','.join is a builtin/
+        // external call with no matching node in the graph, so it's filtered out).
         assert_eq!(graph.nodes.len(), 1);
-        assert_eq!(graph.edges.len(), 1);
-        // External calls reference non-existent nodes, so validate may fail
-        // (that's expected — the callee is outside this file)
+        assert_eq!(graph.edges.len(), 0);
     }
 
     #[test]

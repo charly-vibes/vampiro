@@ -386,32 +386,37 @@ fn process_call_expression(
                 let callee_id = StableId::new(format!("py:{}:{}", file_path, callee_name));
 
                 let span = node_span(node, file_path);
-                let provenance = if call_depth <= 3 {
-                    Provenance::Direct
-                } else if call_depth <= 10 {
-                    Provenance::WithinH { hops: call_depth }
-                } else {
-                    Provenance::OverBound {
-                        max_hops: 10,
-                        actual: call_depth,
-                        traced_hops: vec![],
-                    }
-                };
 
-                let edge = CirEdge {
-                    id: StableId::new(format!("py:edge:{}", caller_id)),
-                    source: caller_id.clone(),
-                    target: callee_id,
-                    resolution: EffectResolution::Propagated,
-                    unwrap_evidence: None,
-                    provenance,
-                    span,
-                    discard_spans: vec![],
-                    trust_provenance: TrustProvenance::default(),
-                };
+                if graph.node_by_id(&callee_id).is_some() {
+                    // Only add edge if the target node exists in the graph.
+                    // Builtins (e.g. getattr) are not extracted as nodes.
+                    let provenance = if call_depth <= 3 {
+                        Provenance::Direct
+                    } else if call_depth <= 10 {
+                        Provenance::WithinH { hops: call_depth }
+                    } else {
+                        Provenance::OverBound {
+                            max_hops: 10,
+                            actual: call_depth,
+                            traced_hops: vec![],
+                        }
+                    };
 
-                graph.add_edge(edge);
-                *edge_counter += 1;
+                    let edge = CirEdge {
+                        id: StableId::new(format!("py:edge:{}", caller_id)),
+                        source: caller_id.clone(),
+                        target: callee_id,
+                        resolution: EffectResolution::Propagated,
+                        unwrap_evidence: None,
+                        provenance,
+                        span,
+                        discard_spans: vec![],
+                        trust_provenance: TrustProvenance::default(),
+                    };
+
+                    graph.add_edge(edge);
+                    *edge_counter += 1;
+                }
             }
 
             // Recurse into arguments for nested calls
