@@ -31,9 +31,9 @@
 - [x] 5.3 Run Python runner, lifecycle snapshot, advisory, and core facade E2E tests; record contract versions and passing evidence.
 
 ## 6. Clojure Law/Lifecycle/Core Integration Tracer
-- [ ] 6.1 Add failing Clojure fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and private-var findings against published consumer contracts.
-- [ ] 6.2 Implement the registered Clojure runner and lifecycle facts without language-specific engine branches.
-- [ ] 6.3 Run Clojure runner, lifecycle snapshot, and REQ-V6 E2E tests; record contract versions and passing evidence.
+- [x] 6.1 Add failing Clojure fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and private-var findings against published consumer contracts.
+- [x] 6.2 Implement the registered Clojure runner and lifecycle facts without language-specific engine branches.
+- [x] 6.3 Run Clojure runner, lifecycle snapshot, and REQ-V6 E2E tests; record contract versions and passing evidence.
 
 ## 7. Julia Law/Lifecycle/Core Integration Tracer
 - [ ] 7.1 Add failing Julia fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and type-piracy findings against published consumer contracts.
