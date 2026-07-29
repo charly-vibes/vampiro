@@ -4,15 +4,41 @@
 /// and `Record(Record(...))` to prevent stack overflow or memory exhaustion.
 pub const MAX_SHAPE_DEPTH: u32 = 64;
 
+/// A fine-grained scalar kind for type-aware shape comparison.
+///
+/// Replaces the coarse `Shape::Scalar(ScalarKind::Unit)` unit variant. Unknown scalar types
+/// (fallback in frontends) use `Unit` as the default.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ScalarKind {
+    /// An integer type (i8, u32, usize, etc.).
+    #[serde(rename = "int")]
+    Int,
+    /// A floating-point type (f32, f64).
+    #[serde(rename = "float")]
+    Float,
+    /// A boolean type.
+    #[serde(rename = "bool")]
+    Bool,
+    /// A character type.
+    #[serde(rename = "char")]
+    Char,
+    /// A string type (String, &str).
+    #[serde(rename = "string")]
+    String,
+    /// The unit/void type, or a generic/unknown scalar.
+    #[serde(rename = "unit")]
+    Unit,
+}
+
 /// A structural shape for a node's domain or codomain.
 ///
 /// Shapes are structural and permit an `Opaque` sentinel for cases where
-/// extraction is not possible (dynamic, untyped, no annotations).
+/// extraction is not dynamic (dynamic).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Shape {
-    /// A scalar value (e.g., `int`, `string`, `bool`).
-    Scalar,
+    /// A scalar value of a specific kind (int, float, bool, char, string, unit).
+    Scalar(ScalarKind),
     /// A structured record/product type.
     Record(Vec<Shape>),
     /// A tagged union/sum type.
@@ -44,7 +70,7 @@ impl Shape {
     /// Compound variants have depth = 1 + max(depth of children).
     pub fn depth(&self) -> u32 {
         match self {
-            Shape::Scalar | Shape::Opaque | Shape::Bottom => 0,
+            Shape::Scalar(_) | Shape::Opaque | Shape::Bottom => 0,
             Shape::Record(fields) | Shape::Union(fields) => {
                 1 + fields.iter().map(Shape::depth).max().unwrap_or(0)
             }
@@ -79,7 +105,7 @@ impl Shape {
     /// Normalization is idempotent: `normalize(normalize(s)) == normalize(s)`.
     pub fn normalize(&self) -> Shape {
         match self {
-            Shape::Scalar | Shape::Opaque | Shape::Bottom => self.clone(),
+            Shape::Scalar(_) | Shape::Opaque | Shape::Bottom => self.clone(),
             Shape::Record(fields) => {
                 let normalized: Vec<Shape> = fields.iter().map(Shape::normalize).collect();
                 let mut keyed: Vec<(String, Shape)> = normalized
@@ -153,6 +179,18 @@ impl Shape {
     }
 }
 
+impl ScalarKind {
+    /// All `ScalarKind` variants for exhaustive iteration.
+    pub const ALL: &'static [ScalarKind] = &[
+        ScalarKind::Int,
+        ScalarKind::Float,
+        ScalarKind::Bool,
+        ScalarKind::Char,
+        ScalarKind::String,
+        ScalarKind::Unit,
+    ];
+}
+
 /// Lowercase hex encoding of a byte slice (no external `hex` dependency).
 fn to_hex_lower(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
@@ -179,8 +217,8 @@ mod tests {
     #[test]
     fn shape_scalar() {
         assert_eq!(
-            serde_json::to_value(Shape::Scalar).unwrap(),
-            serde_json::json!("scalar")
+            serde_json::to_value(Shape::Scalar(ScalarKind::Unit)).unwrap(),
+            serde_json::json!({ "scalar": "unit" })
         );
     }
 
@@ -207,18 +245,18 @@ mod tests {
 
     #[test]
     fn shape_record() {
-        let s = Shape::Record(vec![Shape::Scalar, Shape::Scalar]);
+        let s = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
         assert_eq!(
             serde_json::to_value(s).unwrap(),
-            serde_json::json!({"record": ["scalar", "scalar"]})
+            serde_json::json!({ "record": [{ "scalar": "unit" }, { "scalar": "unit" }] })
         );
     }
 
     #[test]
     fn shape_function() {
-        let s = Shape::Function(Box::new(Shape::Scalar), Box::new(Shape::Opaque));
+        let s = Shape::Function(Box::new(Shape::Scalar(ScalarKind::Unit)), Box::new(Shape::Opaque));
         let json = serde_json::to_value(s).unwrap();
-        assert_eq!(json["function"][0], "scalar");
+        assert_eq!(json["function"][0], serde_json::json!({"scalar": "unit"}));
         assert_eq!(json["function"][1], "opaque");
     }
 
@@ -226,19 +264,19 @@ mod tests {
     fn shape_parameterized() {
         let s = Shape::Parameterized {
             base: "Vec".into(),
-            parameters: vec![Shape::Scalar],
+            parameters: vec![Shape::Scalar(ScalarKind::Unit)],
         };
         let json = serde_json::to_value(s).unwrap();
         assert_eq!(json["parameterized"]["base"], "Vec");
         assert_eq!(
             json["parameterized"]["parameters"],
-            serde_json::json!(["scalar"])
+            serde_json::json!([{ "scalar": "unit" }])
         );
     }
 
     #[test]
-    fn shape_depth_scalar() {
-        assert_eq!(Shape::Scalar.depth(), 0);
+    fn shape_depth_scalar_leaf() {
+        assert_eq!(Shape::Scalar(ScalarKind::Unit).depth(), 0);
     }
 
     #[test]
@@ -248,13 +286,13 @@ mod tests {
 
     #[test]
     fn shape_depth_record() {
-        let s = Shape::Record(vec![Shape::Scalar, Shape::Scalar]);
+        let s = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
         assert_eq!(s.depth(), 1);
     }
 
     #[test]
     fn shape_depth_nested_record() {
-        let inner = Shape::Record(vec![Shape::Scalar]);
+        let inner = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]);
         let outer = Shape::Record(vec![inner]);
         assert_eq!(outer.depth(), 2);
     }
@@ -263,7 +301,7 @@ mod tests {
     fn shape_depth_parameterized_nested() {
         let inner = Shape::Parameterized {
             base: "Option".into(),
-            parameters: vec![Shape::Scalar],
+            parameters: vec![Shape::Scalar(ScalarKind::Unit)],
         };
         let outer = Shape::Parameterized {
             base: "Vec".into(),
@@ -274,7 +312,7 @@ mod tests {
 
     #[test]
     fn shape_depth_within_limit() {
-        let mut s = Shape::Scalar;
+        let mut s = Shape::Scalar(ScalarKind::Unit);
         for _ in 0..10 {
             s = Shape::Record(vec![s]);
         }
@@ -283,7 +321,7 @@ mod tests {
 
     #[test]
     fn shape_depth_beyond_limit() {
-        let mut s = Shape::Scalar;
+        let mut s = Shape::Scalar(ScalarKind::Unit);
         for _ in 0..(MAX_SHAPE_DEPTH + 1) {
             s = Shape::Record(vec![s]);
         }
@@ -295,8 +333,8 @@ mod tests {
     /// Two union arms whose compact JSON serializations sort in a known order:
     /// `"scalar"` < `{"record":[...]}` lexicographically.
     fn reorder_union_pair() -> (Shape, Shape) {
-        let a = Shape::Record(vec![Shape::Scalar, Shape::Scalar]);
-        let b = Shape::Scalar;
+        let a = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
+        let b = Shape::Scalar(ScalarKind::Unit);
         (
             Shape::Union(vec![a.clone(), b.clone()]),
             Shape::Union(vec![b, a]),
@@ -305,7 +343,7 @@ mod tests {
 
     #[test]
     fn normalize_leaf_idempotent() {
-        assert_eq!(Shape::Scalar.normalize(), Shape::Scalar);
+        assert_eq!(Shape::Scalar(ScalarKind::Unit).normalize(), Shape::Scalar(ScalarKind::Unit));
         assert_eq!(Shape::Opaque.normalize(), Shape::Opaque);
         assert_eq!(Shape::Bottom.normalize(), Shape::Bottom);
     }
@@ -319,8 +357,8 @@ mod tests {
         let Shape::Union(arms) = &n else {
             panic!("expected union, got {n:?}");
         };
-        assert_eq!(arms[0], Shape::Scalar);
-        assert_eq!(arms[1], Shape::Record(vec![Shape::Scalar, Shape::Scalar]));
+        assert_eq!(arms[0], Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]));
+        assert_eq!(arms[1], Shape::Scalar(ScalarKind::Unit));
     }
 
     #[test]
@@ -341,7 +379,7 @@ mod tests {
     fn normalize_sorts_record_fields() {
         // Record elements are structural (no field names); normalization sorts
         // them by canonical serialization so record order is irrelevant.
-        let (a, b) = (Shape::Scalar, Shape::Record(vec![Shape::Scalar]));
+        let (a, b) = (Shape::Scalar(ScalarKind::Unit), Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]));
         let r1 = Shape::Record(vec![a.clone(), b.clone()]);
         let r2 = Shape::Record(vec![b, a]);
         assert_eq!(r1.normalize(), r2.normalize());
@@ -376,14 +414,14 @@ mod tests {
         // arm order is significant and MUST be preserved, not sorted.
         let p = Shape::Parameterized {
             base: "Result".into(),
-            parameters: vec![Shape::Scalar, Shape::Opaque],
+            parameters: vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque],
         };
         let n = p.normalize();
         let Shape::Parameterized { base, parameters } = &n else {
             panic!("expected parameterized, got {n:?}");
         };
         assert_eq!(base, "Result");
-        assert_eq!(parameters, &vec![Shape::Scalar, Shape::Opaque]);
+        assert_eq!(parameters, &vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]);
     }
 
     #[test]
@@ -402,13 +440,13 @@ mod tests {
 
     #[test]
     fn normalize_nested_recursive() {
-        let inner = Shape::Union(vec![Shape::Opaque, Shape::Scalar]);
-        let outer = Shape::Record(vec![inner, Shape::Scalar]);
+        let inner = Shape::Union(vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)]);
+        let outer = Shape::Record(vec![inner, Shape::Scalar(ScalarKind::Unit)]);
         let n = outer.normalize();
         // Inner union arms sorted by canonical JSON ("opaque" < "scalar"),
         // then record fields sorted ("opaque.." union JSON vs "scalar").
-        let expected_inner = Shape::Union(vec![Shape::Opaque, Shape::Scalar]);
-        let expected = Shape::Record(vec![Shape::Scalar, expected_inner]);
+        let expected_inner = Shape::Union(vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)]);
+        let expected = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), expected_inner]);
         assert_eq!(n, expected);
     }
 
@@ -416,10 +454,10 @@ mod tests {
     fn normalize_deeply_idempotent() {
         let s = Shape::Union(vec![
             Shape::Record(vec![
-                Shape::Union(vec![Shape::Opaque, Shape::Scalar]),
+                Shape::Union(vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)]),
                 Shape::Bottom,
             ]),
-            Shape::Scalar,
+            Shape::Scalar(ScalarKind::Unit),
         ]);
         let once = s.normalize();
         let twice = once.clone().normalize();
@@ -428,7 +466,7 @@ mod tests {
 
     #[test]
     fn canonical_json_round_trips() {
-        let s = Shape::Union(vec![Shape::Record(vec![Shape::Scalar]), Shape::Scalar]);
+        let s = Shape::Union(vec![Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]), Shape::Scalar(ScalarKind::Unit)]);
         let json = s.to_canonical_json();
         let back: Shape = serde_json::from_str(&json).expect("canonical json must deserialize");
         assert_eq!(back.normalize(), s.normalize());
@@ -436,13 +474,13 @@ mod tests {
 
     #[test]
     fn canonical_hash_is_deterministic() {
-        let s = Shape::Record(vec![Shape::Scalar, Shape::Opaque]);
+        let s = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]);
         assert_eq!(s.canonical_hash(), s.canonical_hash());
     }
 
     #[test]
     fn canonical_hash_is_128_bit_hex() {
-        let h = Shape::Scalar.canonical_hash();
+        let h = Shape::Scalar(ScalarKind::Unit).canonical_hash();
         assert_eq!(h.len(), 32, "128-bit hash = 32 hex chars, got {h}");
         assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
     }
@@ -450,12 +488,12 @@ mod tests {
     #[test]
     fn canonical_hash_content_sensitive() {
         assert_ne!(
-            Shape::Scalar.canonical_hash(),
+            Shape::Scalar(ScalarKind::Unit).canonical_hash(),
             Shape::Opaque.canonical_hash()
         );
         assert_ne!(
-            Shape::Record(vec![Shape::Scalar]).canonical_hash(),
-            Shape::Union(vec![Shape::Scalar]).canonical_hash()
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]).canonical_hash(),
+            Shape::Union(vec![Shape::Scalar(ScalarKind::Unit)]).canonical_hash()
         );
     }
 
