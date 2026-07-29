@@ -38,5 +38,5 @@ pub use frontend::Frontend;
 pub use provenance::{
     DiscardSpan, Provenance, SourceSpan, StableId, TrustProvenance, ValidationObservation,
 };
-pub use shape::Shape;
+pub use shape::{ScalarKind, Shape};
 pub use visibility::{BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts};

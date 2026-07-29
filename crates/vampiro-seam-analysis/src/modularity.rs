@@ -209,6 +209,7 @@ impl ModularityAnalyzer {
 
 #[cfg(test)]
 mod tests {
+    use vampiro_cir::ScalarKind;
     use super::*;
     use vampiro_cir::{
         BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts,
@@ -235,12 +236,13 @@ mod tests {
     fn node(id: &str, line: usize, name: &str) -> CirNode {
         CirNode {
             id: sid(id),
-            domain: vampiro_cir::Shape::Scalar,
-            codomain: vampiro_cir::Shape::Scalar,
+            domain: vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+            codomain: vampiro_cir::Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Plain,
             span: span(line),
             name: Some(name.into()),
             trust_provenance: Default::default(),
+            is_test: false,
         }
     }
 
@@ -445,8 +447,8 @@ mod tests {
         // Caller in a different file to trigger the cross-file edge check.
         graph.add_node(CirNode {
             id: sid("caller"),
-            domain: vampiro_cir::Shape::Scalar,
-            codomain: vampiro_cir::Shape::Scalar,
+            domain: vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+            codomain: vampiro_cir::Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Plain,
             span: SourceSpan {
                 file: "other.rs".into(),
@@ -457,6 +459,7 @@ mod tests {
             },
             name: Some("caller".into()),
             trust_provenance: Default::default(),
+            is_test: false,
         });
         graph.add_edge(edge("e1", "caller", "exposed", 2));
 

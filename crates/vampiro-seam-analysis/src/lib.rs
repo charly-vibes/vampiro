@@ -44,6 +44,28 @@ pub use vampiro_cir::{
     BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts,
 };
 
+/// Filter out findings from test-only nodes (`#[cfg(test)]` modules,
+/// `#[test]` functions, or files in `tests/` directories).
+///
+/// A finding is excluded if its source line range overlaps with any node
+/// in the graph that is marked as `is_test: true`.
+pub fn filter_test_findings(graph: &CirGraph, findings: &mut Vec<Finding>) {
+    let test_ranges: Vec<(usize, usize)> = graph
+        .nodes
+        .iter()
+        .filter(|n| n.is_test)
+        .map(|n| (n.span.start_line, n.span.end_line))
+        .collect();
+    if test_ranges.is_empty() {
+        return;
+    }
+    findings.retain(|f| {
+        let fs = f.line_range.start;
+        let fe = f.line_range.end;
+        !test_ranges.iter().any(|(ts, te)| fs >= *ts && fe <= *te)
+    });
+}
+
 /// Run the currently-implemented analysis slices over `graph` and return the
 /// findings.
 ///

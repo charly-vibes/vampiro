@@ -7,7 +7,8 @@
 use std::path::Path;
 use tree_sitter::Node;
 use vampiro_cir::{
-    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
+    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, ScalarKind, Shape,
+    SourceSpan,
     StableId, TrustProvenance,
 };
 
@@ -59,12 +60,13 @@ fn process_node(
             let effect = detect_julia_effect(node, source);
             graph.add_node(CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             });
             *node_counter += 1;
             // Extract call edges from body
@@ -87,12 +89,13 @@ fn process_node(
             let id = StableId::new(format!("jl:{}:{}", file_path, name));
             graph.add_node(CirNode {
                 id,
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Plain,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             });
             *node_counter += 1;
         }
@@ -105,12 +108,13 @@ fn process_node(
             let id = StableId::new(format!("jl:{}:{}", file_path, name));
             graph.add_node(CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Plain,
                 span,
                 name: Some(name),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             });
             *node_counter += 1;
             // Recurse into module body
@@ -137,12 +141,13 @@ fn process_node(
             ));
             graph.add_node(CirNode {
                 id,
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Plain,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             });
             *node_counter += 1;
         }
@@ -186,12 +191,13 @@ fn process_node(
             let id = StableId::new(format!("jl:{}:{}:try_{}", file_path, name, *node_counter));
             graph.add_node(CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Recursive(Box::new(EffectChannel::Result)),
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             });
             *node_counter += 1;
             let mut c = node.walk();

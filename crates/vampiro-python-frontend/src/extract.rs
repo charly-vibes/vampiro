@@ -4,7 +4,7 @@
 
 use std::path::Path;
 use tree_sitter::Node;
-use vampiro_cir::{
+use vampiro_cir::{ScalarKind, 
     CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
     StableId, TrustProvenance,
 };
@@ -158,11 +158,12 @@ fn process_lambda(
     let cir_node = CirNode {
         id,
         domain,
-        codomain: Shape::Scalar,
+        codomain: Shape::Scalar(ScalarKind::Unit),
         effect: EffectChannel::Plain,
         span,
         name: Some(name),
         trust_provenance: TrustProvenance::default(),
+        is_test: false,
     };
 
     graph.add_node(cir_node);
@@ -183,12 +184,12 @@ fn extract_lambda_domain(node: Node, _source: &str) -> Shape {
                 }
             }
             if count <= 1 {
-                Shape::Scalar
+                Shape::Scalar(ScalarKind::Unit)
             } else {
-                Shape::Record(vec![Shape::Scalar; count])
+                Shape::Record(vec![Shape::Scalar(ScalarKind::Unit); count])
             }
         }
-        None => Shape::Scalar,
+        None => Shape::Scalar(ScalarKind::Unit),
     }
 }
 
@@ -232,6 +233,7 @@ fn process_function_definition(
         span: span.clone(),
         name: Some(name.clone()),
         trust_provenance: TrustProvenance::default(),
+        is_test: false,
     };
 
     graph.add_node(cir_node);
@@ -273,12 +275,13 @@ fn process_class_definition(
 
     let cir_node = CirNode {
         id: id.clone(),
-        domain: Shape::Scalar,
-        codomain: Shape::Scalar,
+        domain: Shape::Scalar(ScalarKind::Unit),
+        codomain: Shape::Scalar(ScalarKind::Unit),
         effect: EffectChannel::Plain,
         span,
         name: Some(name),
         trust_provenance: TrustProvenance::default(),
+        is_test: false,
     };
 
     graph.add_node(cir_node);
@@ -572,7 +575,7 @@ fn extract_domain_shape(node: Node, source: &str) -> Shape {
     let parameters = node.child_by_field_name("parameters");
     let params = match parameters {
         Some(p) => p,
-        None => return Shape::Scalar,
+        None => return Shape::Scalar(ScalarKind::Unit),
     };
 
     let mut fields = Vec::new();
@@ -580,23 +583,23 @@ fn extract_domain_shape(node: Node, source: &str) -> Shape {
     for child in params.children(&mut cursor) {
         match child.kind() {
             "identifier" => {
-                fields.push(Shape::Scalar);
+                fields.push(Shape::Scalar(ScalarKind::Unit));
             }
             "typed_parameter" => {
                 let type_node = child.child_by_field_name("type");
                 match type_node {
                     Some(t) => fields.push(type_hint_to_shape(t, source)),
-                    None => fields.push(Shape::Scalar),
+                    None => fields.push(Shape::Scalar(ScalarKind::Unit)),
                 }
             }
             "default_parameter" => {
-                fields.push(Shape::Scalar);
+                fields.push(Shape::Scalar(ScalarKind::Unit));
             }
             "typed_default_parameter" => {
                 let type_node = child.child_by_field_name("type");
                 match type_node {
                     Some(t) => fields.push(type_hint_to_shape(t, source)),
-                    None => fields.push(Shape::Scalar),
+                    None => fields.push(Shape::Scalar(ScalarKind::Unit)),
                 }
             }
             _ => {}
@@ -604,7 +607,7 @@ fn extract_domain_shape(node: Node, source: &str) -> Shape {
     }
 
     if fields.len() <= 1 {
-        fields.into_iter().next().unwrap_or(Shape::Scalar)
+        fields.into_iter().next().unwrap_or(Shape::Scalar(ScalarKind::Unit))
     } else {
         Shape::Record(fields)
     }
@@ -615,7 +618,7 @@ fn extract_codomain_shape(node: Node, source: &str) -> Shape {
     let return_type = node.child_by_field_name("return_type");
     match return_type {
         Some(t) => type_hint_to_shape(t, source),
-        None => Shape::Scalar,
+        None => Shape::Scalar(ScalarKind::Unit),
     }
 }
 
@@ -628,7 +631,7 @@ fn type_hint_to_shape(node: Node, source: &str) -> Shape {
                 node.children(&mut cursor).collect()
             };
             if children.is_empty() {
-                return Shape::Scalar;
+                return Shape::Scalar(ScalarKind::Unit);
             }
             let first = children[0];
             match first.kind() {
@@ -636,7 +639,7 @@ fn type_hint_to_shape(node: Node, source: &str) -> Shape {
                     let name = node_text(first, source).unwrap_or_default();
                     match name.as_str() {
                         "int" | "float" | "str" | "bool" | "bytes" | "None" | "Any" => {
-                            Shape::Scalar
+                            Shape::Scalar(ScalarKind::Unit)
                         }
                         "list" | "set" | "frozenset" => {
                             if children.len() > 1 {
@@ -645,39 +648,39 @@ fn type_hint_to_shape(node: Node, source: &str) -> Shape {
                                     let inner_shape = type_hint_to_shape(*inner, source);
                                     Shape::Record(vec![inner_shape])
                                 } else {
-                                    Shape::Record(vec![Shape::Scalar])
+                                    Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
                                 }
                             } else {
-                                Shape::Record(vec![Shape::Scalar])
+                                Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
                             }
                         }
-                        "dict" => Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
-                        "tuple" => Shape::Record(vec![Shape::Scalar]),
+                        "dict" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+                        "tuple" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
                         "Optional" => {
                             if children.len() > 1 {
                                 let inner = &children[1];
                                 if inner.kind() == "type" {
                                     type_hint_to_shape(*inner, source)
                                 } else {
-                                    Shape::Scalar
+                                    Shape::Scalar(ScalarKind::Unit)
                                 }
                             } else {
-                                Shape::Scalar
+                                Shape::Scalar(ScalarKind::Unit)
                             }
                         }
-                        _ => Shape::Scalar,
+                        _ => Shape::Scalar(ScalarKind::Unit),
                     }
                 }
-                "subscript" => Shape::Record(vec![Shape::Scalar]),
-                "union_type" => Shape::Record(vec![Shape::Scalar]),
-                _ => Shape::Scalar,
+                "subscript" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+                "union_type" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+                _ => Shape::Scalar(ScalarKind::Unit),
             }
         }
-        "union_type" => Shape::Record(vec![Shape::Scalar]),
-        "generic_type" => Shape::Record(vec![Shape::Scalar]),
-        "list" | "tuple" | "dictionary" => Shape::Record(vec![Shape::Scalar]),
-        "none" => Shape::Scalar,
-        _ => Shape::Scalar,
+        "union_type" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+        "generic_type" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+        "list" | "tuple" | "dictionary" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+        "none" => Shape::Scalar(ScalarKind::Unit),
+        _ => Shape::Scalar(ScalarKind::Unit),
     }
 }
 

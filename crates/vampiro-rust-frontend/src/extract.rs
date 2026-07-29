@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use vampiro_cir::{
+use vampiro_cir::{ScalarKind, 
     CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
     StableId, Totality, UnwrapEvidence, UnwrapKind,
 };
@@ -47,6 +47,7 @@ pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> Extractio
         source,
         lines_cache,
         param_shapes: HashMap::new(),
+        is_test_context: false,
     };
     visit::visit_file(&mut extractor, syntax);
     ExtractionResult {
@@ -86,6 +87,8 @@ struct Extractor<'src> {
     /// Populated when entering a function, used to resolve variable
     /// references in argument expressions for the slot-boundary check.
     param_shapes: HashMap<String, Shape>,
+    /// Whether we are currently inside a `#[cfg(test)]` module or a `#[test]` function.
+    is_test_context: bool,
 }
 
 impl<'src> Extractor<'src> {
@@ -107,6 +110,28 @@ impl<'src> Extractor<'src> {
                 _ => false,
             }
         })
+    }
+
+    /// Check if an attribute list includes `#[cfg(test)]`.
+    fn has_cfg_test(&self, attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| {
+            if !attr.path().is_ident("cfg") {
+                return false;
+            }
+            match &attr.meta {
+                syn::Meta::List(list) => list
+                    .parse_args::<syn::Path>()
+                    .ok()
+                    .map(|p| p.is_ident("test"))
+                    .unwrap_or(false),
+                _ => false,
+            }
+        })
+    }
+
+    /// Check if an attribute list includes `#[test]`.
+    fn has_test_attr(&self, attrs: &[syn::Attribute]) -> bool {
+        attrs.iter().any(|attr| attr.path().is_ident("test"))
     }
 
     /// The current module path as a `::`-joined string.
@@ -172,9 +197,12 @@ impl<'src> Extractor<'src> {
                     Some(seg) => {
                         let ident = seg.ident.to_string();
                         match ident.as_str() {
-                            "bool" | "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16"
-                            | "u32" | "u64" | "u128" | "f32" | "f64" | "usize" | "isize"
-                            | "char" | "String" | "str" => Shape::Scalar,
+                            "bool" => Shape::Scalar(ScalarKind::Bool),
+                            "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16"
+                            | "u32" | "u64" | "u128" | "usize" | "isize" => Shape::Scalar(ScalarKind::Int),
+                            "f32" | "f64" => Shape::Scalar(ScalarKind::Float),
+                            "char" => Shape::Scalar(ScalarKind::Char),
+                            "String" | "str" => Shape::Scalar(ScalarKind::String),
                             _ => {
                                 if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
                                     let params: Vec<Shape> = args
@@ -188,7 +216,7 @@ impl<'src> Extractor<'src> {
                                         })
                                         .collect();
                                     if params.is_empty() {
-                                        Shape::Scalar
+                                        Shape::Scalar(ScalarKind::Unit)
                                     } else {
                                         Shape::Parameterized {
                                             base: ident,
@@ -196,7 +224,7 @@ impl<'src> Extractor<'src> {
                                         }
                                     }
                                 } else {
-                                    Shape::Scalar
+                                    Shape::Scalar(ScalarKind::Unit)
                                 }
                             }
                         }
@@ -211,9 +239,9 @@ impl<'src> Extractor<'src> {
             syn::Type::Tuple(tuple) => {
                 let elems: Vec<Shape> = tuple.elems.iter().map(|t| self.extract_shape(t)).collect();
                 if elems.len() == 1 {
-                    elems.into_iter().next().unwrap_or(Shape::Scalar)
+                    elems.into_iter().next().unwrap_or(Shape::Scalar(ScalarKind::Unit))
                 } else if elems.is_empty() {
-                    Shape::Scalar
+                    Shape::Scalar(ScalarKind::Unit)
                 } else {
                     Shape::Record(elems)
                 }
@@ -344,8 +372,9 @@ impl<'src> Extractor<'src> {
     }
 
     /// Extract nodes from a function declaration.
-    fn extract_function(&mut self, func: &syn::ItemFn, _attrs: &[syn::Attribute]) {
+    fn extract_function(&mut self, func: &syn::ItemFn, attrs: &[syn::Attribute]) {
         let name = func.sig.ident.to_string();
+        let is_test = self.is_test_context || self.has_test_attr(attrs);
         let id = self.make_id(&name, &func.sig.ident.span());
         let fq = self.current_fq(&name);
 
@@ -366,10 +395,10 @@ impl<'src> Extractor<'src> {
                 syn::FnArg::Receiver(rec) => {
                     let shape = if rec.reference.is_some() {
                         // &self → Ref(Scalar)
-                        Shape::Ref(Box::new(Shape::Scalar))
+                        Shape::Ref(Box::new(Shape::Scalar(ScalarKind::Unit)))
                     } else {
                         // self (by value) → Scalar
-                        Shape::Scalar
+                        Shape::Scalar(ScalarKind::Unit)
                     };
                     self.param_shapes.insert("self".into(), shape);
                 }
@@ -393,6 +422,7 @@ impl<'src> Extractor<'src> {
             span,
             name: Some(name.clone()),
             trust_provenance: Default::default(),
+            is_test,
         };
 
         self.graph.add_node(node);
@@ -415,12 +445,12 @@ impl<'src> Extractor<'src> {
             .iter()
             .map(|param| match param {
                 syn::FnArg::Typed(pat_type) => self.extract_shape(&pat_type.ty),
-                syn::FnArg::Receiver(_) => Shape::Scalar,
+                syn::FnArg::Receiver(_) => Shape::Scalar(ScalarKind::Unit),
             })
             .collect();
 
         if params.is_empty() {
-            Shape::Scalar
+            Shape::Scalar(ScalarKind::Unit)
         } else if params.len() == 1 {
             params.into_iter().next().unwrap()
         } else {
@@ -431,7 +461,7 @@ impl<'src> Extractor<'src> {
     /// Extract codomain shape from return type.
     fn extract_return_shape(&self, output: &syn::ReturnType) -> Shape {
         match output {
-            syn::ReturnType::Default => Shape::Scalar,
+            syn::ReturnType::Default => Shape::Scalar(ScalarKind::Unit),
             syn::ReturnType::Type(_, ty) => self.extract_shape(ty),
         }
     }
@@ -455,12 +485,24 @@ impl<'src> Extractor<'src> {
                 }
                 None
             }
-            // Literal arguments (numbers, strings, bools) are Scalar.
-            syn::Expr::Lit(_) => Some(Shape::Scalar),
+            // Literal arguments — distinguish by literal kind.
+            syn::Expr::Lit(lit) => {
+                match &lit.lit {
+                    syn::Lit::Str(_) => Some(Shape::Scalar(ScalarKind::String)),
+                    syn::Lit::ByteStr(_) => Some(Shape::Scalar(ScalarKind::String)),
+                    syn::Lit::Int(_) => Some(Shape::Scalar(ScalarKind::Int)),
+                    syn::Lit::Float(_) => Some(Shape::Scalar(ScalarKind::Float)),
+                    syn::Lit::Bool(_) => Some(Shape::Scalar(ScalarKind::Bool)),
+                    syn::Lit::Char(_) => Some(Shape::Scalar(ScalarKind::Char)),
+                    syn::Lit::Byte(_) => Some(Shape::Scalar(ScalarKind::Int)),
+                    syn::Lit::Verbatim(_) => Some(Shape::Scalar(ScalarKind::Unit)),
+                    _ => Some(Shape::Scalar(ScalarKind::Unit)),
+                }
+            }
             // Tuple expression: unit () is Scalar, else opaque.
             syn::Expr::Tuple(tup) => {
                 if tup.elems.is_empty() {
-                    Some(Shape::Scalar)
+                    Some(Shape::Scalar(ScalarKind::Unit))
                 } else {
                     None
                 }
@@ -846,11 +888,14 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
     fn visit_item_mod(&mut self, item: &'ast syn::ItemMod) {
         let name = item.ident.to_string();
         self.module_stack.push(name);
+        let was_test = self.is_test_context;
+        self.is_test_context = was_test || self.has_cfg_test(&item.attrs);
         if let Some((_, items)) = &item.content {
             for child in items {
                 visit::visit_item(self, child);
             }
         }
+        self.is_test_context = was_test;
         self.module_stack.pop();
     }
 
@@ -1000,8 +1045,8 @@ mod tests {
         assert_eq!(result.graph.nodes.len(), 1);
         let node = &result.graph.nodes[0];
         assert_eq!(node.name.as_deref(), Some("hello"));
-        assert_eq!(node.domain, Shape::Scalar);
-        assert_eq!(node.codomain, Shape::Scalar);
+        assert_eq!(node.domain, Shape::Scalar(ScalarKind::Unit));
+        assert_eq!(node.codomain, Shape::Scalar(ScalarKind::Int));
         assert_eq!(node.effect, EffectChannel::Plain);
     }
 
@@ -1015,9 +1060,9 @@ mod tests {
         assert_eq!(node.name.as_deref(), Some("add"));
         assert_eq!(
             node.domain,
-            Shape::Record(vec![Shape::Scalar, Shape::Scalar])
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Int), Shape::Scalar(ScalarKind::Int)])
         );
-        assert_eq!(node.codomain, Shape::Scalar);
+        assert_eq!(node.codomain, Shape::Scalar(ScalarKind::Int));
     }
 
     #[test]
@@ -1043,12 +1088,12 @@ mod tests {
         let node = &result.graph.nodes[0];
         assert_eq!(node.name.as_deref(), Some("parse"));
         assert_eq!(node.effect, EffectChannel::Result);
-        assert_eq!(node.domain, Shape::Ref(Box::new(Shape::Scalar)));
+        assert_eq!(node.domain, Shape::Ref(Box::new(Shape::Scalar(ScalarKind::String))));
         assert_eq!(
             node.codomain,
             Shape::Parameterized {
                 base: "Result".into(),
-                parameters: vec![Shape::Scalar, Shape::Scalar],
+                parameters: vec![Shape::Scalar(ScalarKind::Int), Shape::Scalar(ScalarKind::Unit)],
             }
         );
     }
@@ -1124,7 +1169,7 @@ mod tests {
         let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(
             result.graph.nodes[0].domain,
-            Shape::Ref(Box::new(Shape::Scalar))
+            Shape::Ref(Box::new(Shape::Scalar(ScalarKind::String)))
         );
     }
 
@@ -1137,7 +1182,7 @@ mod tests {
             result.graph.nodes[0].domain,
             Shape::Parameterized {
                 base: "Vec".into(),
-                parameters: vec![Shape::Scalar],
+                parameters: vec![Shape::Scalar(ScalarKind::Int)],
             }
         );
     }

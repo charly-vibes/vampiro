@@ -7,7 +7,7 @@
 
 use std::path::Path;
 use tree_sitter::Node;
-use vampiro_cir::{
+use vampiro_cir::{ScalarKind, 
     CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
     StableId, TrustProvenance,
 };
@@ -86,12 +86,13 @@ fn process_form(
 
             let cir_node = CirNode {
                 id,
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Plain,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -148,12 +149,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -178,12 +180,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Plain,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -207,12 +210,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Plain,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -238,12 +242,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -272,12 +277,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Plain,
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -306,12 +312,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Recursive(Box::new(EffectChannel::Async)),
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -334,12 +341,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Recursive(Box::new(EffectChannel::Stream)),
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -363,12 +371,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Recursive(Box::new(EffectChannel::Result)),
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);
@@ -394,12 +403,13 @@ fn process_list_lit(
 
             let cir_node = CirNode {
                 id: id.clone(),
-                domain: Shape::Scalar,
-                codomain: Shape::Scalar,
+                domain: Shape::Scalar(ScalarKind::Unit),
+                codomain: Shape::Scalar(ScalarKind::Unit),
                 effect: EffectChannel::Recursive(Box::new(EffectChannel::Throws)),
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+                is_test: false,
             };
 
             graph.add_node(cir_node);

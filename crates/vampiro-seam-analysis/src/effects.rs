@@ -222,6 +222,7 @@ impl EffectHandlingAnalyzer {
 
 #[cfg(test)]
 mod tests {
+    use vampiro_cir::ScalarKind;
     use super::*;
     use vampiro_cir::{
         CirEdge, CirGraph, CirNode, DiscardSpan, EffectChannel, EffectResolution, Provenance,
@@ -245,12 +246,13 @@ mod tests {
     fn node(id: &str, effect: EffectChannel, line: usize) -> CirNode {
         CirNode {
             id: sid(id),
-            domain: vampiro_cir::Shape::Scalar,
-            codomain: vampiro_cir::Shape::Scalar,
+            domain: vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+            codomain: vampiro_cir::Shape::Scalar(ScalarKind::Unit),
             effect,
             span: span("src/lib.rs", line),
             name: Some(id.into()),
             trust_provenance: Default::default(),
+            is_test: false,
         }
     }
 

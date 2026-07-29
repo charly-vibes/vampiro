@@ -124,6 +124,7 @@ impl BoundaryLeakAnalyzer {
 
 #[cfg(test)]
 mod tests {
+    use vampiro_cir::ScalarKind;
     use super::*;
     use crate::finding::Evidence;
     use vampiro_cir::{
@@ -138,8 +139,8 @@ mod tests {
     fn node(id: &str, name: &str, trust: TrustProvenance) -> CirNode {
         CirNode {
             id: sid(id),
-            domain: Shape::Scalar,
-            codomain: Shape::Scalar,
+            domain: Shape::Scalar(ScalarKind::Unit),
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Plain,
             span: SourceSpan {
                 file: "lib.rs".into(),
@@ -150,6 +151,7 @@ mod tests {
             },
             name: Some(name.into()),
             trust_provenance: trust,
+            is_test: false,
         }
     }
 

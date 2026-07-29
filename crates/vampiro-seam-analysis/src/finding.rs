@@ -400,7 +400,7 @@ pub struct Diagnostic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use vampiro_cir::Shape;
+    use vampiro_cir::{ScalarKind, Shape};
 
     #[test]
     fn axis_serializes_to_closed_kebab_set() {
@@ -444,8 +444,8 @@ mod tests {
         let f = Finding::composition_mismatch(
             PathBuf::from("src/lib.rs"),
             10..=12,
-            Shape::Scalar,
-            Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
             vec![Shape::Opaque],
         );
         assert_eq!(f.rule, "REQ-7");
@@ -464,10 +464,10 @@ mod tests {
         else {
             panic!("expected composition mismatch evidence");
         };
-        assert_eq!(caller_expected, &Shape::Scalar);
+        assert_eq!(caller_expected, &Shape::Scalar(ScalarKind::Unit));
         assert_eq!(
             callee_produced,
-            &Shape::Union(vec![Shape::Opaque, Shape::Scalar])
+            &Shape::Union(vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)])
         );
         assert_eq!(unhandled, &vec![Shape::Opaque]);
     }

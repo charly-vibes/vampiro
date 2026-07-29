@@ -32,6 +32,13 @@ pub struct CirNode {
     /// default to `Trusted` (same-origin default).
     #[serde(default)]
     pub trust_provenance: TrustProvenance,
+    /// Whether this node is inside test-only code (`#[cfg(test)]`, `#[test]`,
+    /// or in a `tests/` directory).
+    ///
+    /// Findings from test-only nodes are filtered out by default to reduce
+    /// noise in standard analysis output.
+    #[serde(default)]
+    pub is_test: bool,
 }
 
 /// An edge in the Composition IR, representing a call site.
@@ -244,6 +251,7 @@ impl CirGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ScalarKind;
     use crate::effect::{EffectChannel, Totality, UnwrapEvidence, UnwrapKind};
     use crate::provenance::Provenance;
 
@@ -262,6 +270,7 @@ mod tests {
             },
             name: Some(name.into()),
             trust_provenance: Default::default(),
+            is_test: false,
         }
     }
 
@@ -270,8 +279,8 @@ mod tests {
         // Build a simple graph: one function calling another
         let mut graph = CirGraph::new("src/lib.rs");
 
-        let caller = make_node("caller", "caller_fn", Shape::Scalar, Shape::Scalar);
-        let callee = make_node("callee", "callee_fn", Shape::Scalar, Shape::Scalar);
+        let caller = make_node("caller", "caller_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+        let callee = make_node("callee", "callee_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
 
         let edge = CirEdge {
             id: StableId::new("edge-1"),
@@ -330,8 +339,8 @@ mod tests {
 
         let node = CirNode {
             id: StableId::new("fn-1"),
-            domain: Shape::Scalar,
-            codomain: Shape::Scalar,
+            domain: Shape::Scalar(ScalarKind::Unit),
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Recursive(Box::new(EffectChannel::Option)),
             span: SourceSpan {
                 file: "effects.rs".into(),
@@ -342,6 +351,7 @@ mod tests {
             },
             name: Some("risky_fn".into()),
             trust_provenance: Default::default(),
+            is_test: false,
         };
 
         let edge = CirEdge {
@@ -426,8 +436,8 @@ mod tests {
 
         let node = CirNode {
             id: StableId::new("custom-node"),
-            domain: Shape::Scalar,
-            codomain: Shape::Scalar,
+            domain: Shape::Scalar(ScalarKind::Unit),
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Custom("my-eff".into()),
             span: SourceSpan {
                 file: "custom.rs".into(),
@@ -438,6 +448,7 @@ mod tests {
             },
             name: Some("custom_fn".into()),
             trust_provenance: Default::default(),
+            is_test: false,
         };
 
         let edge = CirEdge {
@@ -479,7 +490,7 @@ mod tests {
     #[test]
     fn cir_graph_validate_missing_node() {
         let mut graph = CirGraph::new("test.rs");
-        let node = make_node("a", "fn_a", Shape::Scalar, Shape::Scalar);
+        let node = make_node("a", "fn_a", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
         let edge = CirEdge {
             id: StableId::new("e1"),
             source: StableId::new("a"),
@@ -528,8 +539,8 @@ mod tests {
 
         let node = CirNode {
             id: StableId::new("deep"),
-            domain: Shape::Scalar,
-            codomain: Shape::Scalar,
+            domain: Shape::Scalar(ScalarKind::Unit),
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: deep_effect,
             span: SourceSpan {
                 file: "test.rs".into(),
@@ -540,6 +551,7 @@ mod tests {
             },
             name: None,
             trust_provenance: Default::default(),
+            is_test: false,
         };
         graph.add_node(node);
 
@@ -554,7 +566,7 @@ mod tests {
     #[test]
     fn cir_graph_validate_shape_depth() {
         let mut graph = CirGraph::new("test.rs");
-        let mut deep_shape = Shape::Scalar;
+        let mut deep_shape = Shape::Scalar(ScalarKind::Unit);
         for _ in 0..(crate::shape::MAX_SHAPE_DEPTH + 1) {
             deep_shape = Shape::Record(vec![deep_shape]);
         }
@@ -562,7 +574,7 @@ mod tests {
         let node = CirNode {
             id: StableId::new("deep"),
             domain: deep_shape,
-            codomain: Shape::Scalar,
+            codomain: Shape::Scalar(ScalarKind::Unit),
             effect: EffectChannel::Plain,
             span: SourceSpan {
                 file: "test.rs".into(),
@@ -573,6 +585,7 @@ mod tests {
             },
             name: None,
             trust_provenance: Default::default(),
+            is_test: false,
         };
         graph.add_node(node);
 
@@ -591,8 +604,8 @@ mod tests {
             "source_file": "test.rs",
             "nodes": [{
                 "id": "n1",
-                "domain": "scalar",
-                "codomain": "scalar",
+                "domain": {"scalar": "unit"},
+                "codomain": {"scalar": "unit"},
                 "effect": "plain",
                 "span": { "file": "test.rs", "start_line": 1, "start_column": 1, "end_line": 1, "end_column": 1 }
             }],
@@ -605,7 +618,7 @@ mod tests {
     #[test]
     fn cir_graph_validate_duplicate_node() {
         let mut graph = CirGraph::new("test.rs");
-        let mut node = make_node("dup", "fn_a", Shape::Scalar, Shape::Scalar);
+        let mut node = make_node("dup", "fn_a", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
         graph.add_node(node.clone());
         // Same id, different name — should be rejected.
         node.name = Some("fn_b".into());
@@ -643,8 +656,8 @@ mod tests {
     fn cir_graph_slot_round_trip() {
         // Verify that a CirEdge with slot set round-trips through JSON.
         let mut graph = CirGraph::new("test.rs");
-        let caller = make_node("caller", "caller_fn", Shape::Scalar, Shape::Scalar);
-        let callee = make_node("callee", "callee_fn", Shape::Scalar, Shape::Scalar);
+        let caller = make_node("caller", "caller_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+        let callee = make_node("callee", "callee_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
 
         graph.add_node(caller);
         graph.add_node(callee);
