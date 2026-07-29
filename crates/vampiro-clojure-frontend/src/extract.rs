@@ -82,10 +82,7 @@ fn process_form(
             // #(body) — anonymous function literal
             let name = binding_name.unwrap_or("<#(fn)>");
             let span = node_span(node, file_path);
-            let id = StableId::new(format!(
-                "clj:{}:{}:anon_{}",
-                file_path, name, *node_counter
-            ));
+            let id = StableId::new(format!("clj:{}:{}:anon_{}", file_path, name, *node_counter));
 
             let cir_node = CirNode {
                 id,
@@ -333,10 +330,7 @@ fn process_list_lit(
         Some("lazy-seq") => {
             let name = binding_name.unwrap_or("<lazy-seq>");
             let span = node_span(node, file_path);
-            let id = StableId::new(format!(
-                "clj:{}:{}:lazy_{}",
-                file_path, name, *node_counter
-            ));
+            let id = StableId::new(format!("clj:{}:{}:lazy_{}", file_path, name, *node_counter));
 
             let cir_node = CirNode {
                 id: id.clone(),

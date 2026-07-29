@@ -21,9 +21,9 @@
 - [x] 3.3 Run deterministic CIR/visibility/REQ-V6 conformance and negative fixtures; publish frontend/table versions and report path.
 
 ## 4. Julia Extraction Tracer
-- [ ] 4.1 Add failing approved-version Julia fixtures for CIR/provenance, effects, module visibility, macro/unknown boundaries, and generic-function/type ownership metadata.
-- [ ] 4.2 Implement the Julia frontend and versioned idiom tables against only the shared CIR acceptance contract.
-- [ ] 4.3 Run deterministic CIR/visibility/REQ-V5 conformance and negative fixtures; publish frontend/table versions and report path.
+- [x] 4.1 Add failing approved-version Julia fixtures for CIR/provenance, effects, module visibility, macro/unknown boundaries, and generic-function/type ownership metadata.
+- [x] 4.2 Implement the Julia frontend and versioned idiom tables against only the shared CIR acceptance contract.
+- [x] 4.3 Run deterministic CIR/visibility/REQ-V5 conformance and negative fixtures; publish frontend/table versions and report path.
 
 ## 5. Python Law/Lifecycle/Core Integration Tracer
 - [ ] 5.1 Add failing Python fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and facade findings against published consumer contracts (REQ-10, REQ-17, REQ-T1–T3).
