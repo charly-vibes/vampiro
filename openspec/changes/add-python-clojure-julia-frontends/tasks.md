@@ -26,9 +26,9 @@
 - [x] 4.3 Run deterministic CIR/visibility/REQ-V5 conformance and negative fixtures; publish frontend/table versions and report path.
 
 ## 5. Python Law/Lifecycle/Core Integration Tracer
-- [ ] 5.1 Add failing Python fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and facade findings against published consumer contracts (REQ-10, REQ-17, REQ-T1–T3).
-- [ ] 5.2 Implement the registered Python runner and lifecycle facts without language-specific branches in core/law/lifecycle engines.
-- [ ] 5.3 Run Python runner, lifecycle snapshot, advisory, and core facade E2E tests; record contract versions and passing evidence.
+- [x] 5.1 Add failing Python fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and facade findings against published consumer contracts (REQ-10, REQ-17, REQ-T1–T3).
+- [x] 5.2 Implement the registered Python runner and lifecycle facts without language-specific branches in core/law/lifecycle engines.
+- [x] 5.3 Run Python runner, lifecycle snapshot, advisory, and core facade E2E tests; record contract versions and passing evidence.
 
 ## 6. Clojure Law/Lifecycle/Core Integration Tracer
 - [ ] 6.1 Add failing Clojure fixtures for runner inputs/execution/unsupported, lifecycle facts/unknowns, L4 snapshots, and private-var findings against published consumer contracts.
