@@ -549,6 +549,25 @@ fn extract_call_edges(
                 if let Some(op) = operator {
                     let callee_id = StableId::new(format!("clj:{}:{}", file_path, op));
                     let span = node_span(node, file_path);
+
+                    // Skip edges to nodes not in the graph (e.g. macros,
+                    // constructors like ->Response, or builtins like go-loop).
+                    if graph.node_by_id(&callee_id).is_none() {
+                        // Still recurse into arguments for nested calls.
+                        let mut cursor = node.walk();
+                        for child in node.children(&mut cursor) {
+                            extract_call_edges(
+                                child,
+                                source,
+                                file_path,
+                                caller_id,
+                                graph,
+                                edge_counter,
+                                call_depth + 1,
+                            );
+                        }
+                        return;
+                    }
                     let provenance = if call_depth <= 3 {
                         Provenance::Direct
                     } else if call_depth <= 10 {
