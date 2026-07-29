@@ -598,12 +598,17 @@ impl<'src> Extractor<'src> {
         span: proc_macro2::Span,
         resolution: EffectResolution,
         unwrap_evidence: Option<UnwrapEvidence>,
+        slot: Option<u32>,
     ) {
         if Self::is_builtin(callee_name) {
             return;
         }
 
-        let edge_id = self.make_id(&format!("call_{callee_name}"), &span);
+        let suffix = match slot {
+            Some(s) => format!("call_{callee_name}_slot_{s}"),
+            None => format!("call_{callee_name}"),
+        };
+        let edge_id = self.make_id(&suffix, &span);
 
         let source_id = match self
             .current_function
@@ -630,7 +635,7 @@ impl<'src> Extractor<'src> {
             span: source_span,
             discard_spans: vec![],
             trust_provenance: Default::default(),
-            slot: None,
+            slot,
         };
 
         self.graph.add_edge(edge);
@@ -666,7 +671,7 @@ impl<'src> Extractor<'src> {
             },
             _ => return,
         };
-        self.add_call_edge(&name, span, resolution, evidence);
+        self.add_call_edge(&name, span, resolution, evidence, None);
     }
 
     /// Known Rust built-in functions/constructors that should not produce edges.
@@ -776,12 +781,29 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         // expressions have no callee name to resolve.
         if let syn::Expr::Path(expr_path) = &*call.func {
             let callee_name = Self::path_name(expr_path);
-            self.add_call_edge(
-                &callee_name,
-                expr_path.span(),
-                EffectResolution::Propagated,
-                None,
-            );
+            let span = expr_path.span();
+            // Emit one edge per argument with slot information so the
+            // composition analyzer can compare each argument's shape
+            // against the callee's expected domain at that parameter.
+            if call.args.is_empty() {
+                self.add_call_edge(
+                    &callee_name,
+                    span,
+                    EffectResolution::Propagated,
+                    None,
+                    None,
+                );
+            } else {
+                for (i, _arg) in call.args.iter().enumerate() {
+                    self.add_call_edge(
+                        &callee_name,
+                        span,
+                        EffectResolution::Propagated,
+                        None,
+                        Some(i as u32),
+                    );
+                }
+            }
         }
         visit::visit_expr_call(self, call);
     }
@@ -795,7 +817,25 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         let callee_name = call.method.to_string();
         let span = call.method.span();
         let (resolution, evidence) = Self::detect_method_unwrap(&callee_name);
-        self.add_call_edge(&callee_name, span, resolution.clone(), evidence.clone());
+        // Emit one edge per argument: receiver at slot 0, additional args at
+        // slot 1+. For zero-arg methods (iter, clone, etc.), emit a single
+        // edge with slot=None for the receiver.
+        let total_args = 1 + call.args.len(); // receiver + explicit args
+        if total_args == 1 {
+            self.add_call_edge(&callee_name, span, resolution.clone(), evidence.clone(), None);
+        } else {
+            // Receiver at slot 0
+            self.add_call_edge(&callee_name, span, resolution.clone(), None, Some(0));
+            for (i, _arg) in call.args.iter().enumerate() {
+                self.add_call_edge(
+                    &callee_name,
+                    span,
+                    EffectResolution::Propagated,
+                    None,
+                    Some((i + 1) as u32),
+                );
+            }
+        }
         // For unwrap/expect/unwrap_unchecked, the effect being resolved is
         // the receiver's, so tag the receiver call edge before it is visited.
         if evidence.is_some() {
@@ -825,6 +865,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     expr_path.span(),
                     EffectResolution::Unwrapped,
                     ordinary_total(),
+                    None,
                 );
             }
             syn::Expr::Call(inner) => {
@@ -835,6 +876,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         expr_path.span(),
                         EffectResolution::Unwrapped,
                         ordinary_total(),
+                        None,
                     );
                 }
             }
@@ -844,6 +886,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     mc.method.span(),
                     EffectResolution::Unwrapped,
                     ordinary_total(),
+                    None,
                 );
             }
             _ => {}
@@ -936,6 +979,32 @@ mod tests {
         let result = extract_graph(&syntax, Path::new("test.rs"), source);
         assert_eq!(result.graph.nodes.len(), 2);
         assert_eq!(result.graph.edges.len(), 0);
+    }
+
+    #[test]
+    fn extract_multi_arg_call_produces_slot_edges() {
+        let source = "fn add(a: i32, b: i32) -> i32 { a + b }\nfn main() -> i32 { add(1, 2) }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        assert_eq!(result.graph.nodes.len(), 2);
+        assert_eq!(result.graph.edges.len(), 2);
+        let slot0_edge = result.graph.edges.iter().find(|e| e.slot == Some(0)).unwrap();
+        let slot1_edge = result.graph.edges.iter().find(|e| e.slot == Some(1)).unwrap();
+        assert_ne!(slot0_edge.id, slot1_edge.id, "different slot edges should have different IDs");
+        // Both edges should target the same callee
+        assert_eq!(
+            result.graph.node_by_id(&slot0_edge.target).unwrap().name.as_deref(),
+            Some("add")
+        );
+    }
+
+    #[test]
+    fn extract_no_arg_call_has_no_slot() {
+        let source = "fn helper() -> i32 { 42 }\nfn main() -> i32 { helper() }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        assert_eq!(result.graph.edges.len(), 1);
+        assert_eq!(result.graph.edges[0].slot, None);
     }
 
     #[test]
