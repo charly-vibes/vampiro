@@ -65,6 +65,7 @@ fn node(id: &str, file: &str, line: usize, domain: Shape, codomain: Shape) -> Ci
         span: span(file, line),
         name: Some(id.into()),
         trust_provenance: Default::default(),
+
     }
 }
 
@@ -79,6 +80,7 @@ fn edge(id: &str, source: &str, target: &str, file: &str, line: usize) -> CirEdg
         span: span(file, line),
         discard_spans: Vec::new(),
         trust_provenance: Default::default(),
+        slot: None,
     }
 }
 

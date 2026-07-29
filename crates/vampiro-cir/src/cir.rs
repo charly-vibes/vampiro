@@ -65,6 +65,17 @@ pub struct CirEdge {
     /// graphs produced before this field was added).
     #[serde(default)]
     pub trust_provenance: TrustProvenance,
+    /// Per-slot argument binding at this call site.
+    ///
+    /// Which parameter slot of the callee receives the caller's value.
+    /// `None` means unknown or pure control-flow edge (backward-compatible
+    /// default). `Some(n)` means the value flows into callee parameter
+    /// index `n` (0-based).
+    ///
+    /// Frontends SHOULD set this when the argument position can be
+    /// determined statically.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot: Option<u32>,
 }
 
 /// A complete Composition IR graph for a single compilation unit.
@@ -98,7 +109,7 @@ impl CirGraph {
     /// Create a new empty CIR graph for the given source file.
     pub fn new(source_file: impl Into<String>) -> Self {
         CirGraph {
-            version: "0.1.0".into(),
+            version: "0.2.0".into(),
             source_file: source_file.into(),
             nodes: Vec::new(),
             edges: Vec::new(),
@@ -268,6 +279,7 @@ mod tests {
             },
             discard_spans: vec![],
             trust_provenance: Default::default(),
+            slot: None,
         };
 
         graph.add_node(caller);
@@ -278,7 +290,7 @@ mod tests {
         let json = serde_json::to_string_pretty(&graph).unwrap();
         let deserialized: CirGraph = CirGraph::from_json(&json).unwrap();
 
-        assert_eq!(deserialized.version, "0.1.0");
+        assert_eq!(deserialized.version, "0.2.0");
         assert_eq!(deserialized.source_file, "src/lib.rs");
         assert_eq!(deserialized.nodes.len(), 2);
         assert_eq!(deserialized.edges.len(), 1);
@@ -344,6 +356,7 @@ mod tests {
                 end_line: 8,
             }],
             trust_provenance: Default::default(),
+            slot: None,
         };
 
         graph.add_node(node);
@@ -431,6 +444,7 @@ mod tests {
             },
             discard_spans: vec![],
             trust_provenance: Default::default(),
+            slot: None,
         };
 
         graph.add_node(node);
@@ -469,6 +483,7 @@ mod tests {
             },
             discard_spans: vec![],
             trust_provenance: Default::default(),
+            slot: None,
         };
         graph.add_node(node);
         graph.add_edge(edge);
@@ -558,7 +573,7 @@ mod tests {
     #[test]
     fn cir_graph_from_json_valid() {
         let json = r#"{
-            "version": "0.1.0",
+            "version": "0.2.0",
             "source_file": "test.rs",
             "nodes": [{
                 "id": "n1",
@@ -593,7 +608,7 @@ mod tests {
     #[test]
     fn cir_graph_from_json_invalid_missing_node() {
         let json = r#"{
-            "version": "0.1.0",
+            "version": "0.2.0",
             "source_file": "test.rs",
             "nodes": [],
             "edges": [{
@@ -608,5 +623,70 @@ mod tests {
         }"#;
         let result = CirGraph::from_json(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn cir_graph_slot_round_trip() {
+        // Verify that a CirEdge with slot set round-trips through JSON.
+        let mut graph = CirGraph::new("test.rs");
+        let caller = make_node("caller", "caller_fn", Shape::Scalar, Shape::Scalar);
+        let callee = make_node("callee", "callee_fn", Shape::Scalar, Shape::Scalar);
+
+        graph.add_node(caller);
+        graph.add_node(callee);
+
+        // Edge with slot=Some(0)
+        graph.add_edge(CirEdge {
+            id: StableId::new("e1"),
+            source: StableId::new("caller"),
+            target: StableId::new("callee"),
+            resolution: EffectResolution::Propagated,
+            unwrap_evidence: None,
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "test.rs".into(),
+                start_line: 1,
+                start_column: 1,
+                end_line: 1,
+                end_column: 1,
+            },
+            discard_spans: vec![],
+            trust_provenance: Default::default(),
+            slot: Some(0),
+        });
+
+        // Edge with slot=None
+        graph.add_edge(CirEdge {
+            id: StableId::new("e2"),
+            source: StableId::new("caller"),
+            target: StableId::new("callee"),
+            resolution: EffectResolution::Propagated,
+            unwrap_evidence: None,
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "test.rs".into(),
+                start_line: 2,
+                start_column: 1,
+                end_line: 2,
+                end_column: 1,
+            },
+            discard_spans: vec![],
+            trust_provenance: Default::default(),
+            slot: None,
+        });
+
+        let json = serde_json::to_string_pretty(&graph).unwrap();
+        let deserialized: CirGraph = CirGraph::from_json(&json).unwrap();
+
+        assert_eq!(deserialized.edges.len(), 2);
+        // e1 has slot=Some(0) preserved
+        // edges are not indexed, so check via iteration
+        let e1_from_edges: Vec<&CirEdge> = deserialized.edges.iter().filter(|e| e.id.as_str() == "e1").collect();
+        assert_eq!(e1_from_edges.len(), 1);
+        assert_eq!(e1_from_edges[0].slot, Some(0));
+        // e2 has slot=None preserved
+        let e2_from_edges: Vec<&CirEdge> = deserialized.edges.iter().filter(|e| e.id.as_str() == "e2").collect();
+        assert_eq!(e2_from_edges.len(), 1);
+        assert_eq!(e2_from_edges[0].slot, None);
     }
 }

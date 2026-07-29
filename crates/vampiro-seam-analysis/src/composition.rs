@@ -329,6 +329,7 @@ mod tests {
             },
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
+            slot: None,
         }
     }
 
@@ -464,6 +465,7 @@ mod tests {
             },
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
+            slot: None,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -506,6 +508,7 @@ mod tests {
             },
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
+            slot: None,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -561,6 +564,7 @@ mod tests {
             },
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
+            slot: None,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);

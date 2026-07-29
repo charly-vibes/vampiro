@@ -150,6 +150,7 @@ mod tests {
             },
             name: Some(name.into()),
             trust_provenance: trust,
+
         }
     }
 
@@ -170,6 +171,7 @@ mod tests {
             },
             discard_spans: vec![],
             trust_provenance: trust,
+            slot: None,
         }
     }
 

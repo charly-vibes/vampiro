@@ -364,6 +364,7 @@ impl<'src> Extractor<'src> {
             span,
             name: Some(name.clone()),
             trust_provenance: Default::default(),
+
         };
 
         self.graph.add_node(node);
@@ -629,6 +630,7 @@ impl<'src> Extractor<'src> {
             span: source_span,
             discard_spans: vec![],
             trust_provenance: Default::default(),
+            slot: None,
         };
 
         self.graph.add_edge(edge);

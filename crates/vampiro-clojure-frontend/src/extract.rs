@@ -92,6 +92,7 @@ fn process_form(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -154,6 +155,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -184,6 +186,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -213,6 +216,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -244,6 +248,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -278,6 +283,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -312,6 +318,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -340,6 +347,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -369,6 +377,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -400,6 +409,7 @@ fn process_list_lit(
                 span,
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
+
             };
 
             graph.add_node(cir_node);
@@ -590,6 +600,7 @@ fn extract_call_edges(
                         span,
                         discard_spans: vec![],
                         trust_provenance: TrustProvenance::default(),
+                        slot: None,
                     };
 
                     graph.add_edge(edge);

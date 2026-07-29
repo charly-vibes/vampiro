@@ -95,13 +95,14 @@ fn consumer_imports_cir_and_constructs_graph() {
         },
         discard_spans: vec![],
         trust_provenance: Default::default(),
+        slot: None,
     };
 
     graph.add_node(caller);
     graph.add_node(callee);
     graph.add_edge(edge);
 
-    assert_eq!(graph.version, "0.1.0");
+    assert_eq!(graph.version, "0.2.0");
     assert_eq!(graph.nodes.len(), 2);
     assert_eq!(graph.edges.len(), 1);
 }
@@ -168,6 +169,7 @@ fn consumer_detects_invalid_graph() {
         },
         discard_spans: vec![],
         trust_provenance: Default::default(),
+        slot: None,
     };
     graph.add_node(node);
     graph.add_edge(edge);
@@ -271,7 +273,7 @@ fn consumer_round_trips_cir_via_json() {
 fn consumer_from_json_validates() {
     // A consumer should be able to use from_json which validates on deserialization.
     let json = r#"{
-        "version": "0.1.0",
+        "version": "0.2.0",
         "source_file": "test.rs",
         "nodes": [
             {
@@ -300,7 +302,7 @@ fn consumer_from_json_validates() {
 fn consumer_rejects_invalid_json() {
     // A consumer should be able to detect invalid JSON.
     let json = r#"{
-        "version": "0.1.0",
+        "version": "0.2.0",
         "source_file": "test.rs",
         "nodes": [],
         "edges": [
