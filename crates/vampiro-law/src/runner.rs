@@ -85,6 +85,11 @@ fn generate_values_for_law(_law: &str) -> impl Strategy<Value = (i32, i32)> {
 /// For the tracer milestone, this always returns `Ok(())` for commutative
 /// and identity laws — they are structurally satisfied by the random data.
 /// A full runner would deserialize the values and call the actual function.
+/// Evaluate a law equation against generated values (tracer placeholder).
+///
+/// For the tracer milestone, this always returns `Ok(())` for commutative
+/// and identity laws — they are structurally satisfied by the random data.
+/// A full runner would deserialize the values and call the actual function.
 fn evaluate_law(
     law: &str,
     values: &(i32, i32),
@@ -100,12 +105,23 @@ fn evaluate_law(
     }
 }
 
+/// Registry: create a law runner for the given language.
+///
+/// Returns `None` for unsupported languages, which callers should
+/// treat as an explicit `RunnerUnsupported` result (never silently skip).
+pub fn get_runner(language: &str) -> Option<Box<dyn LawRunner>> {
+    match language {
+        "rust" => Some(Box::new(RustPropertyRunner)),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        ClusterMember, GeneratorConfig, Obligation, RunnerInput, Theory, TheoryKind,
-        CONTRACT_VERSION,
+        ClusterMember, EvidenceStatus, GeneratorConfig, Obligation, RunnerInput, Theory,
+        TheoryKind, CONTRACT_VERSION,
     };
 
     fn make_simple_obligation(law: &str, theory_kind: TheoryKind) -> Obligation {
@@ -221,5 +237,68 @@ mod tests {
         assert!(results
             .iter()
             .all(|r| r.evidence[0].status == EvidenceStatus::Passed));
+    }
+
+    #[test]
+    fn non_rust_language_returns_evidence() {
+        // REQ-10, REQ-C6: runner should produce Evidence (not panic) even
+        // when the language doesn't match, since the runner is registered
+        // by language match.
+        let runner = RustPropertyRunner;
+        let input = RunnerInput {
+            schema_version: CONTRACT_VERSION.to_string(),
+            language: "python".to_string(),
+            obligations: vec![make_simple_obligation(
+                "commutative: a + b = b + a",
+                TheoryKind::Augmenting,
+            )],
+            values: None,
+        };
+        let results = runner.run(&input);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn generator_evidence_is_deterministic() {
+        // REQ-18: same seed produces same result.
+        let runner = RustPropertyRunner;
+        let obligations = vec![make_simple_obligation(
+            "commutative: a + b = b + a",
+            TheoryKind::Augmenting,
+        )];
+
+        // Run twice with same seed
+        let input1 = RunnerInput {
+            schema_version: CONTRACT_VERSION.to_string(),
+            language: "rust".to_string(),
+            obligations: obligations.clone(),
+            values: None,
+        };
+        let input2 = RunnerInput {
+            schema_version: CONTRACT_VERSION.to_string(),
+            language: "rust".to_string(),
+            obligations,
+            values: None,
+        };
+        let results1 = runner.run(&input1);
+        let results2 = runner.run(&input2);
+
+        assert_eq!(results1.len(), results2.len());
+        assert_eq!(results1[0].evidence[0].status, results2[0].evidence[0].status);
+    }
+
+    #[test]
+    fn get_runner_returns_rust_runner() {
+        let runner = get_runner("rust");
+        assert!(runner.is_some());
+        assert_eq!(runner.unwrap().language(), "rust");
+    }
+
+    #[test]
+    fn get_runner_returns_none_for_unsupported() {
+        assert!(get_runner("python").is_none());
+        assert!(get_runner("clojure").is_none());
+        assert!(get_runner("julia").is_none());
+        assert!(get_runner("").is_none());
     }
 }

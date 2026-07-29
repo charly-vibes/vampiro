@@ -190,6 +190,40 @@ fn cli_mode_gate_passes_on_clean_baseline() {
 }
 
 // ---------------------------------------------------------------------------
+// Law verification — static check does NOT execute law code (REQ-10)
+// ---------------------------------------------------------------------------
+
+/// REQ-10: static `check` must never execute law-annotated source.
+/// Creates a file with a `#[law] fn` that panics, then runs check.
+/// If check tries to run the law, the process panics and exits non-zero.
+#[test]
+fn check_does_not_execute_law_code() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let source = r#"
+#[law]
+fn check_property(a: i32, b: i32) -> bool {
+    panic!("law code must not run during static check");
+}
+"#;
+    let file_path = dir.path().join("law_test.rs");
+    std::fs::write(&file_path, source).unwrap();
+    let (output, _stdout) = run_check(&[
+        "--path",
+        &file_path.to_string_lossy(),
+        "--full",
+        "--mode",
+        "guidance",
+    ]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "static check must exit 0 (would panic if it executed law code); stderr: {:?}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    dir.close().unwrap();
+}
+
+// ---------------------------------------------------------------------------
 // CI workflow generation
 // ---------------------------------------------------------------------------
 
