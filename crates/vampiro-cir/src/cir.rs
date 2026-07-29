@@ -76,6 +76,16 @@ pub struct CirEdge {
     /// determined statically.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub slot: Option<u32>,
+    /// The inferred shape of the argument value at this slot, if known.
+    ///
+    /// `None` means not computed (backward-compatible default). When set,
+    /// the slot-boundary check compares this against the callee's expected
+    /// domain at `slot` instead of using the containing function's codomain.
+    ///
+    /// Frontends SHOULD set this when the argument expression's shape can
+    /// be statically determined (e.g., function call result, literal).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arg_shape: Option<Shape>,
 }
 
 /// A complete Composition IR graph for a single compilation unit.
@@ -109,7 +119,7 @@ impl CirGraph {
     /// Create a new empty CIR graph for the given source file.
     pub fn new(source_file: impl Into<String>) -> Self {
         CirGraph {
-            version: "0.2.0".into(),
+            version: "0.2.1".into(),
             source_file: source_file.into(),
             nodes: Vec::new(),
             edges: Vec::new(),
@@ -280,6 +290,7 @@ mod tests {
             discard_spans: vec![],
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         };
 
         graph.add_node(caller);
@@ -290,7 +301,7 @@ mod tests {
         let json = serde_json::to_string_pretty(&graph).unwrap();
         let deserialized: CirGraph = CirGraph::from_json(&json).unwrap();
 
-        assert_eq!(deserialized.version, "0.2.0");
+        assert_eq!(deserialized.version, "0.2.1");
         assert_eq!(deserialized.source_file, "src/lib.rs");
         assert_eq!(deserialized.nodes.len(), 2);
         assert_eq!(deserialized.edges.len(), 1);
@@ -357,6 +368,7 @@ mod tests {
             }],
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         };
 
         graph.add_node(node);
@@ -445,6 +457,7 @@ mod tests {
             discard_spans: vec![],
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         };
 
         graph.add_node(node);
@@ -484,6 +497,7 @@ mod tests {
             discard_spans: vec![],
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         };
         graph.add_node(node);
         graph.add_edge(edge);
@@ -573,7 +587,7 @@ mod tests {
     #[test]
     fn cir_graph_from_json_valid() {
         let json = r#"{
-            "version": "0.2.0",
+            "version": "0.2.1",
             "source_file": "test.rs",
             "nodes": [{
                 "id": "n1",
@@ -608,7 +622,7 @@ mod tests {
     #[test]
     fn cir_graph_from_json_invalid_missing_node() {
         let json = r#"{
-            "version": "0.2.0",
+            "version": "0.2.1",
             "source_file": "test.rs",
             "nodes": [],
             "edges": [{
@@ -653,6 +667,7 @@ mod tests {
             discard_spans: vec![],
             trust_provenance: Default::default(),
             slot: Some(0),
+            arg_shape: None,
         });
 
         // Edge with slot=None
@@ -673,6 +688,7 @@ mod tests {
             discard_spans: vec![],
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         });
 
         let json = serde_json::to_string_pretty(&graph).unwrap();

@@ -98,6 +98,7 @@ impl Frontend for MockValidFrontend {
             discard_spans: vec![],
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         };
         graph.add_node(caller);
         graph.add_node(callee);
@@ -224,7 +225,7 @@ fn frontend_valid_extraction_produces_graph() {
     let graph = frontend
         .extract("src/lib.rs", Path::new("src/lib.rs"))
         .expect("valid extraction should succeed");
-    assert_eq!(graph.version, "0.2.0");
+    assert_eq!(graph.version, "0.2.1");
     assert_eq!(graph.nodes.len(), 2);
     assert_eq!(graph.edges.len(), 1);
 }

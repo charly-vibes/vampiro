@@ -199,26 +199,29 @@ impl CompositionAnalyzer {
                 }
             }
 
-            // --- Slot-boundary check (new) ---
+            // --- Slot-boundary check ---
             //
-            // For edges with a known slot, compare the caller's codomain
-            // (the value being passed) against the callee's expected domain
-            // at that slot. Unlike the return-boundary check, we do NOT skip
-            // Scalar codomains — Scalar here represents a primitive value
-            // being passed, not void/unit.
+            // For edges with a known slot, compare the argument value shape
+            // (computed by the frontend from the argument expression) against
+            // the callee's expected domain at that slot. Only fires when the
+            // frontend could statically determine the argument's shape.
+            // When arg_shape is None (unknown), we skip without firing to
+            // avoid false positives from comparing unrelated types.
             if let Some(slot) = edge.slot {
                 if let Some(expected) = callee.domain.domain_slot(slot) {
                     if !matches!(expected, Shape::Opaque) {
-                        match unify_shapes(&caller.codomain, expected) {
-                            Unification::Match | Unification::OpaqueExcluded => {}
-                            Unification::Mismatch { .. } => {
-                                findings.push(Finding::slot_mismatch(
-                                    edge.span.file.clone().into(),
-                                    edge.span.start_line..=edge.span.end_line,
-                                    slot,
-                                    expected.clone(),
-                                    caller.codomain.clone(),
-                                ));
+                        if let Some(ref value_shape) = edge.arg_shape {
+                            match unify_shapes(value_shape, expected) {
+                                Unification::Match | Unification::OpaqueExcluded => {}
+                                Unification::Mismatch { .. } => {
+                                    findings.push(Finding::slot_mismatch(
+                                        edge.span.file.clone().into(),
+                                        edge.span.start_line..=edge.span.end_line,
+                                        slot,
+                                        expected.clone(),
+                                        value_shape.clone(),
+                                    ));
+                                }
                             }
                         }
                     }
@@ -371,6 +374,7 @@ mod tests {
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
             slot,
+            arg_shape: None,
         }
     }
 
@@ -610,6 +614,7 @@ mod tests {
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -653,6 +658,7 @@ mod tests {
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -709,6 +715,7 @@ mod tests {
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);

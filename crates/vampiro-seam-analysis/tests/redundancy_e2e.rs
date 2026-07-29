@@ -47,6 +47,7 @@ fn edge(id: &str, source: &str, target: &str, line: usize) -> CirEdge {
         discard_spans: Vec::new(),
         trust_provenance: Default::default(),
         slot: None,
+        arg_shape: None,
     }
 }
 

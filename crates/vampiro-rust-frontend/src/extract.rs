@@ -46,6 +46,7 @@ pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> Extractio
         doc_hidden_stack: Vec::new(),
         source,
         lines_cache,
+        param_shapes: HashMap::new(),
     };
     visit::visit_file(&mut extractor, syntax);
     ExtractionResult {
@@ -81,6 +82,10 @@ struct Extractor<'src> {
     source: &'src str,
     /// Pre-indexed source lines for O(1) line lookups in make_id.
     lines_cache: Vec<&'src str>,
+    /// Parameter name → Shape map for the current function being visited.
+    /// Populated when entering a function, used to resolve variable
+    /// references in argument expressions for the slot-boundary check.
+    param_shapes: HashMap<String, Shape>,
 }
 
 impl<'src> Extractor<'src> {
@@ -347,6 +352,30 @@ impl<'src> Extractor<'src> {
         let domain = self.extract_fn_params(&func.sig);
         let codomain = self.extract_return_shape(&func.sig.output);
 
+        // Build parameter name → Shape map for argument expression resolution
+        self.param_shapes.clear();
+        for param in &func.sig.inputs {
+            match param {
+                syn::FnArg::Typed(pat_type) => {
+                    if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
+                        let name = pat_ident.ident.to_string();
+                        let shape = self.extract_shape(&pat_type.ty);
+                        self.param_shapes.insert(name, shape);
+                    }
+                }
+                syn::FnArg::Receiver(rec) => {
+                    let shape = if rec.reference.is_some() {
+                        // &self → Ref(Scalar)
+                        Shape::Ref(Box::new(Shape::Scalar))
+                    } else {
+                        // self (by value) → Scalar
+                        Shape::Scalar
+                    };
+                    self.param_shapes.insert("self".into(), shape);
+                }
+            }
+        }
+
         let mut effect = self.extract_effect(&func.sig.output);
 
         if func.sig.asyncness.is_some() {
@@ -404,6 +433,54 @@ impl<'src> Extractor<'src> {
         match output {
             syn::ReturnType::Default => Shape::Scalar,
             syn::ReturnType::Type(_, ty) => self.extract_shape(ty),
+        }
+    }
+
+    /// Infer the shape of a call argument expression, if possible.
+    ///
+    /// Returns `None` when the shape cannot be determined statically.
+    /// Frontends use this to populate `CirEdge.arg_shape` for the
+    /// slot-boundary check.
+    fn extract_expr_shape(&self, expr: &syn::Expr) -> Option<Shape> {
+        match expr {
+            // Argument is a function call: use the callee's codomain.
+            syn::Expr::Call(call) => {
+                if let syn::Expr::Path(expr_path) = &*call.func {
+                    let callee_name = Self::path_name(expr_path);
+                    if let Some(node_id) = self.resolve_node(&callee_name) {
+                        if let Some(node) = self.graph.node_by_id(&node_id) {
+                            return Some(node.codomain.clone());
+                        }
+                    }
+                }
+                None
+            }
+            // Literal arguments (numbers, strings, bools) are Scalar.
+            syn::Expr::Lit(_) => Some(Shape::Scalar),
+            // Tuple expression: unit () is Scalar, else opaque.
+            syn::Expr::Tuple(tup) => {
+                if tup.elems.is_empty() {
+                    Some(Shape::Scalar)
+                } else {
+                    None
+                }
+            }
+            // Block expression { ... } — opaque.
+            syn::Expr::Block(_) => None,
+            // Struct literal Foo { ... } — opaque.
+            syn::Expr::Struct(_) => None,
+            // Field access foo.bar — try the base expression.
+            syn::Expr::Field(field) => self.extract_expr_shape(&field.base),
+            // Path expression (variable/constant reference).
+            syn::Expr::Path(expr_path) => {
+                let name = Self::path_name(expr_path);
+                // Look up in the current function's parameter shapes
+                self.param_shapes.get(&name).cloned()
+            }
+            // Method call — try the receiver.
+            syn::Expr::MethodCall(mc) => self.extract_expr_shape(&mc.receiver),
+            // Everything else: opaque.
+            _ => None,
         }
     }
 
@@ -598,6 +675,7 @@ impl<'src> Extractor<'src> {
         resolution: EffectResolution,
         unwrap_evidence: Option<UnwrapEvidence>,
         slot: Option<u32>,
+        arg_shape: Option<Shape>,
     ) {
         if Self::is_builtin(callee_name) {
             return;
@@ -635,6 +713,7 @@ impl<'src> Extractor<'src> {
             discard_spans: vec![],
             trust_provenance: Default::default(),
             slot,
+            arg_shape,
         };
 
         self.graph.add_edge(edge);
@@ -670,7 +749,7 @@ impl<'src> Extractor<'src> {
             },
             _ => return,
         };
-        self.add_call_edge(&name, span, resolution, evidence, None);
+        self.add_call_edge(&name, span, resolution, evidence, None, None);
     }
 
     /// Known Rust built-in functions/constructors that should not produce edges.
@@ -785,15 +864,24 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
             // composition analyzer can compare each argument's shape
             // against the callee's expected domain at that parameter.
             if call.args.is_empty() {
-                self.add_call_edge(&callee_name, span, EffectResolution::Propagated, None, None);
+                self.add_call_edge(
+                    &callee_name,
+                    span,
+                    EffectResolution::Propagated,
+                    None,
+                    None,
+                    None,
+                );
             } else {
-                for (i, _arg) in call.args.iter().enumerate() {
+                for (i, arg) in call.args.iter().enumerate() {
+                    let arg_shape = self.extract_expr_shape(arg);
                     self.add_call_edge(
                         &callee_name,
                         span,
                         EffectResolution::Propagated,
                         None,
                         Some(i as u32),
+                        arg_shape,
                     );
                 }
             }
@@ -821,10 +909,11 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 resolution.clone(),
                 evidence.clone(),
                 None,
+                None,
             );
         } else {
             // Receiver at slot 0
-            self.add_call_edge(&callee_name, span, resolution.clone(), None, Some(0));
+            self.add_call_edge(&callee_name, span, resolution.clone(), None, Some(0), None);
             for (i, _arg) in call.args.iter().enumerate() {
                 self.add_call_edge(
                     &callee_name,
@@ -832,6 +921,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     EffectResolution::Propagated,
                     None,
                     Some((i + 1) as u32),
+                    None,
                 );
             }
         }
@@ -865,6 +955,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     EffectResolution::Unwrapped,
                     ordinary_total(),
                     None,
+                    None,
                 );
             }
             syn::Expr::Call(inner) => {
@@ -876,6 +967,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         EffectResolution::Unwrapped,
                         ordinary_total(),
                         None,
+                        None,
                     );
                 }
             }
@@ -885,6 +977,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     mc.method.span(),
                     EffectResolution::Unwrapped,
                     ordinary_total(),
+                    None,
                     None,
                 );
             }

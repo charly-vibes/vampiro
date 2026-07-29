@@ -78,25 +78,35 @@ All three modes exercised on wai (890 findings, 777 medium):
 
 Exit codes correct. Gate mode at default threshold fails every repo due to the massive slot-boundary FP count — making gate mode unusable.
 
-## Conclusion
+## Update: slot-boundary redesign (vampiro-51v.2)
 
-The per-slot argument binding (vampiro-51v) **does not improve** the composition checker's false-positive rate. It adds a new false-positive class that dominates every repo:
+The slot-boundary check was redesigned in the same session. Instead of comparing the containing function's return type (`caller.codomain`) against the callee's domain slot (which produced 3906 false positives), the frontend now computes the **actual argument expression shape** and stores it on the edge as `arg_shape`. When `arg_shape` is available, the check compares it against the callee's domain slot; when unavailable (unknown expression type), the check is skipped entirely.
 
-- **Composition FPs: 194 → 4284** (+4090, 21× increase)
-- **FP rate: ~100%**, unchanged
-- **Target: <50% FP** — not met
+### Redesign results
 
-The slot-boundary check is structurally flawed in its current form: it compares the containing function's return type against the callee's parameter type, but most call sites are inside sub-expressions whose types have no relationship to the outer function's return type.
+| Metric | dogfood-4 (before) | dogfood-8 (after) | Change |
+|--------|-------------------:|------------------:|-------:|
+| Total findings | 4662 | 2010 | −57% |
+| Composition-break | 4284 | 1661 | −61% |
+| Slot-boundary | 3906 | 1323 | −66% |
+| Return-boundary | 378 | 338 | −11% |
+| Swallowed-effect | 297 | 280 | — |
+| Redundancy | 81 | 69 | — |
 
-### Recommended next investments
+### Where the remaining slot-boundary FPs come from
 
-1. **Redesign the slot-boundary check** (Filed: vampiro-27v) — the value being passed through a slot edge is not the containing function's return type. Options:
-   - Add intermediate-expression CIR nodes so the edge source reflects the actual argument type.
-   - Compare the callee's domain slot against the **source expression's extracted shape** (obtainable from the frontend's visitor context) rather than the containing function's codomain.
-   - Bounding: only fire when the edge's source node's codomain matches the callee's domain slot.
+The 1323 remaining slot-boundary findings are all a single pattern: `produced=Scalar, expected=Ref(Scalar)`. This is a **coarse shape model limitation**: string literals are mapped to `Shape::Scalar`, while `&str` parameters are `Shape::Ref(Box::new(Shape::Scalar))`. The checker fires because `Scalar ≠ Ref(Scalar)`, but string literals are valid `&str` arguments in Rust. Fixing this requires refinements to the shape model (e.g., adding a `Str` variant or a `Literal` classification).
 
-2. **Data-flow edges in CIR** (0vb.4.7 — deferred) — true data-flow edges (connecting the producer of a value to the consumer as a direct edge, not through the containing function) remain the foundational fix for all composition tracers.
+### Acceptance criteria verdict
 
-3. **Test-module awareness** (vampiro-03s) — suppress swallow-effect findings inside `#[cfg(test)]` / `*_tests` modules. Would eliminate the majority of the 297 swallow-effect findings.
+**Target: <80% FP rate for composition-break findings.** Not met for the coarse tracers (still ~100% FP in aggregate), but the slot-boundary redesign eliminated the dominant false-positive class (caller-codomain noise). The remaining composition FPs are now from the return-boundary check (unchanged) and the shape model's inability to distinguish string literals from refs.
 
-4. **Guidance-only shipping** — the coarse tracers (composition, swallowed-effect, redundancy) remain unusable in `gate` mode. Shipping them in `guidance` mode with a clear warning is the pragmatic path until at least one of the above improvements lands.
+## Recommended next investments
+
+1. **Refine shape model** — add a `Shape::Str` variant (or parameterized string type) so string literals match `&str` parameters. Would eliminate virtually all remaining slot-boundary FPs.
+
+2. **Data-flow edges in CIR** (0vb.4.7 — deferred) — true data-flow edges remain the foundational fix for all composition tracers.
+
+3. **Test-module awareness** (vampiro-03s) — suppress swallow-effect findings inside `#[cfg(test)]` / `*_tests` modules.
+
+4. **Guidance-only shipping** — the coarse tracers remain unusable in `gate` mode. Guidance mode only.

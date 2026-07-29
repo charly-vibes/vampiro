@@ -171,6 +171,7 @@ mod tests {
             discard_spans: vec![],
             trust_provenance: trust,
             slot: None,
+            arg_shape: None,
         }
     }
 

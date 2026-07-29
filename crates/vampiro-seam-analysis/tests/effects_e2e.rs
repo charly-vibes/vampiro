@@ -59,6 +59,7 @@ fn edge(
         discard_spans,
         trust_provenance: Default::default(),
         slot: None,
+        arg_shape: None,
     }
 }
 

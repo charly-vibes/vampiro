@@ -330,6 +330,7 @@ fn extract_call_edges(
                     discard_spans: vec![],
                     trust_provenance: TrustProvenance::default(),
                     slot: None,
+                    arg_shape: None,
                 });
                 *edge_counter += 1;
             }

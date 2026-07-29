@@ -211,6 +211,7 @@ mod tests {
             discard_spans: Vec::new(),
             trust_provenance: Default::default(),
             slot: None,
+            arg_shape: None,
         }
     }
 

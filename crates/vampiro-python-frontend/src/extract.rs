@@ -413,6 +413,7 @@ fn process_call_expression(
                         discard_spans: vec![],
                         trust_provenance: TrustProvenance::default(),
                         slot: None,
+                        arg_shape: None,
                     };
 
                     graph.add_edge(edge);
