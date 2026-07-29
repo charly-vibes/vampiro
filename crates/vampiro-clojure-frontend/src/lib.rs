@@ -15,9 +15,28 @@
 //! - Visibility → `defn-` (private), `defn` (public), namespace re-exports
 
 mod extract;
+pub mod facade;
+pub mod law;
+pub mod lifecycle;
+pub mod visibility;
 
+pub use facade::{FacadeDecl, FacadeMetadata};
+pub use law::LawRunnerInput;
+pub use lifecycle::LifecycleFacts;
+use std::collections::HashMap;
 use std::path::Path;
-use vampiro_cir::{CirError, CirGraph, Frontend};
+use vampiro_cir::{CirError, CirGraph, Frontend, StableId};
+pub use visibility::Visibility;
+
+/// The complete extraction output from the Clojure frontend.
+#[derive(Debug, Clone)]
+pub struct ExtractionOutput {
+    pub graph: CirGraph,
+    pub facades: Vec<FacadeDecl>,
+    pub visibility: HashMap<StableId, Visibility>,
+    pub law_input: LawRunnerInput,
+    pub lifecycle_facts: LifecycleFacts,
+}
 
 /// The Clojure language frontend.
 ///
@@ -43,6 +62,34 @@ impl Frontend for ClojureFrontend {
         let root = tree.root_node();
         let graph = extract::extract_graph(root, source, path);
         Ok(graph)
+    }
+}
+
+impl ClojureFrontend {
+    /// Extract the full CIR and contract surface from Clojure source.
+    pub fn extract_full(&self, source: &str, path: &Path) -> Result<ExtractionOutput, CirError> {
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_clojure::LANGUAGE.into())
+            .map_err(|e| CirError::Extraction(format!("failed to set Clojure language: {e}")))?;
+
+        let tree = parser
+            .parse(source, None)
+            .ok_or_else(|| CirError::Extraction("failed to parse Clojure source".into()))?;
+
+        let root = tree.root_node();
+        let graph = extract::extract_graph(root, source, path);
+        let law_input = law::extract_law_input(root, source, path);
+        let lifecycle_facts = lifecycle::extract_lifecycle_facts(root, source, path);
+        let facades = facade::extract_facade_metadata(root, source, path);
+
+        Ok(ExtractionOutput {
+            graph,
+            facades: facades.facades,
+            visibility: HashMap::new(),
+            law_input,
+            lifecycle_facts,
+        })
     }
 }
 
