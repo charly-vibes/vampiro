@@ -167,6 +167,7 @@ impl RedundancyAnalyzer {
 
 #[cfg(test)]
 mod tests {
+    use vampiro_cir::ScalarKind;
     use super::*;
     use vampiro_cir::{
         CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, SourceSpan,
@@ -196,6 +197,7 @@ mod tests {
             span: span("src/lib.rs", line),
             name: Some(id.into()),
             trust_provenance: Default::default(),
+            is_test: false,
         }
     }
 
@@ -223,20 +225,20 @@ mod tests {
         // The Python example: primary -> FullRecord, cache -> union<PartialRecord, None>
         graph.add_node(node(
             "primary",
-            Shape::Scalar,
-            Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
             1,
         ));
         graph.add_node(node(
             "cache",
-            Shape::Scalar,
-            Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
             5,
         ));
         graph.add_node(node(
             "use",
-            Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
-            Shape::Scalar,
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+            Shape::Scalar(ScalarKind::Unit),
             10,
         ));
         graph.add_edge(edge("e1", "primary", "use", 3));
@@ -262,7 +264,7 @@ mod tests {
         assert_eq!(branch_shapes.len(), 2);
         assert_eq!(
             *expected_shape,
-            Shape::Record(vec![Shape::Scalar, Shape::Scalar])
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)])
         );
         assert!(adapters.is_empty());
     }
@@ -272,9 +274,9 @@ mod tests {
     #[test]
     fn two_branches_same_codomain_no_finding() {
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("primary", Shape::Scalar, Shape::Scalar, 1));
-        graph.add_node(node("cache", Shape::Scalar, Shape::Scalar, 5));
-        graph.add_node(node("use", Shape::Scalar, Shape::Scalar, 10));
+        graph.add_node(node("primary", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 1));
+        graph.add_node(node("cache", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 5));
+        graph.add_node(node("use", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 10));
         graph.add_edge(edge("e1", "primary", "use", 3));
         graph.add_edge(edge("e2", "cache", "use", 7));
 
@@ -289,8 +291,8 @@ mod tests {
     #[test]
     fn single_inbound_edge_no_finding() {
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("source", Shape::Scalar, Shape::Scalar, 1));
-        graph.add_node(node("use", Shape::Scalar, Shape::Scalar, 5));
+        graph.add_node(node("source", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 1));
+        graph.add_node(node("use", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 5));
         graph.add_edge(edge("e1", "source", "use", 3));
 
         assert!(
@@ -304,9 +306,9 @@ mod tests {
     #[test]
     fn opaque_branch_excluded() {
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("primary", Shape::Scalar, Shape::Scalar, 1));
-        graph.add_node(node("cache", Shape::Scalar, Shape::Opaque, 5));
-        graph.add_node(node("use", Shape::Scalar, Shape::Scalar, 10));
+        graph.add_node(node("primary", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 1));
+        graph.add_node(node("cache", Shape::Scalar(ScalarKind::Unit), Shape::Opaque, 5));
+        graph.add_node(node("use", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 10));
         graph.add_edge(edge("e1", "primary", "use", 3));
         graph.add_edge(edge("e2", "cache", "use", 7));
 
@@ -322,15 +324,15 @@ mod tests {
     #[test]
     fn three_branches_mismatch_raises_finding() {
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("a", Shape::Scalar, Shape::Scalar, 1));
+        graph.add_node(node("a", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 1));
         graph.add_node(node(
             "b",
-            Shape::Scalar,
-            Shape::Union(vec![Shape::Scalar, Shape::Scalar]),
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
             5,
         ));
-        graph.add_node(node("c", Shape::Scalar, Shape::Opaque, 9));
-        graph.add_node(node("use", Shape::Scalar, Shape::Scalar, 15));
+        graph.add_node(node("c", Shape::Scalar(ScalarKind::Unit), Shape::Opaque, 9));
+        graph.add_node(node("use", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 15));
         graph.add_edge(edge("e1", "a", "use", 3));
         graph.add_edge(edge("e2", "b", "use", 7));
         graph.add_edge(edge("e3", "c", "use", 11));
@@ -359,25 +361,25 @@ mod tests {
         // primary -> FullRecord via adapter that returns Scalar
         graph.add_node(node(
             "primary",
-            Shape::Scalar,
-            Shape::Record(vec![Shape::Scalar, Shape::Scalar]),
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
             1,
         ));
         // cache -> PartialRecord | None via same adapter
         graph.add_node(node(
             "cache",
-            Shape::Scalar,
-            Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
             5,
         ));
         // adapter takes union<Scalar,Opaque> or Record[Scalar,Scalar] → Scalar
         graph.add_node(node(
             "adapter",
-            Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
-            Shape::Scalar,
+            Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
+            Shape::Scalar(ScalarKind::Unit),
             8,
         ));
-        graph.add_node(node("use", Shape::Scalar, Shape::Scalar, 15));
+        graph.add_node(node("use", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 15));
 
         // primary -> adapter -> use
         graph.add_edge(edge("e1", "primary", "use", 3)); // direct (no adapter on this path)
@@ -400,14 +402,14 @@ mod tests {
     #[test]
     fn all_redundancy_findings_use_robustness_axis() {
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("a", Shape::Scalar, Shape::Scalar, 1));
+        graph.add_node(node("a", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 1));
         graph.add_node(node(
             "b",
-            Shape::Scalar,
-            Shape::Union(vec![Shape::Scalar, Shape::Opaque]),
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]),
             5,
         ));
-        graph.add_node(node("use", Shape::Scalar, Shape::Scalar, 10));
+        graph.add_node(node("use", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit), 10));
         graph.add_edge(edge("e1", "a", "use", 3));
         graph.add_edge(edge("e2", "b", "use", 7));
 
