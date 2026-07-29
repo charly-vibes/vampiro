@@ -127,3 +127,5 @@
 {"id":"int-a33e3656","kind":"field_change","created_at":"2026-07-29T21:27:03.365217615Z","actor":"charly vibes","issue_id":"vampiro-eos","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-eacf6c24","kind":"field_change","created_at":"2026-07-29T21:45:57.408717176Z","actor":"charly vibes","issue_id":"vampiro-51v.2","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-65f61257","kind":"field_change","created_at":"2026-07-29T21:51:20.243292905Z","actor":"charly vibes","issue_id":"vampiro-51v.3","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-36b084ad","kind":"field_change","created_at":"2026-07-29T22:08:44.532649072Z","actor":"charly vibes","issue_id":"vampiro-af2.1","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-e9f43f91","kind":"field_change","created_at":"2026-07-29T22:08:44.908527847Z","actor":"charly vibes","issue_id":"vampiro-af2.3","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
