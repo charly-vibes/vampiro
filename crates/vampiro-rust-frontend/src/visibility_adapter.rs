@@ -86,9 +86,27 @@ pub fn to_visibility_facts(out: &ExtractionOutput) -> VisibilityFacts {
         });
     }
 
+    /// Returns `true` if the module path segment looks like a test module.
+    ///
+    /// Rust convention: test modules are typically named `*_test`, `*_tests`, or `tests`.
+    /// These modules' `use super::*;` re-exports should not trigger facade-leak findings
+    /// since they're private testing infrastructure, not public API facades.
+    fn is_test_module(segment: &str) -> bool {
+        segment == "tests" || segment.ends_with("_test") || segment.ends_with("_tests")
+    }
+
+    /// Returns `true` if a `::`-joined module path contains a test-module segment.
+    fn module_path_contains_test_segment(module_path: &str) -> bool {
+        module_path.split("::").any(|seg| is_test_module(seg))
+    }
+
     // Map facades to language-neutral re-exports. Match by name to find the
-    // underlying node.
+    // underlying node. Skip facades in test modules — their `use super::*;`
+    // re-exports are private testing infrastructure, not public API facades.
     for fd in &out.facades {
+        if module_path_contains_test_segment(&fd.module_path) {
+            continue;
+        }
         for entry in &fd.entries {
             if let Some(node) = out
                 .graph
@@ -206,6 +224,64 @@ pub use internal::raw_helper;
         assert!(
             vis.facades.iter().any(|f| f.exported_name == "raw_helper"),
             "raw_helper must be in facades"
+        );
+    }
+
+    #[test]
+    fn test_module_facade_filtered_out() {
+        // Test modules with `use super::*;` should not produce FacadeReexport
+        // entries for the items they bring in, since they're private testing
+        // infrastructure, not public API facades. Regression for vampiro-03s.
+        let source = r#"
+fn parse_line_span(input: &str) -> u32 { 0 }
+
+pub(crate) fn source_key(doc: &str) -> u32 { 0 }
+
+mod parse_line_span_tests {
+    use super::*;
+}
+
+mod source_key_tests {
+    use super::*;
+}
+"#;
+        let out = extract(source);
+        let vis = to_visibility_facts(&out);
+
+        // Neither test module should produce a FacadeReexport
+        for reexport in &vis.facades {
+            assert!(
+                reexport.facade_scope != "parse_line_span_tests",
+                "test module facade_scope should not appear: {}",
+                reexport.facade_scope
+            );
+            assert!(
+                reexport.facade_scope != "source_key_tests",
+                "test module facade_scope should not appear: {}",
+                reexport.facade_scope
+            );
+        }
+        // A real crate-root facade still works
+    }
+
+    #[test]
+    fn test_module_glob_facade_not_in_reexports() {
+        // The `use super::*;` in a test module should not create
+        // FacadeReexport entries for the items it brings in scope.
+        let source = r#"
+pub fn exposed_api() -> u32 { 0 }
+
+mod tests {
+    use super::*;
+}
+"#;
+        let out = extract(source);
+        let vis = to_visibility_facts(&out);
+
+        // The `tests` module's use-super-glob should not create a facade
+        assert!(
+            !vis.facades.iter().any(|f| f.facade_scope == "tests"),
+            "tests module should not produce facades"
         );
     }
 }
