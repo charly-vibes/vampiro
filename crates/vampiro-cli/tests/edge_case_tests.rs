@@ -102,7 +102,10 @@ fn edge_case_rust_unsafe() {
 
 #[test]
 fn edge_case_rust_enormous() {
-    assert_no_panic(&edge_case("rust", "enormous.rs"), "enormous.rs (1000 fn chain)");
+    assert_no_panic(
+        &edge_case("rust", "enormous.rs"),
+        "enormous.rs (1000 fn chain)",
+    );
 }
 
 #[test]
@@ -153,12 +156,18 @@ fn edge_case_clojure_empty() {
 
 #[test]
 fn edge_case_clojure_comments_only() {
-    assert_no_panic(&edge_case("clojure", "comments_only.clj"), "comments_only.clj");
+    assert_no_panic(
+        &edge_case("clojure", "comments_only.clj"),
+        "comments_only.clj",
+    );
 }
 
 #[test]
 fn edge_case_clojure_syntax_error() {
-    assert_no_panic(&edge_case("clojure", "syntax_error.clj"), "syntax_error.clj");
+    assert_no_panic(
+        &edge_case("clojure", "syntax_error.clj"),
+        "syntax_error.clj",
+    );
 }
 
 #[test]

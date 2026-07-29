@@ -1,7 +1,7 @@
 # config Specification
 
 ## Purpose
-TBD - created by archiving change upgrade-genesis. Update Purpose after archive.
+Specify shared configuration management via genesis::config.
 ## Requirements
 ### Requirement: Shared config management
 

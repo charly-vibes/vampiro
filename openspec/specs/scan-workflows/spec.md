@@ -1,7 +1,7 @@
 # scan-workflows Specification
 
 ## Purpose
-TBD - created by archiving change add-scan-gating-reporting. Update Purpose after archive.
+Define diff-scoped and full-repository scan workflows: default seam-only scope, explicit targets, merge-base resolution, CI revision handling, incremental extraction, and cache invalidation.
 ## Requirements
 ### Requirement: Scans are diff-default and incrementally complete
 The system SHALL default interactive and agent `check` invocations to seam-only diff scope and support explicit full-repository scope. Local default SHALL compare `HEAD` to a synthetic worktree target containing staged, unstaged, and untracked non-ignored files. An explicit target SHALL default to its first parent; `--base` SHALL resolve the merge base with the target; detached `HEAD` SHALL use the same rules. A target without a parent SHALL use Git's empty tree. Explicit revision inputs SHALL resolve to immutable commit IDs before analysis, and their selected parent or merge base SHALL be locally available. A missing shallow parent/merge base, non-Git context, unresolved CI revision, or failed/unavailable fetch required to obtain a CI commit or merge base SHALL return an operational error naming scope, base/target inputs, reason, and explicit-full guidance, with no silent full fallback. Every result SHALL identify resolved scope and base/target commit IDs. In full scope, zero unchanged compatible files SHALL be re-extracted; compatibility SHALL be keyed by source content plus analyzer, schema, plugin, and configuration versions, with observable cache hit/miss/invalidation telemetry. Source requirements: REQ-5, REQ-28.

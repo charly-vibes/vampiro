@@ -285,7 +285,10 @@ mod tests {
         let results2 = runner.run(&input2);
 
         assert_eq!(results1.len(), results2.len());
-        assert_eq!(results1[0].evidence[0].status, results2[0].evidence[0].status);
+        assert_eq!(
+            results1[0].evidence[0].status,
+            results2[0].evidence[0].status
+        );
     }
 
     #[test]

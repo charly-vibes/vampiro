@@ -1,7 +1,7 @@
 # cir-plugin-platform Specification
 
 ## Purpose
-TBD - created by archiving change add-cir-plugin-platform. Update Purpose after archive.
+Define the Composition IR (CIR) platform contract — nodes, edges, shapes, recursive effect channels, resolutions, and argument provenance — that all frontends must conform to.
 ## Requirements
 ### Requirement: Composition IR preserves compositional structure
 The platform SHALL contract frontends to extract, without execution, CIR nodes with domain/codomain shapes and recursive effect channels, and edges with source, target, resolution, totality, wrapper-removal evidence, exact discard span, and callee-to-caller argument provenance through a configured finite number `H` of local-binding hops. Built-in effect and resolution IDs SHALL use the REQ-2/REQ-3 vocabularies. Projects MAY add validated effect/functor and resolution/natural-transformation IDs under REQ-C1; all built-in and declared effect IDs compose as recursive coproduct terms. `unknown` SHALL be a sentinel used only for undeclared or unrecognized wrappers or resolution patterns. Source requirements: REQ-1, REQ-2, REQ-3.

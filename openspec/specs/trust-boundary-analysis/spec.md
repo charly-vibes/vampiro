@@ -1,7 +1,7 @@
 # trust-boundary-analysis Specification
 
 ## Purpose
-TBD - created by archiving change add-trust-boundary-analysis. Update Purpose after archive.
+Define trust provenance and refinement contracts — untrusted/trusted/unknown classification, smart-constructor recognition, and refinement confirmation independent of argument provenance.
 ## Requirements
 ### Requirement: Trust provenance and refinement are explicit contracts
 The system SHALL attach trust provenance separately from CIR argument provenance to every CIR value occurrence (node parameter/output, sum arm, or edge argument slot), using exactly `untrusted`, `trusted`, or `unknown`. Frontends SHALL recognize trust-boundary sources and smart constructors only through versioned, conformance-tested idioms or explicit project declarations. A recognized external source SHALL be untrusted; a recognized internal literal and smart-constructor success-arm value SHALL be trusted; a non-success-arm payload or ordinary derived occurrence SHALL be untrusted if any contributor is untrusted, otherwise unknown if any contributor is unknown, otherwise trusted. A path over argument-provenance bound `H`, an unmatched pattern, or a declaration/idiom conflict SHALL be unknown and emit `trust-provenance:unknown` without defaulting to trusted. A smart constructor SHALL return a distinct refined shape through a `Result`, `Option`, or equivalent sum-typed codomain. Trust classification SHALL remain independent from external refinement confirmation. Source requirements: REQ-B1, REQ-B2, REQ-B6.

@@ -1,7 +1,7 @@
 # seam-analysis Specification
 
 ## Purpose
-TBD - created by archiving change add-core-seam-analysis. Update Purpose after archive.
+Specify structural seam analysis — conservative shape unification, composition findings for non-unifying edges, and opaque-node eligibility for modularity and robustness checks.
 ## Requirements
 ### Requirement: Structural seams unify conservatively
 The system SHALL raise a `composition` finding with expected and produced shapes when a new or modified edge does not structurally unify; `shape:opaque` SHALL skip only composition checking and remain eligible for modularity and robustness checks. Source requirements: REQ-7, REQ-23.

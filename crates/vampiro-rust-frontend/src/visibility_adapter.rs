@@ -92,7 +92,10 @@ pub fn to_visibility_facts(out: &ExtractionOutput) -> VisibilityFacts {
     /// These modules' `use super::*;` re-exports should not trigger facade-leak findings
     /// since they're private testing infrastructure, not public API facades.
     fn is_test_module(segment: &str) -> bool {
-        segment == "test" || segment == "tests" || segment.ends_with("_test") || segment.ends_with("_tests")
+        segment == "test"
+            || segment == "tests"
+            || segment.ends_with("_test")
+            || segment.ends_with("_tests")
     }
 
     /// Returns `true` if a `::`-joined module path contains a test-module segment.

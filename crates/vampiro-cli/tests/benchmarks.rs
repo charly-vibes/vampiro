@@ -38,7 +38,11 @@ fn generate_rust_source(n_fns: usize, path: &Path) {
     writeln!(f, "// Auto-generated benchmark fixture — do not edit").unwrap();
     writeln!(f, "#![allow(unused)]\n").unwrap();
     writeln!(f, "struct Point {{ x: i32, y: i32 }}").unwrap();
-    writeln!(f, "trait Transform {{ fn apply(&self, p: Point) -> Point; }}\n").unwrap();
+    writeln!(
+        f,
+        "trait Transform {{ fn apply(&self, p: Point) -> Point; }}\n"
+    )
+    .unwrap();
     writeln!(f, "struct Identity;").unwrap();
     writeln!(f, "impl Transform for Identity {{").unwrap();
     writeln!(f, "    fn apply(&self, p: Point) -> Point {{ p }}").unwrap();

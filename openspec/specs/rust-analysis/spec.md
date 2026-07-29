@@ -1,7 +1,7 @@
 # rust-analysis Specification
 
 ## Purpose
-TBD - created by archiving change add-rust-analysis-frontend. Update Purpose after archive.
+Specify the Rust frontend's CIR extraction contract: conformance to platform-owned node, edge, shape, effect, resolution, and argument-provenance types without executing source.
 ## Requirements
 ### Requirement: Rust source maps conservatively into CIR
 The Rust frontend SHALL conform to platform-owned node, edge, shape, recursive built-in/project effect, resolution, and configured bounded callee-to-caller argument-provenance contracts without executing source, preserving `opaque`, `unknown`, and over-bound classifications. Conformance references: REQ-1, REQ-2, REQ-3.

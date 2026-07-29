@@ -1,7 +1,7 @@
 # cli-foundation Specification
 
 ## Purpose
-TBD - created by archiving change add-rust-cli-foundation. Update Purpose after archive.
+Establish the vampiro binary's command and configuration foundation: reserved subcommands, config format/discovery/precedence, exit codes, and snapshot-test contracts.
 ## Requirements
 ### Requirement: Stable command and configuration foundation
 The system SHALL expose a `vampiro` binary and reserve `check` and `prove`. Before implementation it SHALL select/document configuration filename, format, discovery and precedence and exact numeric success, policy-failure, and operational/configuration-failure codes, then snapshot-test those contracts. This change SHALL NOT specify CI-generation spelling or claim analysis/proof behavior. Conformance references: REQ-5, REQ-12.

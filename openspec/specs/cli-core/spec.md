@@ -1,7 +1,7 @@
 # cli-core Specification
 
 ## Purpose
-TBD - created by archiving change upgrade-genesis. Update Purpose after archive.
+Adopt genesis::guide for CLI scaffolding and genesis::config for shared configuration management.
 ## Requirements
 ### Requirement: CLI scaffold uses Guide
 

@@ -1,7 +1,7 @@
 # lifecycle-safety Specification
 
 ## Purpose
-TBD - created by archiving change add-lifecycle-safety-analysis. Update Purpose after archive.
+Define facade-history analysis — persistent snapshot storage, schema versioning, baseline/ancestor comparison, migration declarations, and breaking-change detection across revisions.
 ## Requirements
 ### Requirement: Facade history detects authorized and breaking evolution
 Before persistence implementation, the system SHALL select and document snapshot storage, schema/version, retention, baseline override, and migration declaration syntax. It SHALL persist each analyzed revision's L4 facade by qualified identity and compare by default with the nearest persisted first-parent ancestor. An explicit baseline SHALL exist and be an ancestor or produce an operational error. A first snapshot SHALL establish history without a breaking finding; multiple eligible snapshots SHALL resolve deterministically. A persistent incompatible shape without a declared migration SHALL raise a composition `breaking-change` finding. Source requirements: REQ-T1, REQ-T4.
