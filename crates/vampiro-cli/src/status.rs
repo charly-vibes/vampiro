@@ -8,8 +8,8 @@ use std::path::Path;
 
 use genesis::status::{StatusContributor, StatusItem, StatusSection};
 
-use genesis::config::ConfigFile;
 use crate::config::Config;
+use genesis::config::ConfigFile;
 
 /// Vampiro's status contributor.
 #[derive(Debug, Clone, Copy)]
@@ -30,10 +30,7 @@ impl StatusContributor for VampiroStatus {
                     items.push(StatusItem::healthy("Config", "valid"));
                 }
                 Err(e) => {
-                    items.push(StatusItem::error(
-                        "Config",
-                        format!("parse error: {e}"),
-                    ));
+                    items.push(StatusItem::error("Config", format!("parse error: {e}")));
                 }
             }
         } else {
@@ -74,7 +71,11 @@ impl StatusContributor for VampiroStatus {
             }
         }
 
-        Ok(StatusSection::with_items("vampiro", "vampiro status", items))
+        Ok(StatusSection::with_items(
+            "vampiro",
+            "vampiro status",
+            items,
+        ))
     }
 }
 

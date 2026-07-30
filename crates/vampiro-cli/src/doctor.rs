@@ -143,10 +143,7 @@ impl DoctorCheck for CiWorkflowCheck {
     }
     fn run(&self, _repo: &Path) -> Result<Vec<LintResult>, Box<dyn std::error::Error>> {
         let mut results = Vec::new();
-        let workflow_path = _repo
-            .join(".github")
-            .join("workflows")
-            .join("ci.yml");
+        let workflow_path = _repo.join(".github").join("workflows").join("ci.yml");
 
         if workflow_path.exists() {
             results.push(LintResult::new(
@@ -193,7 +190,10 @@ impl DoctorCheck for SuiteGateCheck {
 
         let espectacular_dir = _repo.join(".espectacular");
         if espectacular_dir.exists() {
-            results.push(LintResult::new("espectacular configured", Severity::Advisory));
+            results.push(LintResult::new(
+                "espectacular configured",
+                Severity::Advisory,
+            ));
         }
 
         if !dont_dir.exists() && !espectacular_dir.exists() {
@@ -271,8 +271,11 @@ mod tests {
         let dir = std::env::temp_dir().join("vampiro-doctor-test-ci-present");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir.join(".github").join("workflows")).unwrap();
-        std::fs::write(dir.join(".github").join("workflows").join("ci.yml"), "name: CI\n")
-            .unwrap();
+        std::fs::write(
+            dir.join(".github").join("workflows").join("ci.yml"),
+            "name: CI\n",
+        )
+        .unwrap();
 
         let check = CiWorkflowCheck;
         let results = check.run(&dir).unwrap();

@@ -87,12 +87,23 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
 
     // Parameterized base aliasing: Vec[T] ↔ slice[T] are structurally
     // compatible when their type parameters unify.
-    if let (Shape::Parameterized { base: b1, parameters: p1 }, Shape::Parameterized { base: b2, parameters: p2 }) = (&produced, &expected) {
+    if let (
+        Shape::Parameterized {
+            base: b1,
+            parameters: p1,
+        },
+        Shape::Parameterized {
+            base: b2,
+            parameters: p2,
+        },
+    ) = (&produced, &expected)
+    {
         let bases_match = (b1 == "Vec" && b2 == "slice") || (b1 == "slice" && b2 == "Vec");
         if bases_match && p1.len() == p2.len() {
-            let all_params_match = p1.iter().zip(p2.iter()).all(|(l, r)| {
-                matches!(unify_shapes(l, r), Unification::Match)
-            });
+            let all_params_match = p1
+                .iter()
+                .zip(p2.iter())
+                .all(|(l, r)| matches!(unify_shapes(l, r), Unification::Match));
             if all_params_match {
                 return Unification::Match;
             }
@@ -255,11 +266,8 @@ impl CompositionAnalyzer {
                         // instead of the full effect-wrapped codomain
                         // (vampiro-0j8).
                         let callee_shape = if let Some(ref ue) = edge.unwrap_evidence {
-                            if ue.kind == UnwrapKind::Ordinary
-                                && ue.totality == Totality::Total
-                            {
-                                unwrap_outer_effect(&callee.codomain)
-                                    .unwrap_or(&callee.codomain)
+                            if ue.kind == UnwrapKind::Ordinary && ue.totality == Totality::Total {
+                                unwrap_outer_effect(&callee.codomain).unwrap_or(&callee.codomain)
                             } else {
                                 &callee.codomain
                             }
@@ -294,8 +302,7 @@ impl CompositionAnalyzer {
                             if !matches!(expected, Shape::Opaque) {
                                 if let Some(ref value_shape) = edge.arg_shape {
                                     match unify_shapes(value_shape, expected) {
-                                        Unification::Match
-                                        | Unification::OpaqueExcluded => {}
+                                        Unification::Match | Unification::OpaqueExcluded => {}
                                         Unification::Mismatch { .. } => {
                                             findings.push(Finding::slot_mismatch(
                                                 edge.span.file.clone().into(),
@@ -327,7 +334,10 @@ mod tests {
     #[test]
     fn unify_scalar_match() {
         assert_eq!(
-            unify_shapes(&Shape::Scalar(ScalarKind::Unit), &Shape::Scalar(ScalarKind::Unit)),
+            unify_shapes(
+                &Shape::Scalar(ScalarKind::Unit),
+                &Shape::Scalar(ScalarKind::Unit)
+            ),
             Unification::Match
         );
     }
@@ -383,7 +393,10 @@ mod tests {
     #[test]
     fn unify_cross_variant_mismatch() {
         assert_eq!(
-            unify_shapes(&Shape::Scalar(ScalarKind::Unit), &Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])),
+            unify_shapes(
+                &Shape::Scalar(ScalarKind::Unit),
+                &Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
+            ),
             Unification::Mismatch { unhandled: vec![] }
         );
     }
@@ -412,7 +425,10 @@ mod tests {
     fn unify_scalar_matches_ref_scalar() {
         // String literal (Scalar) passed where &str (Ref(Scalar)) expected.
         assert_eq!(
-            unify_shapes(&Shape::Scalar(ScalarKind::Unit), &Shape::Ref(Box::new(Shape::Scalar(ScalarKind::Unit)))),
+            unify_shapes(
+                &Shape::Scalar(ScalarKind::Unit),
+                &Shape::Ref(Box::new(Shape::Scalar(ScalarKind::Unit)))
+            ),
             Unification::Match
         );
     }
@@ -422,7 +438,10 @@ mod tests {
         // Reverse direction: &str (Ref(Scalar)) returned where String
         // (Scalar) expected — real mismatch, requires .to_string().
         assert_eq!(
-            unify_shapes(&Shape::Ref(Box::new(Shape::Scalar(ScalarKind::Unit))), &Shape::Scalar(ScalarKind::Unit)),
+            unify_shapes(
+                &Shape::Ref(Box::new(Shape::Scalar(ScalarKind::Unit))),
+                &Shape::Scalar(ScalarKind::Unit)
+            ),
             Unification::Mismatch { unhandled: vec![] }
         );
     }
@@ -495,7 +514,10 @@ mod tests {
         graph.add_node(node(
             "caller",
             Shape::Scalar(ScalarKind::Unit),
-            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+            Shape::Record(vec![
+                Shape::Scalar(ScalarKind::Unit),
+                Shape::Scalar(ScalarKind::Unit),
+            ]),
         ));
         graph.add_node(node(
             "callee",
@@ -525,20 +547,34 @@ mod tests {
         };
         assert_eq!(
             caller_expected,
-            &Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)])
+            &Shape::Record(vec![
+                Shape::Scalar(ScalarKind::Unit),
+                Shape::Scalar(ScalarKind::Unit)
+            ])
         );
         assert_eq!(
             callee_produced,
             &Shape::Union(vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)])
         );
-        assert_eq!(unhandled, &vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)]);
+        assert_eq!(
+            unhandled,
+            &vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)]
+        );
     }
 
     #[test]
     fn analyze_no_finding_on_match() {
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
-        graph.add_node(node("callee", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
         graph.add_edge(edge("e1", "caller", "callee", 7));
         assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
     }
@@ -546,9 +582,17 @@ mod tests {
     #[test]
     fn analyze_opaque_shape_excluded() {
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
         // Callee codomain opaque → excluded by REQ-23.
-        graph.add_node(node("callee", Shape::Scalar(ScalarKind::Unit), Shape::Opaque));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Opaque,
+        ));
         graph.add_edge(edge("e1", "caller", "callee", 7));
         assert!(
             CompositionAnalyzer::new().analyze(&graph).is_empty(),
@@ -560,7 +604,10 @@ mod tests {
     fn analyze_non_void_match_is_silent() {
         // Caller returns Record, callee returns same Record → match → no finding.
         let mut graph = CirGraph::new("src/lib.rs");
-        let rec = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
+        let rec = Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]);
         graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), rec.clone()));
         graph.add_node(node("callee", Shape::Scalar(ScalarKind::Unit), rec));
         graph.add_edge(edge("e1", "caller", "callee", 7));
@@ -576,10 +623,17 @@ mod tests {
         // and passes it at slot 0 → match → no findings.
         // Caller's codomain is Scalar (void), so return-boundary check skips.
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
         graph.add_node(node(
             "callee",
-            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+            Shape::Record(vec![
+                Shape::Scalar(ScalarKind::Unit),
+                Shape::Scalar(ScalarKind::Unit),
+            ]),
             Shape::Scalar(ScalarKind::Unit),
         ));
         graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(0)));
@@ -595,13 +649,19 @@ mod tests {
         // Both codomains match (both return Scalar) so return-boundary
         // produces no finding.
         let mut graph = CirGraph::new("src/lib.rs");
-        let rec = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
+        let rec = Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]);
         // caller returns Record (non-void), domain is irrelevant
         graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), rec.clone()));
         // callee has 2 Scalar params (Record domain), returns Scalar
         graph.add_node(node(
             "callee",
-            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+            Shape::Record(vec![
+                Shape::Scalar(ScalarKind::Unit),
+                Shape::Scalar(ScalarKind::Unit),
+            ]),
             rec.clone(), // same codomain as caller → return-boundary match
         ));
         graph.add_edge(CirEdge {
@@ -649,10 +709,21 @@ mod tests {
         // Caller passes Scalar at slot 0, but callee expects Record at
         // that slot → slot mismatch finding.
         let mut graph = CirGraph::new("src/lib.rs");
-        let inner_rec = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
+        let inner_rec = Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]);
         let callee_domain = Shape::Record(vec![inner_rec.clone(), Shape::Scalar(ScalarKind::Unit)]);
-        graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
-        graph.add_node(node("callee", callee_domain, Shape::Scalar(ScalarKind::Unit)));
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
+        graph.add_node(node(
+            "callee",
+            callee_domain,
+            Shape::Scalar(ScalarKind::Unit),
+        ));
         graph.add_edge(CirEdge {
             id: StableId::new("e1"),
             source: StableId::new("caller"),
@@ -687,9 +758,16 @@ mod tests {
         // Caller returns Record[Scalar,Scalar], callee codomain = same Record
         // (return-boundary match). Caller passes Record at slot 1 → match.
         let mut graph = CirGraph::new("src/lib.rs");
-        let inner_rec = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
+        let inner_rec = Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]);
         let callee_domain = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), inner_rec.clone()]);
-        graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), inner_rec.clone()));
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            inner_rec.clone(),
+        ));
         graph.add_node(node("callee", callee_domain, inner_rec));
         graph.add_edge(edge_with_slot("e1", "caller", "callee", 7, Some(1)));
         assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
@@ -700,8 +778,16 @@ mod tests {
         // Edge without a slot should not produce a slot-boundary finding.
         // The return-boundary check still runs.
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
-        graph.add_node(node("callee", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
         graph.add_edge(edge("e1", "caller", "callee", 7));
         assert!(CompositionAnalyzer::new().analyze(&graph).is_empty());
     }
@@ -774,7 +860,11 @@ mod tests {
         // Caller returns f64, callee returns Option<f64>.
         // Edge has Ordinary+Total unwrap evidence → compare unwrapped type.
         let mut graph = CirGraph::new("src/lib.rs");
-        graph.add_node(node("caller", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
         graph.add_node(node(
             "callee",
             Shape::Scalar(ScalarKind::Unit),

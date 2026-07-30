@@ -7,9 +7,9 @@
 /// 3. Produce findings using the CLI finding contract
 /// 4. Load configuration using the CLI config contract
 use std::path::PathBuf;
-use vampiro_cir::{NodeKind, ScalarKind, 
-    CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, Provenance,
-    Shape, SourceSpan,
+use vampiro_cir::{
+    CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, NodeKind,
+    Provenance, ScalarKind, Shape, SourceSpan,
 };
 use vampiro_cli::config::Config;
 use vampiro_cli::finding::{Axis, Finding, Severity};
@@ -260,7 +260,10 @@ fn consumer_round_trips_cir_via_json() {
     let node = CirNode {
         id: "n1".into(),
         domain: Shape::Scalar(ScalarKind::Unit),
-        codomain: Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+        codomain: Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]),
         effect: EffectChannel::Option,
         span: SourceSpan {
             file: "consumer_test.rs".into(),
@@ -285,7 +288,10 @@ fn consumer_round_trips_cir_via_json() {
     assert_eq!(deserialized.nodes[0].effect, EffectChannel::Option);
     assert_eq!(
         deserialized.nodes[0].codomain,
-        Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)])
+        Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit)
+        ])
     );
 }
 

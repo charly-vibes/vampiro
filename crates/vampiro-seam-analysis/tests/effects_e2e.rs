@@ -7,9 +7,9 @@
 //! (discard detection is a separate enhancement). This E2E test constructs the
 //! graph programmatically to validate the analyzer + evidence + output format.
 
-use vampiro_cir::{NodeKind, ScalarKind, 
-    CirEdge, CirGraph, CirNode, DiscardSpan, EffectChannel, EffectResolution, Provenance,
-    SourceSpan, StableId, Totality, UnwrapEvidence, UnwrapKind,
+use vampiro_cir::{
+    CirEdge, CirGraph, CirNode, DiscardSpan, EffectChannel, EffectResolution, NodeKind, Provenance,
+    ScalarKind, SourceSpan, StableId, Totality, UnwrapEvidence, UnwrapKind,
 };
 use vampiro_seam_analysis::{analyze, Axis, Evidence, Severity};
 

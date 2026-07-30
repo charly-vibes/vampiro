@@ -13,7 +13,10 @@ fn sample_finding() -> Finding {
         PathBuf::from("src/lib.rs"),
         10..=12,
         vampiro_cir::Shape::Scalar(ScalarKind::Unit),
-        vampiro_cir::Shape::Union(vec![vampiro_cir::Shape::Scalar(ScalarKind::Unit), vampiro_cir::Shape::Opaque]),
+        vampiro_cir::Shape::Union(vec![
+            vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+            vampiro_cir::Shape::Opaque,
+        ]),
         vec![vampiro_cir::Shape::Opaque],
     )
 }

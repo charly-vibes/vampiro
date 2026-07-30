@@ -124,10 +124,10 @@ impl BoundaryLeakAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use vampiro_cir::ScalarKind;
     use super::*;
-    use vampiro_cir::NodeKind;
     use crate::finding::Evidence;
+    use vampiro_cir::NodeKind;
+    use vampiro_cir::ScalarKind;
     use vampiro_cir::{
         CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
         StableId,

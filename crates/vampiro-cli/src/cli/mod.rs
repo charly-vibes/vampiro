@@ -96,8 +96,10 @@ fn run_doctor(fix: bool) -> ExitCode {
 
     match runner.run(&cwd, fix) {
         Ok(report) => {
-            println!("vampiro doctor — {} pass, {} warn, {} fail",
-                report.summary.pass, report.summary.warn, report.summary.fail);
+            println!(
+                "vampiro doctor — {} pass, {} warn, {} fail",
+                report.summary.pass, report.summary.warn, report.summary.fail
+            );
 
             for entry in &report.checks {
                 let icon = match entry.status {

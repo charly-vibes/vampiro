@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use vampiro_cir::{NodeKind, ScalarKind, 
-    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
-    StableId, Totality, UnwrapEvidence, UnwrapKind,
+use vampiro_cir::{
+    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, NodeKind, Provenance, ScalarKind,
+    Shape, SourceSpan, StableId, Totality, UnwrapEvidence, UnwrapKind,
 };
 
 use crate::visibility::{FacadeDecl, FacadeEntry, Visibility};
@@ -206,8 +206,8 @@ impl<'src> Extractor<'src> {
                         let ident = seg.ident.to_string();
                         match ident.as_str() {
                             "bool" => Shape::Scalar(ScalarKind::Bool),
-                            "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16"
-                            | "u32" | "u64" | "u128" | "usize" | "isize" => Shape::Scalar(ScalarKind::Int),
+                            "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16" | "u32"
+                            | "u64" | "u128" | "usize" | "isize" => Shape::Scalar(ScalarKind::Int),
                             "f32" | "f64" => Shape::Scalar(ScalarKind::Float),
                             "char" => Shape::Scalar(ScalarKind::Char),
                             "String" | "str" => Shape::Scalar(ScalarKind::String),
@@ -247,7 +247,10 @@ impl<'src> Extractor<'src> {
             syn::Type::Tuple(tuple) => {
                 let elems: Vec<Shape> = tuple.elems.iter().map(|t| self.extract_shape(t)).collect();
                 if elems.len() == 1 {
-                    elems.into_iter().next().unwrap_or(Shape::Scalar(ScalarKind::Unit))
+                    elems
+                        .into_iter()
+                        .next()
+                        .unwrap_or(Shape::Scalar(ScalarKind::Unit))
                 } else if elems.is_empty() {
                     Shape::Scalar(ScalarKind::Unit)
                 } else {
@@ -499,19 +502,17 @@ impl<'src> Extractor<'src> {
                 None
             }
             // Literal arguments — distinguish by literal kind.
-            syn::Expr::Lit(lit) => {
-                match &lit.lit {
-                    syn::Lit::Str(_) => Some(Shape::Scalar(ScalarKind::String)),
-                    syn::Lit::ByteStr(_) => Some(Shape::Scalar(ScalarKind::String)),
-                    syn::Lit::Int(_) => Some(Shape::Scalar(ScalarKind::Int)),
-                    syn::Lit::Float(_) => Some(Shape::Scalar(ScalarKind::Float)),
-                    syn::Lit::Bool(_) => Some(Shape::Scalar(ScalarKind::Bool)),
-                    syn::Lit::Char(_) => Some(Shape::Scalar(ScalarKind::Char)),
-                    syn::Lit::Byte(_) => Some(Shape::Scalar(ScalarKind::Int)),
-                    syn::Lit::Verbatim(_) => Some(Shape::Scalar(ScalarKind::Unit)),
-                    _ => Some(Shape::Scalar(ScalarKind::Unit)),
-                }
-            }
+            syn::Expr::Lit(lit) => match &lit.lit {
+                syn::Lit::Str(_) => Some(Shape::Scalar(ScalarKind::String)),
+                syn::Lit::ByteStr(_) => Some(Shape::Scalar(ScalarKind::String)),
+                syn::Lit::Int(_) => Some(Shape::Scalar(ScalarKind::Int)),
+                syn::Lit::Float(_) => Some(Shape::Scalar(ScalarKind::Float)),
+                syn::Lit::Bool(_) => Some(Shape::Scalar(ScalarKind::Bool)),
+                syn::Lit::Char(_) => Some(Shape::Scalar(ScalarKind::Char)),
+                syn::Lit::Byte(_) => Some(Shape::Scalar(ScalarKind::Int)),
+                syn::Lit::Verbatim(_) => Some(Shape::Scalar(ScalarKind::Unit)),
+                _ => Some(Shape::Scalar(ScalarKind::Unit)),
+            },
             // Tuple expression: unit () is Scalar, else opaque.
             syn::Expr::Tuple(tup) => {
                 if tup.elems.is_empty() {
@@ -530,7 +531,9 @@ impl<'src> Extractor<'src> {
             syn::Expr::Path(expr_path) => {
                 let name = Self::path_name(expr_path);
                 // Check parameter shapes first, then local variable bindings.
-                self.param_shapes.get(&name).cloned()
+                self.param_shapes
+                    .get(&name)
+                    .cloned()
                     .or_else(|| self.local_shapes.get(&name).cloned())
             }
             // Method call — try the receiver.
@@ -756,6 +759,7 @@ impl<'src> Extractor<'src> {
     /// `.unwrap()`/`.expect()` receiver edges. Dedup is by stable edge ID, so
     /// the first recorder wins — callers that need to tag an edge with unwrap
     /// evidence must call this before the plain call visitor runs.
+    #[allow(clippy::too_many_arguments)]
     fn add_call_edge(
         &mut self,
         callee_name: &str,
@@ -934,8 +938,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 // `expr;` — expression statement with semicolon, result is
                 // discarded. A tail expression (no semicolon) is the function's
                 // return value and is NOT a discard.
-                if semi.is_some()
-                    && matches!(&*expr, syn::Expr::Call(_) | syn::Expr::MethodCall(_))
+                if semi.is_some() && matches!(&*expr, syn::Expr::Call(_) | syn::Expr::MethodCall(_))
                 {
                     self.pending_discard = true;
                 }
@@ -1032,7 +1035,15 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
 
                 // Emit a single declaration→declaration edge for the return-boundary
                 // check (no slot). This preserves the existing codomain comparison.
-                self.add_call_edge(&callee_name, span, resolution.clone(), None, None, None, None);
+                self.add_call_edge(
+                    &callee_name,
+                    span,
+                    resolution.clone(),
+                    None,
+                    None,
+                    None,
+                    None,
+                );
 
                 // Emit expression→declaration edges for each argument with a known
                 // shape. These are the data-flow edges: the composition analyzer
@@ -1086,10 +1097,19 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 evidence.clone(),
                 None,
                 None,
-            None);
+                None,
+            );
         } else {
             // Receiver at slot 0
-            self.add_call_edge(&callee_name, span, resolution.clone(), None, Some(0), None, None);
+            self.add_call_edge(
+                &callee_name,
+                span,
+                resolution.clone(),
+                None,
+                Some(0),
+                None,
+                None,
+            );
             for (i, _arg) in call.args.iter().enumerate() {
                 self.add_call_edge(
                     &callee_name,
@@ -1098,7 +1118,8 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     None,
                     Some((i + 1) as u32),
                     None,
-                None);
+                    None,
+                );
             }
         }
         // For unwrap/expect/unwrap_unchecked, the effect being resolved is
@@ -1132,7 +1153,8 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     ordinary_total(),
                     None,
                     None,
-                None);
+                    None,
+                );
             }
             syn::Expr::Call(inner) => {
                 if let syn::Expr::Path(expr_path) = &*inner.func {
@@ -1151,7 +1173,8 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                             ordinary_total(),
                             None,
                             None,
-                        None);
+                            None,
+                        );
                     } else {
                         for i in 0..inner.args.len() {
                             self.add_call_edge(
@@ -1161,7 +1184,8 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                                 ordinary_total(),
                                 Some(i as u32),
                                 None,
-                            None);
+                                None,
+                            );
                         }
                     }
                 }
@@ -1181,7 +1205,8 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         ordinary_total(),
                         None,
                         None,
-                    None);
+                        None,
+                    );
                 } else {
                     self.add_call_edge(
                         &method_name,
@@ -1190,7 +1215,8 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         ordinary_total(),
                         Some(0),
                         None,
-                    None);
+                        None,
+                    );
                 }
             }
             _ => {}
@@ -1227,7 +1253,10 @@ mod tests {
         assert_eq!(node.name.as_deref(), Some("add"));
         assert_eq!(
             node.domain,
-            Shape::Record(vec![Shape::Scalar(ScalarKind::Int), Shape::Scalar(ScalarKind::Int)])
+            Shape::Record(vec![
+                Shape::Scalar(ScalarKind::Int),
+                Shape::Scalar(ScalarKind::Int)
+            ])
         );
         assert_eq!(node.codomain, Shape::Scalar(ScalarKind::Int));
     }
@@ -1255,12 +1284,18 @@ mod tests {
         let node = &result.graph.nodes[0];
         assert_eq!(node.name.as_deref(), Some("parse"));
         assert_eq!(node.effect, EffectChannel::Result);
-        assert_eq!(node.domain, Shape::Ref(Box::new(Shape::Scalar(ScalarKind::String))));
+        assert_eq!(
+            node.domain,
+            Shape::Ref(Box::new(Shape::Scalar(ScalarKind::String)))
+        );
         assert_eq!(
             node.codomain,
             Shape::Parameterized {
                 base: "Result".into(),
-                parameters: vec![Shape::Scalar(ScalarKind::Int), Shape::Scalar(ScalarKind::Unit)],
+                parameters: vec![
+                    Shape::Scalar(ScalarKind::Int),
+                    Shape::Scalar(ScalarKind::Unit)
+                ],
             }
         );
     }

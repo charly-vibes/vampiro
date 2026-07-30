@@ -6,9 +6,9 @@
 /// and test byte reproducibility.
 use serde::Deserialize;
 use std::path::Path;
-use vampiro_cir::{NodeKind, ScalarKind, 
-    CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, Provenance,
-    Shape, SourceSpan,
+use vampiro_cir::{
+    CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, NodeKind,
+    Provenance, ScalarKind, Shape, SourceSpan,
 };
 
 /// The relative path from the workspace root to the fixture directory.

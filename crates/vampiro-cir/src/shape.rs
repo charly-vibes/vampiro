@@ -245,7 +245,10 @@ mod tests {
 
     #[test]
     fn shape_record() {
-        let s = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
+        let s = Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]);
         assert_eq!(
             serde_json::to_value(s).unwrap(),
             serde_json::json!({ "record": [{ "scalar": "unit" }, { "scalar": "unit" }] })
@@ -254,7 +257,10 @@ mod tests {
 
     #[test]
     fn shape_function() {
-        let s = Shape::Function(Box::new(Shape::Scalar(ScalarKind::Unit)), Box::new(Shape::Opaque));
+        let s = Shape::Function(
+            Box::new(Shape::Scalar(ScalarKind::Unit)),
+            Box::new(Shape::Opaque),
+        );
         let json = serde_json::to_value(s).unwrap();
         assert_eq!(json["function"][0], serde_json::json!({"scalar": "unit"}));
         assert_eq!(json["function"][1], "opaque");
@@ -286,7 +292,10 @@ mod tests {
 
     #[test]
     fn shape_depth_record() {
-        let s = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
+        let s = Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]);
         assert_eq!(s.depth(), 1);
     }
 
@@ -333,7 +342,10 @@ mod tests {
     /// Two union arms whose compact JSON serializations sort in a known order:
     /// `"scalar"` < `{"record":[...]}` lexicographically.
     fn reorder_union_pair() -> (Shape, Shape) {
-        let a = Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]);
+        let a = Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]);
         let b = Shape::Scalar(ScalarKind::Unit);
         (
             Shape::Union(vec![a.clone(), b.clone()]),
@@ -343,7 +355,10 @@ mod tests {
 
     #[test]
     fn normalize_leaf_idempotent() {
-        assert_eq!(Shape::Scalar(ScalarKind::Unit).normalize(), Shape::Scalar(ScalarKind::Unit));
+        assert_eq!(
+            Shape::Scalar(ScalarKind::Unit).normalize(),
+            Shape::Scalar(ScalarKind::Unit)
+        );
         assert_eq!(Shape::Opaque.normalize(), Shape::Opaque);
         assert_eq!(Shape::Bottom.normalize(), Shape::Bottom);
     }
@@ -357,7 +372,13 @@ mod tests {
         let Shape::Union(arms) = &n else {
             panic!("expected union, got {n:?}");
         };
-        assert_eq!(arms[0], Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]));
+        assert_eq!(
+            arms[0],
+            Shape::Record(vec![
+                Shape::Scalar(ScalarKind::Unit),
+                Shape::Scalar(ScalarKind::Unit)
+            ])
+        );
         assert_eq!(arms[1], Shape::Scalar(ScalarKind::Unit));
     }
 
@@ -379,7 +400,10 @@ mod tests {
     fn normalize_sorts_record_fields() {
         // Record elements are structural (no field names); normalization sorts
         // them by canonical serialization so record order is irrelevant.
-        let (a, b) = (Shape::Scalar(ScalarKind::Unit), Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]));
+        let (a, b) = (
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+        );
         let r1 = Shape::Record(vec![a.clone(), b.clone()]);
         let r2 = Shape::Record(vec![b, a]);
         assert_eq!(r1.normalize(), r2.normalize());
@@ -421,7 +445,10 @@ mod tests {
             panic!("expected parameterized, got {n:?}");
         };
         assert_eq!(base, "Result");
-        assert_eq!(parameters, &vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]);
+        assert_eq!(
+            parameters,
+            &vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]
+        );
     }
 
     #[test]
@@ -466,7 +493,10 @@ mod tests {
 
     #[test]
     fn canonical_json_round_trips() {
-        let s = Shape::Union(vec![Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]), Shape::Scalar(ScalarKind::Unit)]);
+        let s = Shape::Union(vec![
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+            Shape::Scalar(ScalarKind::Unit),
+        ]);
         let json = s.to_canonical_json();
         let back: Shape = serde_json::from_str(&json).expect("canonical json must deserialize");
         assert_eq!(back.normalize(), s.normalize());

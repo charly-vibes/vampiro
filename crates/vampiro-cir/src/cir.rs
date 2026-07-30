@@ -320,9 +320,9 @@ impl CirGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ScalarKind;
     use crate::effect::{EffectChannel, Totality, UnwrapEvidence, UnwrapKind};
     use crate::provenance::Provenance;
+    use crate::ScalarKind;
 
     fn make_node(id: &str, name: &str, domain: Shape, codomain: Shape) -> CirNode {
         CirNode {
@@ -345,11 +345,7 @@ mod tests {
         }
     }
 
-    fn make_expr_node(
-        id: &str,
-        shape: Shape,
-        containing_fn: &str,
-    ) -> CirNode {
+    fn make_expr_node(id: &str, shape: Shape, containing_fn: &str) -> CirNode {
         CirNode {
             id: StableId::new(id),
             domain: shape.clone(),
@@ -375,8 +371,18 @@ mod tests {
         // Build a simple graph: one function calling another
         let mut graph = CirGraph::new("src/lib.rs");
 
-        let caller = make_node("caller", "caller_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
-        let callee = make_node("callee", "callee_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+        let caller = make_node(
+            "caller",
+            "caller_fn",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        );
+        let callee = make_node(
+            "callee",
+            "callee_fn",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        );
 
         let edge = CirEdge {
             id: StableId::new("edge-1"),
@@ -590,7 +596,12 @@ mod tests {
     #[test]
     fn cir_graph_validate_missing_node() {
         let mut graph = CirGraph::new("test.rs");
-        let node = make_node("a", "fn_a", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+        let node = make_node(
+            "a",
+            "fn_a",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        );
         let edge = CirEdge {
             id: StableId::new("e1"),
             source: StableId::new("a"),
@@ -722,7 +733,12 @@ mod tests {
     #[test]
     fn cir_graph_validate_duplicate_node() {
         let mut graph = CirGraph::new("test.rs");
-        let mut node = make_node("dup", "fn_a", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+        let mut node = make_node(
+            "dup",
+            "fn_a",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        );
         graph.add_node(node.clone());
         // Same id, different name — should be rejected.
         node.name = Some("fn_b".into());
@@ -760,8 +776,18 @@ mod tests {
     fn cir_graph_slot_round_trip() {
         // Verify that a CirEdge with slot set round-trips through JSON.
         let mut graph = CirGraph::new("test.rs");
-        let caller = make_node("caller", "caller_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
-        let callee = make_node("callee", "callee_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+        let caller = make_node(
+            "caller",
+            "caller_fn",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        );
+        let callee = make_node(
+            "callee",
+            "callee_fn",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        );
 
         graph.add_node(caller);
         graph.add_node(callee);
@@ -835,9 +861,19 @@ mod tests {
     fn expression_node_round_trip() {
         // Verify that expression nodes round-trip through JSON with kind+containing_function.
         let mut graph = CirGraph::new("test.rs");
-        let caller = make_node("caller", "caller_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+        let caller = make_node(
+            "caller",
+            "caller_fn",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        );
         let expr = make_expr_node("expr-1", Shape::Scalar(ScalarKind::Int), "caller");
-        let callee = make_node("callee", "callee_fn", Shape::Scalar(ScalarKind::Int), Shape::Scalar(ScalarKind::Unit));
+        let callee = make_node(
+            "callee",
+            "callee_fn",
+            Shape::Scalar(ScalarKind::Int),
+            Shape::Scalar(ScalarKind::Unit),
+        );
 
         graph.add_node(caller);
         graph.add_node(expr);

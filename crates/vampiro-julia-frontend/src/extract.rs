@@ -7,9 +7,8 @@
 use std::path::Path;
 use tree_sitter::Node;
 use vampiro_cir::{
-    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, NodeKind, Provenance, ScalarKind, Shape,
-    SourceSpan,
-    StableId, TrustProvenance,
+    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, NodeKind, Provenance, ScalarKind,
+    Shape, SourceSpan, StableId, TrustProvenance,
 };
 
 /// Extract a CIR graph from a tree-sitter parsed Julia module.

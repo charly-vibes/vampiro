@@ -15,10 +15,7 @@ pub enum CirError {
     ShapeDepthExceeded { max_depth: u32, observed: u32 },
     /// An expression node violates the invariant (domain != codomain or
     /// effect != Plain).
-    ExpressionInvariant {
-        node_id: String,
-        detail: String,
-    },
+    ExpressionInvariant { node_id: String, detail: String },
     /// An expression node's `containing_function` references a node that
     /// does not exist or is not a Declaration.
     OrphanedExpression {

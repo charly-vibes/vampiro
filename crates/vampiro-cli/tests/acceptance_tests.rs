@@ -65,7 +65,10 @@ fn rust_cli_foundation_4_no_analysis_or_gating_behavior() {
         std::path::PathBuf::from("test.rs"),
         1..=1,
         vampiro_cir::Shape::Scalar(ScalarKind::Unit),
-        vampiro_cir::Shape::Union(vec![vampiro_cir::Shape::Scalar(ScalarKind::Unit), vampiro_cir::Shape::Opaque]),
+        vampiro_cir::Shape::Union(vec![
+            vampiro_cir::Shape::Scalar(ScalarKind::Unit),
+            vampiro_cir::Shape::Opaque,
+        ]),
         vec![vampiro_cir::Shape::Opaque],
     );
     let _ = vampiro_cli::exit_code::ExitCode::Success;

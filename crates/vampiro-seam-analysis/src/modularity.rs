@@ -209,9 +209,9 @@ impl ModularityAnalyzer {
 
 #[cfg(test)]
 mod tests {
-    use vampiro_cir::ScalarKind;
     use super::*;
     use vampiro_cir::NodeKind;
+    use vampiro_cir::ScalarKind;
     use vampiro_cir::{
         BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts,
     };

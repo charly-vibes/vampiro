@@ -31,9 +31,9 @@
 
 use std::path::{Path, PathBuf};
 
-use vampiro_cir::{NodeKind, ScalarKind, 
+use vampiro_cir::{
     BoundaryKind, CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, LatticeLevel,
-    Provenance, Shape, SourceSpan, StableId, VisibilityFact, VisibilityFacts,
+    NodeKind, Provenance, ScalarKind, Shape, SourceSpan, StableId, VisibilityFact, VisibilityFacts,
 };
 use vampiro_rust_frontend::RustFrontend;
 use vampiro_seam_analysis::{analyze_with_visibility, Finding};
@@ -185,7 +185,10 @@ fn composition_graph() -> CirGraph {
         file,
         7,
         Shape::Scalar(ScalarKind::Unit),
-        Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+        Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]),
     ));
     g.add_node(node(
         "source_value",
@@ -206,9 +209,21 @@ fn composition_graph() -> CirGraph {
 fn swallowed_graph() -> CirGraph {
     let file = "tests/fixtures/stress/swallowed_effect.rs";
     let mut g = CirGraph::new(file);
-    let mut callee = node("lookup", file, 3, Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+    let mut callee = node(
+        "lookup",
+        file,
+        3,
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Scalar(ScalarKind::Unit),
+    );
     callee.effect = EffectChannel::Result;
-    g.add_node(node("report", file, 7, Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
+    g.add_node(node(
+        "report",
+        file,
+        7,
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Scalar(ScalarKind::Unit),
+    ));
     g.add_node(callee);
     let mut e = edge("e1", "report", "lookup", file, 8);
     e.resolution = EffectResolution::Swallowed;
@@ -227,7 +242,10 @@ fn redundancy_graph() -> CirGraph {
         file,
         3,
         Shape::Scalar(ScalarKind::Unit),
-        Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+        Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]),
     ));
     g.add_node(node(
         "cache_get",
@@ -243,7 +261,10 @@ fn redundancy_graph() -> CirGraph {
         "use_data",
         file,
         12,
-        Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
+        Shape::Record(vec![
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ]),
         Shape::Scalar(ScalarKind::Unit),
     ));
     g.add_edge(edge("e1", "primary_source_fetch", "use_data", file, 5));
@@ -267,7 +288,13 @@ fn over_exposure_graph() -> (CirGraph, VisibilityFacts) {
         Shape::Scalar(ScalarKind::Unit),
     ));
     // A cross-file caller (different span.file) — required by vampiro-6ty.
-    g.add_node(node("caller", caller_file, 1, Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)));
+    g.add_node(node(
+        "caller",
+        caller_file,
+        1,
+        Shape::Scalar(ScalarKind::Unit),
+        Shape::Scalar(ScalarKind::Unit),
+    ));
     let mut e = edge("e1", "caller", "_internal", caller_file, 2);
     // Both codomains are Scalar → the composition tracer skips the caller
     // (void-guard), so no composition finding contaminates this fixture.
