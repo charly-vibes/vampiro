@@ -5,11 +5,12 @@
 //! a list determines whether it's a declaration (defn, fn, def, etc.) or a
 //! function call.
 
+use std::collections::HashMap;
 use std::path::Path;
 use tree_sitter::Node;
-use vampiro_cir::{NodeKind, ScalarKind, 
-    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
-    StableId, TrustProvenance,
+use vampiro_cir::{
+    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, NodeKind, Provenance, ScalarKind,
+    Shape, SourceSpan, StableId, TrustProvenance,
 };
 
 /// Extract a CIR graph from a tree-sitter parsed Clojure source.
@@ -31,6 +32,7 @@ pub fn extract_graph(root: Node, source: &str, path: &Path) -> CirGraph {
             &mut edge_counter,
             0,
             None,
+            &mut HashMap::new(),
         );
     }
 
@@ -38,7 +40,7 @@ pub fn extract_graph(root: Node, source: &str, path: &Path) -> CirGraph {
 }
 
 /// Process a form (top-level expression), optionally with a binding name.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn process_form(
     node: Node,
     source: &str,
@@ -48,6 +50,7 @@ fn process_form(
     edge_counter: &mut u64,
     call_depth: u32,
     binding_name: Option<&str>,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     match node.kind() {
         "list_lit" => {
@@ -60,6 +63,7 @@ fn process_form(
                 edge_counter,
                 call_depth,
                 binding_name,
+                local_shapes,
             );
         }
         "vec_lit" | "map_lit" | "set_lit" => {
@@ -75,6 +79,7 @@ fn process_form(
                     edge_counter,
                     call_depth,
                     None,
+                    local_shapes,
                 );
             }
         }
@@ -113,6 +118,7 @@ fn process_form(
                     edge_counter,
                     call_depth,
                     None,
+                    local_shapes,
                 );
             }
         }
@@ -120,7 +126,7 @@ fn process_form(
 }
 
 /// Process a list literal, which may be a special form, function call, or data.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn process_list_lit(
     node: Node,
     source: &str,
@@ -130,6 +136,7 @@ fn process_list_lit(
     edge_counter: &mut u64,
     call_depth: u32,
     binding_name: Option<&str>,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     // Get the first named child to determine the operator
     // Index 0 is `(`, index 1 is the operator symbol
@@ -172,8 +179,10 @@ fn process_list_lit(
                 file_path,
                 &id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
         Some("defn-") => {
@@ -204,8 +213,10 @@ fn process_list_lit(
                 file_path,
                 &id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
         Some("fn") => {
@@ -236,8 +247,10 @@ fn process_list_lit(
                 file_path,
                 &id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
         Some("def") => {
@@ -276,6 +289,7 @@ fn process_list_lit(
                     edge_counter,
                     call_depth + 1,
                     Some(name),
+                    local_shapes,
                 );
             }
         }
@@ -307,8 +321,10 @@ fn process_list_lit(
                 file_path,
                 &id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
         Some("future") => {
@@ -344,8 +360,10 @@ fn process_list_lit(
                 file_path,
                 &id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
         Some("lazy-seq") => {
@@ -375,8 +393,10 @@ fn process_list_lit(
                 file_path,
                 &id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
         Some("try") => {
@@ -407,8 +427,10 @@ fn process_list_lit(
                 file_path,
                 &id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
         Some("with-open") | Some("binding") => {
@@ -441,32 +463,16 @@ fn process_list_lit(
                 file_path,
                 &id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
         // ---- Function calls ----
         Some(_) => {
-            // Any other list with a symbol as first element is a function call
-            let callee_name = operator.unwrap_or("<unknown>");
-            let _callee_id = StableId::new(format!("clj:{}:{}", file_path, callee_name));
-
-            let _span = node_span(node, file_path);
-            let _provenance = if call_depth <= 3 {
-                Provenance::Direct
-            } else if call_depth <= 10 {
-                Provenance::WithinH { hops: call_depth }
-            } else {
-                Provenance::OverBound {
-                    max_hops: 10,
-                    actual: call_depth,
-                    traced_hops: vec![],
-                }
-            };
-
-            // If there's a caller context, add an edge
-            // (call edges are handled by the caller's body processing)
-
+            // Any other list with a symbol as first element is a function call.
+            // Call edges are handled by the caller's body processing (extract_call_edges).
             // Recurse into arguments for nested calls
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
@@ -479,6 +485,7 @@ fn process_list_lit(
                     edge_counter,
                     call_depth + 1,
                     None,
+                    local_shapes,
                 );
             }
         }
@@ -495,6 +502,7 @@ fn process_list_lit(
                     edge_counter,
                     call_depth,
                     None,
+                    local_shapes,
                 );
             }
         }
@@ -502,14 +510,17 @@ fn process_list_lit(
 }
 
 /// Process a body for call edges, extracting edges from inner list forms.
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn process_body_for_calls(
     node: Node,
     source: &str,
     file_path: &str,
     caller_id: &StableId,
     graph: &mut CirGraph,
+    node_counter: &mut u64,
     edge_counter: &mut u64,
     call_depth: u32,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
@@ -519,21 +530,26 @@ fn process_body_for_calls(
             file_path,
             caller_id,
             graph,
+            node_counter,
             edge_counter,
             call_depth,
+            local_shapes,
         );
     }
 }
 
 /// Extract call edges from a form, recursing into nested structures.
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn extract_call_edges(
     node: Node,
     source: &str,
     file_path: &str,
     caller_id: &StableId,
     graph: &mut CirGraph,
+    node_counter: &mut u64,
     edge_counter: &mut u64,
     call_depth: u32,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     match node.kind() {
         "list_lit" => {
@@ -559,8 +575,6 @@ fn extract_call_edges(
                         | "catch"
                         | "with-open"
                         | "binding"
-                        | "let"
-                        | "loop"
                         | "if"
                         | "when"
                         | "cond"
@@ -573,6 +587,50 @@ fn extract_call_edges(
                         | "some->>"
                 )
             );
+
+            // Handle let/loop bindings for local variable tracking
+            if matches!(operator, Some("let" | "loop")) {
+                // (let [bindings...] body...)
+                // The first argument (index 2) is a vector of [name value name value ...]
+                let binding_vec = node.child(2);
+                if let Some(vec_node) = binding_vec {
+                    if vec_node.kind() == "vec_lit" {
+                        let mut vec_cursor = vec_node.walk();
+                        let vec_children: Vec<Node> = vec_node.children(&mut vec_cursor).collect();
+                        // Children alternate: sym_lit, value, sym_lit, value, ...
+                        // vec_children[0] is '[', then pairs start at index 1
+                        let mut i = 1;
+                        while i + 1 < vec_children.len() {
+                            let name_node = vec_children[i];
+                            let value_node = vec_children[i + 1];
+                            if let Some(name) = get_symbol_text(name_node, source) {
+                                // Infer the shape of the value expression
+                                if let Some(shape) = extract_expr_shape(value_node, source, graph) {
+                                    local_shapes.insert(name.to_string(), shape);
+                                }
+                            }
+                            i += 2;
+                        }
+                    }
+                }
+
+                // Recurse into body children for nested calls
+                let mut cursor = node.walk();
+                for child in node.children(&mut cursor) {
+                    extract_call_edges(
+                        child,
+                        source,
+                        file_path,
+                        caller_id,
+                        graph,
+                        node_counter,
+                        edge_counter,
+                        call_depth + 1,
+                        local_shapes,
+                    );
+                }
+                return;
+            }
 
             if !is_special_form {
                 // This is a function call — add an edge
@@ -592,8 +650,10 @@ fn extract_call_edges(
                                 file_path,
                                 caller_id,
                                 graph,
+                                node_counter,
                                 edge_counter,
                                 call_depth + 1,
+                                local_shapes,
                             );
                         }
                         return;
@@ -610,14 +670,16 @@ fn extract_call_edges(
                         }
                     };
 
+                    // Emit a single declaration->declaration edge for the return-boundary
+                    // check (no slot). This preserves the existing codomain comparison.
                     let edge = CirEdge {
                         id: StableId::new(format!("clj:edge:{}", *edge_counter)),
                         source: caller_id.clone(),
-                        target: callee_id,
+                        target: callee_id.clone(),
                         resolution: EffectResolution::Propagated,
                         unwrap_evidence: None,
-                        provenance,
-                        span,
+                        provenance: provenance.clone(),
+                        span: span.clone(),
                         discard_spans: vec![],
                         trust_provenance: TrustProvenance::default(),
                         slot: None,
@@ -626,9 +688,44 @@ fn extract_call_edges(
 
                     graph.add_edge(edge);
                     *edge_counter += 1;
+
+                    // Emit expression->declaration edges for each argument with a known
+                    // shape. In Clojure, arguments start at index 2 (after '(' and operator).
+                    let mut arg_cursor = node.walk();
+                    let arg_nodes: Vec<Node> = node.children(&mut arg_cursor).collect();
+                    // arg_nodes[0] = '(', arg_nodes[1] = operator, arg_nodes[2..] = arguments
+                    let args_start = 2;
+                    for (i, arg) in arg_nodes.iter().enumerate().skip(args_start) {
+                        if let Some(shape) = extract_expr_shape(*arg, source, graph) {
+                            let expr_id = emit_expression_node(
+                                shape,
+                                *arg,
+                                source,
+                                file_path,
+                                graph,
+                                node_counter,
+                                caller_id,
+                            );
+                            let expr_edge = CirEdge {
+                                id: StableId::new(format!("clj:edge:expr_{}", *edge_counter)),
+                                source: expr_id,
+                                target: callee_id.clone(),
+                                resolution: EffectResolution::Propagated,
+                                unwrap_evidence: None,
+                                provenance: provenance.clone(),
+                                span: node_span(*arg, file_path),
+                                discard_spans: vec![],
+                                trust_provenance: TrustProvenance::default(),
+                                slot: Some(i as u32 - 2),
+                                arg_shape: None,
+                            };
+                            graph.add_edge(expr_edge);
+                            *edge_counter += 1;
+                        }
+                    }
                 }
 
-                // Recurse into arguments
+                // Recurse into arguments for nested calls
                 let mut cursor = node.walk();
                 for child in node.children(&mut cursor) {
                     extract_call_edges(
@@ -637,8 +734,10 @@ fn extract_call_edges(
                         file_path,
                         caller_id,
                         graph,
+                        node_counter,
                         edge_counter,
                         call_depth + 1,
+                        local_shapes,
                     );
                 }
             } else {
@@ -651,8 +750,10 @@ fn extract_call_edges(
                         file_path,
                         caller_id,
                         graph,
+                        node_counter,
                         edge_counter,
                         call_depth + 1,
+                        local_shapes,
                     );
                 }
             }
@@ -666,8 +767,10 @@ fn extract_call_edges(
                     file_path,
                     caller_id,
                     graph,
+                    node_counter,
                     edge_counter,
                     call_depth,
+                    local_shapes,
                 );
             }
         }
@@ -681,11 +784,79 @@ fn extract_call_edges(
                     file_path,
                     caller_id,
                     graph,
+                    node_counter,
                     edge_counter,
                     call_depth,
+                    local_shapes,
                 );
             }
         }
+    }
+}
+
+/// Emit an expression node for an intermediate expression value.
+fn emit_expression_node(
+    shape: Shape,
+    node: Node,
+    _source: &str,
+    file_path: &str,
+    graph: &mut CirGraph,
+    node_counter: &mut u64,
+    containing_fn: &StableId,
+) -> StableId {
+    let id = StableId::new(format!(
+        "clj:expr:{}:{:?}:{}",
+        file_path,
+        node.id(),
+        *node_counter
+    ));
+    let expr_node = CirNode {
+        id: id.clone(),
+        domain: shape.clone(),
+        codomain: shape,
+        effect: EffectChannel::Plain,
+        span: node_span(node, file_path),
+        name: None,
+        trust_provenance: TrustProvenance::default(),
+        is_test: false,
+        kind: NodeKind::Expression,
+        containing_function: Some(containing_fn.clone()),
+    };
+    graph.add_node(expr_node);
+    *node_counter += 1;
+    id
+}
+
+/// Infer the shape of a Clojure expression from a tree-sitter AST node.
+fn extract_expr_shape(node: Node, source: &str, graph: &CirGraph) -> Option<Shape> {
+    match node.kind() {
+        // Integer literal -> Scalar(Int)
+        "int_lit" => Some(Shape::Scalar(ScalarKind::Int)),
+        // Float literal -> Scalar(Float)
+        "float_lit" => Some(Shape::Scalar(ScalarKind::Float)),
+        // String literal -> Scalar(String)
+        "str_lit" => Some(Shape::Scalar(ScalarKind::String)),
+        // Boolean literal -> Scalar(Bool)
+        "nil_lit" => Some(Shape::Scalar(ScalarKind::Unit)),
+        // Keyword literal -> Scalar(String)
+        "kwd_lit" => Some(Shape::Scalar(ScalarKind::String)),
+        // Symbol reference: check if tracked via local_shapes
+        // (local_shapes not available here — caller handles this)
+        "sym_lit" | "sym_val_lit" => None,
+        // List literal (call expression) -> use the callee's codomain if resolvable
+        "list_lit" => {
+            let first = node.child(1);
+            let operator = first.and_then(|n| get_symbol_text(n, source));
+            if let Some(op) = operator {
+                let callee_id = StableId::new(format!("clj:{}:{}", graph.source_file, op));
+                if let Some(callee_node) = graph.node_by_id(&callee_id) {
+                    return Some(callee_node.codomain.clone());
+                }
+            }
+            None
+        }
+        // Everything else: opaque
+        _ => None,
     }
 }
 

@@ -1,3 +1,9 @@
+> *"¿Por qué me tratas tan mal? ¿Por qué te escapas? ¿Por qué no ves*
+> *Que si me matas tal vez entre las sombras renaceré?*
+> *No pensés en eso, yo estoy bien*
+> *Solamente los espejos quieren mi reflejo esconder"*
+> — Charly García
+
 # Vampiro
 
 Vampiro is a planned cross-language Rust CLI for checking whether code composes
