@@ -415,7 +415,9 @@ impl<'src> Extractor<'src> {
             effect = EffectChannel::Recursive(Box::new(effect));
         }
 
-        let span = self.make_span(&func.sig.ident, &self.path.to_string_lossy());
+        // Use the full function span (including body) so that test-code
+        // filtering can detect findings inside test function bodies.
+        let span = self.make_span(func, &self.path.to_string_lossy());
 
         let vis = Visibility::from(&func.vis);
         let node = CirNode {

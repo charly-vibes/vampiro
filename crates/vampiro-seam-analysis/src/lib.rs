@@ -93,5 +93,8 @@ pub fn analyze_with_visibility(
     let mut findings = analyze(graph);
     let (mod_findings, mod_diags) = ModularityAnalyzer::new().analyze(graph, vis);
     findings.extend(mod_findings);
+    // Filter out findings from test-only code (`#[cfg(test)]` modules,
+    // `#[test]` functions, `tests/` directories).
+    filter_test_findings(graph, &mut findings);
     (findings, mod_diags)
 }
