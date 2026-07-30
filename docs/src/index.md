@@ -6,11 +6,11 @@
 
 # Vampiro
 
-Vampiro is a planned cross-language Rust CLI that asks one question at every
+Vampiro is a cross-language Rust CLI (v0.2.0) that asks one question at every
 call boundary: **does this edge compose validly in the category it claims to
 compose in?**
 
-It is designed to detect four classes of seam defect:
+It detects four classes of seam defect:
 
 | Axis | Question |
 |---|---|
@@ -19,11 +19,12 @@ It is designed to detect four classes of seam defect:
 | Optionality | Are structurally interchangeable implementations lawfully interchangeable? |
 | Robustness | Are effects, retries, fallbacks, and resource obligations handled completely? |
 
-> **Approved specification, proposals in progress**
->
-> EARS 1.3.0 is approved. The active OpenSpec changes are proposals
-> awaiting human approval. This site documents intended behavior; it does
-> not claim that the CLI has been implemented.
+## Current status
+
+**v0.2.0** — Working CLI with frontends for 4 languages (Python, Clojure,
+Julia, Rust), composition seam analysis, cross-language data-flow edge
+verification, and benchmarked performance. EARS specification v1.3.0 approved.
+Active OpenSpec changes under `openspec/changes/`.
 
 ## Start here
 

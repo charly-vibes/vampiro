@@ -1,6 +1,6 @@
 [package]
 name = "vampiro-seam-analysis"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Language-neutral seam analysis for Vampiro — composition, modularity, optionality, and robustness checks over CIR"
 

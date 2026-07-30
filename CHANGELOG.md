@@ -1,25 +1,53 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0] — 2026-07-30
+
+### Added
+
+- **Data-flow edge infrastructure**: per-slot expression nodes (`NodeKind::Expression`)
+  and slot-indexed edges in CIR, enabling fine-grained argument tracking across call
+  boundaries.
+
+- **Python frontend**: full data-flow edge extraction with `ScalarKind` inference
+  (`int`, `float`, `str`, `bool`, `None`, `bytes`) for call arguments with known
+  shapes. Verified via seeded-fault fixture suite.
+
+- **Clojure frontend**: data-flow edge extraction with per-slot expression nodes
+  for call arguments. Fixed `num_lit` shape inference (Clojure grammar uses `num_lit`
+  not `int_lit`/`float_lit`). Fixed early-return bug that skipped expression nodes
+  for calls to builtins not in the graph (e.g., `+`, `str`, `concat`).
+
+- **Julia frontend**: data-flow edge extraction. Fixed argument extraction to
+  dig into the `argument_list` child (Julia grammar nests arguments inside
+  `argument_list`, not as direct `call_expression` children).
+
+- **Cross-language stress-test suite**: 8 realistic fixtures across Python, Clojure,
+  and Julia (HTTP servers, CLI tools, async examples, data pipelines) verifying
+  extraction succeeds without panic.
+
+- **Edge-case corpus**: 23 edge-case fixtures across Rust, Python, Clojure, and Julia
+  (empty, comments-only, syntax errors, macros, generics, async, unsafe, Unicode,
+  const eval, enormous chains).
+
+- **Benchmark suite**: 4 benchmark tests (100, 1k, 10k, 50k lines) with timing
+  assertions. Results documented in `docs/verification/benchmarks-1.md`.
+
+- **Seeded-fault E2E suite**: cross-language fixtures verifying data-flow edge
+  structure (slot edges + expression nodes) for all 3 frontends.
 
 ### Changed
-- Approved the authoritative EARS specification (v1.3.0): added REQ-30
-  (tiered gate-mode behavior), a REQ-4 default-severity table, definitions of
-  the argument-provenance bound `H` and `intentional branch`, a canonical
-  effect-channel combination grammar, and an explicit ordering of the
-  `refinement_confirmation` reason vocabulary. Status flipped Draft → Approved;
-  unblocks the `add-trust-boundary-analysis` epic (REQ-B1–REQ-B6).
 
-### Added
-- Approval-gated `add-trust-boundary-analysis` OpenSpec change and six matching
-  Beads tickets covering 17 implementation and verification checklist items.
-- Approval-gated `depend-on-genesis` proposal for shared envelope, suggestions,
-  managed-block, and AIX infrastructure.
+- **genesis adoption**: upgraded from genesis v0.2.0 to v0.4.0, adopting the `doctor`,
+  `feedback`, `cli`, `status`, `scaffold`, `guide`, and `discovery` modules with
+  `CliVerbosity`/`CliFormat`/`Output`/`Verbosity` shared infrastructure.
 
-## [0.0.0] — 2026-07-24
+- **ScalarKind shape model**: refined from opaque `Shape` to `ScalarKind` enum
+  (`Int`, `Float`, `String`, `Bool`, `Unit`, `Char`, `Bytes`) for finer-grained
+  composition analysis.
 
-### Added
-- Initial EARS specification (Draft 1.1.0).
-- Eight OpenSpec change proposals for phased implementation.
-- Project infrastructure: wai, openspec, beads, mdBook docs, CI/CD.
-- Agent instructions with wai, openspec, and beads integration.
+- **Composition analysis**: kind-aware scalar matching, Vec↔slice aliasing, unified
+  `Scalar`↔`Ref(Scalar)` matching, redesigned slot-boundary check using `arg_shape`
+  instead of `caller.codomain` — eliminating ~99.8% of false positives.
+
+- **Test-code filtering**: `is_test` node flag added to CIR; test-code findings
+  filtered out in default analysis mode.

@@ -1,6 +1,6 @@
 [package]
 name = "vampiro-clojure-frontend"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Clojure language frontend for Vampiro — extracts CIR graphs from Clojure source using tree-sitter"
 

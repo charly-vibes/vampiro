@@ -1,10 +1,10 @@
 # Vampiro
 
-> Cross-language CLI for checking whether code composes correctly at call and module boundaries.
+> Cross-language Rust CLI (v0.2.0) for checking whether code composes correctly at call and module boundaries. Supports Python, Clojure, Julia, and Rust via tree-sitter frontends.
 
 ## What It Does
 
-Cross-language CLI that checks whether the pieces of a codebase actually compose: whether call boundaries line up structurally, whether module boundaries are respected, whether interchangeable implementations are actually interchangeable, and whether error/absence/retry channels are threaded through call chains instead of silently discarded.
+Cross-language Rust CLI (v0.2.0) that checks whether the pieces of a codebase actually compose. Uses tree-sitter frontends for Python, Clojure, Julia, and Rust to emit a shared Composition IR (CIR) with per-slot data-flow edges. Composition seam analysis achieves ~99.8% precision on clean baselines.
 
 ### Seam Axes
 

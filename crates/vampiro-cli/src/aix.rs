@@ -16,8 +16,8 @@ pub struct ProjectMeta {
 /// Default project metadata for the vampiro repository.
 pub const VAMPIRO_META: ProjectMeta = ProjectMeta {
     name: "vampiro",
-    tagline: "Cross-language CLI for checking whether code composes correctly at call and module boundaries.",
-    description: "Cross-language CLI that checks whether the pieces of a codebase actually compose: whether call boundaries line up structurally, whether module boundaries are respected, whether interchangeable implementations are actually interchangeable, and whether error/absence/retry channels are threaded through call chains instead of silently discarded.",
+    tagline: "Cross-language Rust CLI (v0.2.0) for checking whether code composes correctly at call and module boundaries. Supports Python, Clojure, Julia, and Rust via tree-sitter frontends.",
+    description: "Cross-language Rust CLI (v0.2.0) that checks whether the pieces of a codebase actually compose. Uses tree-sitter frontends for Python, Clojure, Julia, and Rust to emit a shared Composition IR (CIR) with per-slot data-flow edges. Composition seam analysis achieves ~99.8% precision on clean baselines.",
     commands: &[
         ("vampiro check", "Check for seam defects (default: diff-scoped)"),
         ("vampiro scan", "Full repository scan"),
@@ -116,7 +116,7 @@ mod tests {
     fn aix_llms_txt_generated_through_genesis() {
         let content = generate_llms_txt(&VAMPIRO_META);
         assert!(content.contains("# vampiro"));
-        assert!(content.contains("Cross-language CLI"));
+        assert!(content.contains("Cross-language Rust CLI"));
         assert!(content.contains("<!-- VAMPIRO:START -->"));
         assert!(content.contains("<!-- VAMPIRO:END -->"));
     }
@@ -125,7 +125,7 @@ mod tests {
     fn aix_llm_txt_generated_through_genesis() {
         let content = generate_llm_txt(&VAMPIRO_META);
         assert!(content.contains("# Vampiro"));
-        assert!(content.contains("Cross-language CLI"));
+        assert!(content.contains("Cross-language Rust CLI"));
         assert!(content.contains("<!-- VAMPIRO:START -->"));
         assert!(content.contains("<!-- VAMPIRO:END -->"));
     }

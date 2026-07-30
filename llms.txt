@@ -1,6 +1,6 @@
 # vampiro
 
-> Cross-language CLI for checking whether code composes correctly at call and module boundaries.
+> Cross-language Rust CLI (v0.2.0) for checking whether code composes correctly at call and module boundaries. Supports Python, Clojure, Julia, and Rust via tree-sitter frontends.
 
 ## Authorship
 
