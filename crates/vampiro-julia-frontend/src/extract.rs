@@ -4,6 +4,7 @@
 //! Note: tree-sitter-julia 0.23.1 does not use named fields for most nodes.
 //! Children must be accessed by index.
 
+use std::collections::HashMap;
 use std::path::Path;
 use tree_sitter::Node;
 use vampiro_cir::{
@@ -28,12 +29,13 @@ pub fn extract_graph(root: Node, source: &str, path: &Path) -> CirGraph {
             &mut edge_counter,
             0,
             None,
+            &mut HashMap::new(),
         );
     }
     graph
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn process_node(
     node: Node,
     source: &str,
@@ -43,6 +45,7 @@ fn process_node(
     edge_counter: &mut u64,
     call_depth: u32,
     binding_name: Option<&str>,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     match node.kind() {
         "function_definition" | "macro_definition" => {
@@ -79,8 +82,10 @@ fn process_node(
                     file_path,
                     &id,
                     graph,
+                    node_counter,
                     edge_counter,
                     call_depth + 1,
+                    local_shapes,
                 );
             }
         }
@@ -134,6 +139,7 @@ fn process_node(
                     edge_counter,
                     call_depth + 1,
                     None,
+                    local_shapes,
                 );
             }
         }
@@ -159,9 +165,15 @@ fn process_node(
             *node_counter += 1;
         }
         "assignment" => {
+            // Track local variable shapes: x = expr
             if let Some(left) = node.child(0) {
-                if let Some(name) = node_text(left, source) {
+                if let Some(var_name) = node_text(left, source) {
                     if let Some(right) = node.child(2) {
+                        // Infer the shape of the right-hand side
+                        if let Some(shape) = extract_expr_shape(right, source, graph) {
+                            local_shapes.insert(var_name.clone(), shape);
+                        }
+                        // Process the right-hand side for calls and nested declarations
                         process_node(
                             right,
                             source,
@@ -170,14 +182,15 @@ fn process_node(
                             node_counter,
                             edge_counter,
                             call_depth + 1,
-                            Some(&name),
+                            Some(&var_name),
+                            local_shapes,
                         );
                     }
                 }
             }
         }
         "call_expression" | "broadcast_call_expression" | "macrocall_expression" => {
-            // Handled by extract_call_edges
+            // Handled by extract_call_edges — but also recurse for nested calls
             let mut c = node.walk();
             for child in node.children(&mut c) {
                 process_node(
@@ -189,6 +202,7 @@ fn process_node(
                     edge_counter,
                     call_depth + 1,
                     None,
+                    local_shapes,
                 );
             }
         }
@@ -217,8 +231,10 @@ fn process_node(
                     file_path,
                     &id,
                     graph,
+                    node_counter,
                     edge_counter,
                     call_depth + 1,
+                    local_shapes,
                 );
             }
         }
@@ -234,6 +250,7 @@ fn process_node(
                     edge_counter,
                     call_depth,
                     None,
+                    local_shapes,
                 );
             }
         }
@@ -249,6 +266,7 @@ fn process_node(
                     edge_counter,
                     call_depth,
                     None,
+                    local_shapes,
                 );
             }
         }
@@ -294,24 +312,17 @@ fn find_name_inside<'a>(node: Node, source: &'a str) -> Option<&'a str> {
     None
 }
 
-fn node_text_as_str<'a>(node: Node, source: &'a str) -> Option<&'a str> {
-    let start = node.start_byte();
-    let end = node.end_byte();
-    if start < end && end <= source.len() {
-        Some(&source[start..end])
-    } else {
-        None
-    }
-}
-
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn extract_call_edges(
     node: Node,
     source: &str,
     file_path: &str,
     caller_id: &StableId,
     graph: &mut CirGraph,
+    node_counter: &mut u64,
     edge_counter: &mut u64,
     call_depth: u32,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     let kind = node.kind();
     if kind == "call_expression"
@@ -334,20 +345,56 @@ fn extract_call_edges(
                         traced_hops: vec![],
                     }
                 };
+
+                // Emit a single declaration->declaration edge for the return-boundary
+                // check (no slot). This preserves the existing codomain comparison.
                 graph.add_edge(CirEdge {
                     id: StableId::new(format!("jl:edge:{}", *edge_counter)),
                     source: caller_id.clone(),
-                    target: callee_id,
+                    target: callee_id.clone(),
                     resolution: EffectResolution::Propagated,
                     unwrap_evidence: None,
-                    provenance,
-                    span,
+                    provenance: provenance.clone(),
+                    span: span.clone(),
                     discard_spans: vec![],
                     trust_provenance: TrustProvenance::default(),
                     slot: None,
                     arg_shape: None,
                 });
                 *edge_counter += 1;
+
+                // Emit expression->declaration edges for each argument with a known
+                // shape. In Julia, arguments start at index 1 (after the function at index 0).
+                let mut arg_cursor = node.walk();
+                let arg_nodes: Vec<Node> = node.children(&mut arg_cursor).collect();
+                // arg_nodes[0] = function, arg_nodes[1..] = arguments
+                for (i, arg) in arg_nodes.iter().enumerate().skip(1) {
+                    if let Some(shape) = extract_expr_shape(*arg, source, graph) {
+                        let expr_id = emit_expression_node(
+                            shape,
+                            *arg,
+                            source,
+                            file_path,
+                            graph,
+                            node_counter,
+                            caller_id,
+                        );
+                        graph.add_edge(CirEdge {
+                            id: StableId::new(format!("jl:edge:expr_{}", *edge_counter)),
+                            source: expr_id,
+                            target: callee_id.clone(),
+                            resolution: EffectResolution::Propagated,
+                            unwrap_evidence: None,
+                            provenance: provenance.clone(),
+                            span: node_span(*arg, file_path),
+                            discard_spans: vec![],
+                            trust_provenance: TrustProvenance::default(),
+                            slot: Some(i as u32 - 1),
+                            arg_shape: None,
+                        });
+                        *edge_counter += 1;
+                    }
+                }
             }
         }
         let mut c = node.walk();
@@ -358,8 +405,10 @@ fn extract_call_edges(
                 file_path,
                 caller_id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth + 1,
+                local_shapes,
             );
         }
     } else {
@@ -371,10 +420,83 @@ fn extract_call_edges(
                 file_path,
                 caller_id,
                 graph,
+                node_counter,
                 edge_counter,
                 call_depth,
+                local_shapes,
             );
         }
+    }
+}
+
+/// Emit an expression node for an intermediate expression value.
+fn emit_expression_node(
+    shape: Shape,
+    node: Node,
+    _source: &str,
+    file_path: &str,
+    graph: &mut CirGraph,
+    node_counter: &mut u64,
+    containing_fn: &StableId,
+) -> StableId {
+    let id = StableId::new(format!(
+        "jl:expr:{}:{:?}:{}",
+        file_path,
+        node.id(),
+        *node_counter
+    ));
+    let expr_node = CirNode {
+        id: id.clone(),
+        domain: shape.clone(),
+        codomain: shape,
+        effect: EffectChannel::Plain,
+        span: node_span(node, file_path),
+        name: None,
+        trust_provenance: TrustProvenance::default(),
+        is_test: false,
+        kind: NodeKind::Expression,
+        containing_function: Some(containing_fn.clone()),
+    };
+    graph.add_node(expr_node);
+    *node_counter += 1;
+    id
+}
+
+/// Infer the shape of a Julia expression from a tree-sitter AST node.
+fn extract_expr_shape(node: Node, source: &str, graph: &CirGraph) -> Option<Shape> {
+    match node.kind() {
+        // Integer literal -> Scalar(Int)
+        "integer_literal" => Some(Shape::Scalar(ScalarKind::Int)),
+        // Float literal -> Scalar(Float)
+        "float_literal" => Some(Shape::Scalar(ScalarKind::Float)),
+        // String literal -> Scalar(String)
+        "string_literal" | "command_string" | "triple_string_literal" => {
+            Some(Shape::Scalar(ScalarKind::String))
+        }
+        // Boolean literal -> Scalar(Bool)
+        "true" => Some(Shape::Scalar(ScalarKind::Bool)),
+        "false" => Some(Shape::Scalar(ScalarKind::Bool)),
+        // Nothing literal -> Scalar(Unit)
+        "nothing_literal" => Some(Shape::Scalar(ScalarKind::Unit)),
+        // Char literal -> Scalar(Char)
+        "char_literal" => Some(Shape::Scalar(ScalarKind::Char)),
+        // Call expression: use the callee's codomain if resolvable
+        "call_expression" | "broadcast_call_expression" => {
+            if let Some(func) = node.child(0) {
+                if let Some(name) = node_text(func, source) {
+                    let callee_id = StableId::new(format!("jl:{}:{}", graph.source_file, name));
+                    if let Some(callee_node) = graph.node_by_id(&callee_id) {
+                        return Some(callee_node.codomain.clone());
+                    }
+                }
+            }
+            None
+        }
+        // Identifier reference: check if tracked via local_shapes
+        // (local_shapes not available here — caller handles this)
+        "identifier" => None,
+        // Everything else: opaque
+        _ => None,
     }
 }
 
@@ -449,6 +571,16 @@ fn node_text(node: Node, source: &str) -> Option<String> {
     let end = node.end_byte();
     if start < end && end <= source.len() {
         Some(source[start..end].to_string())
+    } else {
+        None
+    }
+}
+
+fn node_text_as_str<'a>(node: Node, source: &'a str) -> Option<&'a str> {
+    let start = node.start_byte();
+    let end = node.end_byte();
+    if start < end && end <= source.len() {
+        Some(&source[start..end])
     } else {
         None
     }
