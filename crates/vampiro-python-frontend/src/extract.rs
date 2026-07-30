@@ -2,11 +2,12 @@
 //!
 //! Walks the tree-sitter CST and emits CIR nodes, edges, shapes, and effects.
 
+use std::collections::HashMap;
 use std::path::Path;
 use tree_sitter::Node;
-use vampiro_cir::{NodeKind, ScalarKind, 
-    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
-    StableId, TrustProvenance,
+use vampiro_cir::{
+    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, NodeKind, Provenance, ScalarKind,
+    Shape, SourceSpan, StableId, TrustProvenance,
 };
 
 /// Extract a CIR graph from a tree-sitter parsed Python module.
@@ -27,6 +28,7 @@ pub fn extract_graph(root: Node, source: &str, path: &Path) -> CirGraph {
             &mut node_counter,
             &mut edge_counter,
             0,
+            &mut HashMap::new(),
         );
     }
 
@@ -34,6 +36,7 @@ pub fn extract_graph(root: Node, source: &str, path: &Path) -> CirGraph {
 }
 
 /// Process a single tree-sitter node, recursively extracting CIR nodes and edges.
+#[allow(clippy::too_many_arguments)]
 fn process_node(
     node: Node,
     source: &str,
@@ -42,6 +45,7 @@ fn process_node(
     node_counter: &mut u64,
     edge_counter: &mut u64,
     call_depth: u32,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     match node.kind() {
         "function_definition" => {
@@ -58,6 +62,7 @@ fn process_node(
                 call_depth,
                 is_async,
                 None,
+                local_shapes,
             );
         }
         "decorated_definition" => {
@@ -79,6 +84,7 @@ fn process_node(
                         call_depth,
                         is_async,
                         None,
+                        local_shapes,
                     );
                 } else if child.kind() == "class_definition" {
                     let _ = process_class_definition(
@@ -89,6 +95,7 @@ fn process_node(
                         node_counter,
                         edge_counter,
                         call_depth,
+                        local_shapes,
                     );
                 }
             }
@@ -102,6 +109,7 @@ fn process_node(
                 node_counter,
                 edge_counter,
                 call_depth,
+                local_shapes,
             );
         }
         "lambda" => {
@@ -118,6 +126,7 @@ fn process_node(
                     node_counter,
                     edge_counter,
                     call_depth,
+                    local_shapes,
                 );
             }
         }
@@ -132,6 +141,7 @@ fn process_node(
                     node_counter,
                     edge_counter,
                     call_depth,
+                    local_shapes,
                 );
             }
         }
@@ -207,6 +217,7 @@ fn process_function_definition(
     call_depth: u32,
     is_async: bool,
     class_name: Option<&str>,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     let name = node
         .child_by_field_name("name")
@@ -254,10 +265,13 @@ fn process_function_definition(
             graph,
             edge_counter,
             call_depth + 1,
+            local_shapes,
+            node_counter,
         );
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 /// Process a class definition node, extracting a CIR node and its methods.
 fn process_class_definition(
     node: Node,
@@ -267,6 +281,7 @@ fn process_class_definition(
     node_counter: &mut u64,
     edge_counter: &mut u64,
     call_depth: u32,
+    local_shapes: &mut HashMap<String, Shape>,
 ) -> Option<StableId> {
     let name = node
         .child_by_field_name("name")
@@ -313,6 +328,7 @@ fn process_class_definition(
                         call_depth,
                         is_async,
                         Some(&cls_name),
+                        local_shapes,
                     );
                 }
                 "decorated_definition" => {
@@ -331,6 +347,7 @@ fn process_class_definition(
                                 call_depth,
                                 is_async,
                                 Some(&cls_name),
+                                local_shapes,
                             );
                         }
                     }
@@ -344,6 +361,8 @@ fn process_class_definition(
                         graph,
                         edge_counter,
                         call_depth + 1,
+                        local_shapes,
+                        node_counter,
                     );
                 }
             }
@@ -354,6 +373,7 @@ fn process_class_definition(
 }
 
 /// Process a body node, extracting call edges.
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn process_body_for_calls(
     node: Node,
     source: &str,
@@ -362,23 +382,63 @@ fn process_body_for_calls(
     graph: &mut CirGraph,
     edge_counter: &mut u64,
     call_depth: u32,
+    local_shapes: &mut HashMap<String, Shape>,
+    node_counter: &mut u64,
 ) {
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        process_call_expression(
-            child,
-            source,
-            file_path,
-            caller_id,
-            graph,
-            edge_counter,
-            call_depth,
-        );
+        match child.kind() {
+            "expression_statement" => {
+                // Check for assignment expressions: x = expr
+                let mut child_cursor = child.walk();
+                for expr_child in child.children(&mut child_cursor) {
+                    if expr_child.kind() == "assignment" {
+                        process_assignment(
+                            expr_child,
+                            source,
+                            file_path,
+                            caller_id,
+                            graph,
+                            edge_counter,
+                            call_depth,
+                            local_shapes,
+                            node_counter,
+                        );
+                    } else {
+                        process_call_expression(
+                            expr_child,
+                            source,
+                            file_path,
+                            caller_id,
+                            graph,
+                            node_counter,
+                            edge_counter,
+                            call_depth,
+                            local_shapes,
+                        );
+                    }
+                }
+            }
+            _ => {
+                process_call_expression(
+                    child,
+                    source,
+                    file_path,
+                    caller_id,
+                    graph,
+                    node_counter,
+                    edge_counter,
+                    call_depth,
+                    local_shapes,
+                );
+            }
+        }
     }
 }
 
-/// Process a call expression, extracting a CIR edge.
-fn process_call_expression(
+/// Process an assignment expression `x = expr` to track local variable shapes.
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
+fn process_assignment(
     node: Node,
     source: &str,
     file_path: &str,
@@ -386,6 +446,62 @@ fn process_call_expression(
     graph: &mut CirGraph,
     edge_counter: &mut u64,
     call_depth: u32,
+    local_shapes: &mut HashMap<String, Shape>,
+    node_counter: &mut u64,
+) {
+    // Check for simple `x = expr` pattern
+    if let Some(left) = node.child_by_field_name("left") {
+        if let Some(right) = node.child_by_field_name("right") {
+            if left.kind() == "identifier" {
+                if let Some(var_name) = node_text(left, source) {
+                    // Infer the shape of the right-hand side
+                    if let Some(shape) = extract_expr_shape(right, source, graph) {
+                        local_shapes.insert(var_name, shape);
+                    }
+                }
+            }
+
+            // Process call expressions in the right-hand side
+            process_call_expression(
+                right,
+                source,
+                file_path,
+                caller_id,
+                graph,
+                node_counter,
+                edge_counter,
+                call_depth,
+                local_shapes,
+            );
+
+            // Process call expressions in the left-hand side (e.g., obj.attr = val)
+            process_call_expression(
+                left,
+                source,
+                file_path,
+                caller_id,
+                graph,
+                node_counter,
+                edge_counter,
+                call_depth,
+                local_shapes,
+            );
+        }
+    }
+}
+
+/// Process a call expression, extracting a CIR edge with per-slot data-flow.
+#[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
+fn process_call_expression(
+    node: Node,
+    source: &str,
+    file_path: &str,
+    caller_id: &StableId,
+    graph: &mut CirGraph,
+    node_counter: &mut u64,
+    edge_counter: &mut u64,
+    call_depth: u32,
+    local_shapes: &mut HashMap<String, Shape>,
 ) {
     match node.kind() {
         "call" => {
@@ -411,14 +527,16 @@ fn process_call_expression(
                         }
                     };
 
+                    // Emit a single declaration->declaration edge for the return-boundary
+                    // check (no slot). This preserves the existing codomain comparison.
                     let edge = CirEdge {
                         id: StableId::new(format!("py:edge:{}", *edge_counter)),
                         source: caller_id.clone(),
-                        target: callee_id,
+                        target: callee_id.clone(),
                         resolution: EffectResolution::Propagated,
                         unwrap_evidence: None,
-                        provenance,
-                        span,
+                        provenance: provenance.clone(),
+                        span: span.clone(),
                         discard_spans: vec![],
                         trust_provenance: TrustProvenance::default(),
                         slot: None,
@@ -427,23 +545,62 @@ fn process_call_expression(
 
                     graph.add_edge(edge);
                     *edge_counter += 1;
-                }
-            }
 
-            // Recurse into arguments for nested calls
-            let arguments = node.child_by_field_name("arguments");
-            if let Some(args) = arguments {
-                let mut cursor = args.walk();
-                for arg in args.children(&mut cursor) {
-                    process_call_expression(
-                        arg,
-                        source,
-                        file_path,
-                        caller_id,
-                        graph,
-                        edge_counter,
-                        call_depth + 1,
-                    );
+                    // Emit expression->declaration edges for each argument with a known
+                    // shape. These are the data-flow edges: the composition analyzer
+                    // compares the expression's shape against the callee's domain slot.
+                    let arguments = node.child_by_field_name("arguments");
+                    if let Some(args) = arguments {
+                        let mut arg_cursor = args.walk();
+                        let arg_nodes: Vec<Node> = args.children(&mut arg_cursor).collect();
+                        for (i, arg) in arg_nodes.iter().enumerate() {
+                            if let Some(shape) = extract_expr_shape(*arg, source, graph) {
+                                let expr_id = emit_expression_node(
+                                    shape,
+                                    *arg,
+                                    source,
+                                    file_path,
+                                    graph,
+                                    node_counter,
+                                    caller_id,
+                                );
+                                let expr_edge = CirEdge {
+                                    id: StableId::new(format!("py:edge:expr_{}", *edge_counter)),
+                                    source: expr_id,
+                                    target: callee_id.clone(),
+                                    resolution: EffectResolution::Propagated,
+                                    unwrap_evidence: None,
+                                    provenance: provenance.clone(),
+                                    span: node_span(*arg, file_path),
+                                    discard_spans: vec![],
+                                    trust_provenance: TrustProvenance::default(),
+                                    slot: Some(i as u32),
+                                    arg_shape: None,
+                                };
+                                graph.add_edge(expr_edge);
+                                *edge_counter += 1;
+                            }
+                        }
+                    }
+                }
+
+                // Recurse into arguments for nested calls
+                let arguments = node.child_by_field_name("arguments");
+                if let Some(args) = arguments {
+                    let mut cursor = args.walk();
+                    for arg in args.children(&mut cursor) {
+                        process_call_expression(
+                            arg,
+                            source,
+                            file_path,
+                            caller_id,
+                            graph,
+                            node_counter,
+                            edge_counter,
+                            call_depth + 1,
+                            local_shapes,
+                        );
+                    }
                 }
             }
         }
@@ -456,8 +613,10 @@ fn process_call_expression(
                     file_path,
                     caller_id,
                     graph,
+                    node_counter,
                     edge_counter,
                     call_depth,
+                    local_shapes,
                 );
             }
         }
@@ -470,8 +629,10 @@ fn process_call_expression(
                     file_path,
                     caller_id,
                     graph,
+                    node_counter,
                     edge_counter,
                     call_depth,
+                    local_shapes,
                 );
             }
         }
@@ -484,11 +645,79 @@ fn process_call_expression(
                     file_path,
                     caller_id,
                     graph,
+                    node_counter,
                     edge_counter,
                     call_depth,
+                    local_shapes,
                 );
             }
         }
+    }
+}
+
+/// Emit an expression node for an intermediate expression value.
+///
+/// Creates a `CirNode` with `kind: Expression`, domain=codomain=shape,
+/// and `containing_function` set to the given declaration ID.
+fn emit_expression_node(
+    shape: Shape,
+    node: Node,
+    _source: &str,
+    file_path: &str,
+    graph: &mut CirGraph,
+    node_counter: &mut u64,
+    containing_fn: &StableId,
+) -> StableId {
+    let id = StableId::new(format!("py:expr:{}:{}", file_path, *node_counter));
+    let expr_node = CirNode {
+        id: id.clone(),
+        domain: shape.clone(),
+        codomain: shape,
+        effect: EffectChannel::Plain,
+        span: node_span(node, file_path),
+        name: None,
+        trust_provenance: TrustProvenance::default(),
+        is_test: false,
+        kind: NodeKind::Expression,
+        containing_function: Some(containing_fn.clone()),
+    };
+    graph.add_node(expr_node);
+    *node_counter += 1;
+    id
+}
+
+/// Infer the shape of a Python expression from a tree-sitter AST node.
+///
+/// Returns `None` when the shape cannot be determined statically.
+fn extract_expr_shape(node: Node, source: &str, graph: &CirGraph) -> Option<Shape> {
+    match node.kind() {
+        // Integer literal -> Scalar(Int)
+        "integer" => Some(Shape::Scalar(ScalarKind::Int)),
+        // Float literal -> Scalar(Float)
+        "float" => Some(Shape::Scalar(ScalarKind::Float)),
+        // String literal -> Scalar(String)
+        "string" | "string_content" => Some(Shape::Scalar(ScalarKind::String)),
+        // Boolean literal -> Scalar(Bool)
+        "true" => Some(Shape::Scalar(ScalarKind::Bool)),
+        "false" => Some(Shape::Scalar(ScalarKind::Bool)),
+        // None literal -> Scalar(Unit)
+        "none" => Some(Shape::Scalar(ScalarKind::Unit)),
+        // Call expression: use the callee's codomain if resolvable
+        "call" => {
+            let function = node.child_by_field_name("function");
+            if let Some(func_node) = function {
+                let callee_name = extract_call_name(func_node, source);
+                let callee_id = StableId::new(format!("py:{}:{}", graph.source_file, callee_name));
+                if let Some(callee_node) = graph.node_by_id(&callee_id) {
+                    return Some(callee_node.codomain.clone());
+                }
+            }
+            None
+        }
+        // Identifier reference: not resolved here (caller handles via local_shapes)
+        "identifier" => None,
+        // Everything else: opaque
+        _ => None,
     }
 }
 
@@ -613,7 +842,10 @@ fn extract_domain_shape(node: Node, source: &str) -> Shape {
     }
 
     if fields.len() <= 1 {
-        fields.into_iter().next().unwrap_or(Shape::Scalar(ScalarKind::Unit))
+        fields
+            .into_iter()
+            .next()
+            .unwrap_or(Shape::Scalar(ScalarKind::Unit))
     } else {
         Shape::Record(fields)
     }
@@ -663,9 +895,7 @@ fn type_hint_to_shape(node: Node, source: &str) -> Shape {
                                 Shape::Scalar(ScalarKind::Unit)
                             }
                         }
-                        "bytes" | "None" | "Any" => {
-                            Shape::Scalar(ScalarKind::Unit)
-                        }
+                        "bytes" | "None" | "Any" => Shape::Scalar(ScalarKind::Unit),
                         "list" | "set" | "frozenset" => {
                             if children.len() > 1 {
                                 let inner = &children[1];
@@ -694,7 +924,10 @@ fn type_hint_to_shape(node: Node, source: &str) -> Shape {
                                 };
                                 Shape::Record(vec![k_shape, v_shape])
                             } else {
-                                Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)])
+                                Shape::Record(vec![
+                                    Shape::Scalar(ScalarKind::Unit),
+                                    Shape::Scalar(ScalarKind::Unit),
+                                ])
                             }
                         }
                         "tuple" => {
@@ -712,7 +945,7 @@ fn type_hint_to_shape(node: Node, source: &str) -> Shape {
                             } else {
                                 Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
                             }
-                        },
+                        }
                         "Optional" => {
                             if children.len() > 1 {
                                 let inner = &children[1];
