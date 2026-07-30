@@ -1,0 +1,1 @@
+Completed vampiro-uah: data-flow edges in CIR + Rust frontend + composition analyzer. Expression nodes now emitted for call arguments; composition analyzer uses expression-source edges for precise slot/domain comparison instead of noisy return-boundary check. Added local_shapes tracking for let-binding resolution.

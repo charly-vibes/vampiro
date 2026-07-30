@@ -3,7 +3,7 @@
 //! Constructs a CIR graph with multiple branches feeding a consumer node with
 //! mismatched codomain shapes (REQ-11, REQ-C7).
 
-use vampiro_cir::{ScalarKind, 
+use vampiro_cir::{NodeKind, ScalarKind, 
     CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
     StableId,
 };
@@ -33,6 +33,8 @@ fn node(id: &str, domain: Shape, codomain: Shape, line: usize) -> CirNode {
         name: Some(id.into()),
         trust_provenance: Default::default(),
         is_test: false,
+        kind: NodeKind::Declaration,
+        containing_function: None,
     }
 }
 

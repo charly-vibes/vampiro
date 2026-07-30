@@ -7,7 +7,7 @@
 
 use std::path::Path;
 use tree_sitter::Node;
-use vampiro_cir::{ScalarKind, 
+use vampiro_cir::{NodeKind, ScalarKind, 
     CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
     StableId, TrustProvenance,
 };
@@ -93,6 +93,8 @@ fn process_form(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -156,6 +158,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -187,6 +191,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -217,6 +223,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -249,6 +257,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -284,6 +294,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -319,6 +331,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -348,6 +362,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -378,6 +394,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);
@@ -410,6 +428,8 @@ fn process_list_lit(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             };
 
             graph.add_node(cir_node);

@@ -13,6 +13,18 @@ pub enum CirError {
     EffectDepthExceeded { max_depth: u32, observed: u32 },
     /// A shape exceeds the maximum allowed nesting depth.
     ShapeDepthExceeded { max_depth: u32, observed: u32 },
+    /// An expression node violates the invariant (domain != codomain or
+    /// effect != Plain).
+    ExpressionInvariant {
+        node_id: String,
+        detail: String,
+    },
+    /// An expression node's `containing_function` references a node that
+    /// does not exist or is not a Declaration.
+    OrphanedExpression {
+        node_id: String,
+        containing_id: String,
+    },
     /// Deserialization of CIR data failed.
     Deserialization(String),
     /// Extraction by a frontend failed.
@@ -60,6 +72,21 @@ impl std::fmt::Display for CirError {
                 observed,
             } => {
                 write!(f, "shape depth {observed} exceeds maximum {max_depth}")
+            }
+            CirError::ExpressionInvariant { node_id, detail } => {
+                write!(
+                    f,
+                    "expression node `{node_id}` violates invariant: {detail}"
+                )
+            }
+            CirError::OrphanedExpression {
+                node_id,
+                containing_id,
+            } => {
+                write!(
+                    f,
+                    "expression node `{node_id}` references missing or non-declaration node `{containing_id}`"
+                )
             }
             CirError::Deserialization(msg) => {
                 write!(f, "CIR deserialization error: {msg}")
@@ -164,5 +191,27 @@ mod tests {
         };
         assert!(err.to_string().contains("abc123"));
         assert!(err.to_string().contains("duplicate"));
+    }
+
+    #[test]
+    fn cir_error_expression_invariant_display() {
+        let err = CirError::ExpressionInvariant {
+            node_id: "expr-1".into(),
+            detail: "domain != codomain".into(),
+        };
+        let s = err.to_string();
+        assert!(s.contains("expr-1"));
+        assert!(s.contains("domain != codomain"));
+    }
+
+    #[test]
+    fn cir_error_orphaned_expression_display() {
+        let err = CirError::OrphanedExpression {
+            node_id: "expr-2".into(),
+            containing_id: "fn-missing".into(),
+        };
+        let s = err.to_string();
+        assert!(s.contains("expr-2"));
+        assert!(s.contains("fn-missing"));
     }
 }

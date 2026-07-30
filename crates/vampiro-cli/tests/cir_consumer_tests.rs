@@ -7,7 +7,7 @@
 /// 3. Produce findings using the CLI finding contract
 /// 4. Load configuration using the CLI config contract
 use std::path::PathBuf;
-use vampiro_cir::{ScalarKind, 
+use vampiro_cir::{NodeKind, ScalarKind, 
     CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, Provenance,
     Shape, SourceSpan,
 };
@@ -39,6 +39,8 @@ impl Frontend for ConsumerTestFrontend {
             name: Some("main".into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
         graph.add_node(node);
         Ok(graph)
@@ -65,6 +67,8 @@ fn consumer_imports_cir_and_constructs_graph() {
         name: Some("caller".into()),
         trust_provenance: Default::default(),
         is_test: false,
+        kind: NodeKind::Declaration,
+        containing_function: None,
     };
     let callee = CirNode {
         id: "callee".into(),
@@ -81,6 +85,8 @@ fn consumer_imports_cir_and_constructs_graph() {
         name: Some("callee".into()),
         trust_provenance: Default::default(),
         is_test: false,
+        kind: NodeKind::Declaration,
+        containing_function: None,
     };
     let edge = CirEdge {
         id: "call-1".into(),
@@ -106,7 +112,7 @@ fn consumer_imports_cir_and_constructs_graph() {
     graph.add_node(callee);
     graph.add_edge(edge);
 
-    assert_eq!(graph.version, "0.2.1");
+    assert_eq!(graph.version, "0.3.0");
     assert_eq!(graph.nodes.len(), 2);
     assert_eq!(graph.edges.len(), 1);
 }
@@ -131,6 +137,8 @@ fn consumer_validates_graph() {
         name: None,
         trust_provenance: Default::default(),
         is_test: false,
+        kind: NodeKind::Declaration,
+        containing_function: None,
     };
     graph.add_node(node);
 
@@ -158,6 +166,8 @@ fn consumer_detects_invalid_graph() {
         name: None,
         trust_provenance: Default::default(),
         is_test: false,
+        kind: NodeKind::Declaration,
+        containing_function: None,
     };
     let edge = CirEdge {
         id: "e1".into(),
@@ -262,6 +272,8 @@ fn consumer_round_trips_cir_via_json() {
         name: Some("consumer_fn".into()),
         trust_provenance: Default::default(),
         is_test: false,
+        kind: NodeKind::Declaration,
+        containing_function: None,
     };
     graph.add_node(node);
 
@@ -281,7 +293,7 @@ fn consumer_round_trips_cir_via_json() {
 fn consumer_from_json_validates() {
     // A consumer should be able to use from_json which validates on deserialization.
     let json = r#"{
-        "version": "0.2.1",
+        "version": "0.3.0",
         "source_file": "test.rs",
         "nodes": [
             {

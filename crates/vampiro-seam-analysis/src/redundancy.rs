@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use vampiro_cir::{CirGraph, Shape};
+use vampiro_cir::{CirGraph, NodeKind, Shape};
 
 use crate::finding::Finding;
 
@@ -71,6 +71,16 @@ impl RedundancyAnalyzer {
                 if unique_sources.contains_key(src_id) {
                     continue; // Skip duplicate edges from the same source.
                 }
+
+                // Skip expression-source edges — these are data-flow edges,
+                // not branching edges. Only declaration→declaration edges
+                // represent true branches (vampiro-uah).
+                if let Some(src_node) = graph.node_by_id(&edge.source) {
+                    if src_node.kind == NodeKind::Expression {
+                        continue;
+                    }
+                }
+
                 unique_sources.insert(src_id, edge);
 
                 if let Some(src_node) = graph.node_by_id(&edge.source) {
@@ -169,6 +179,7 @@ impl RedundancyAnalyzer {
 mod tests {
     use vampiro_cir::ScalarKind;
     use super::*;
+    use vampiro_cir::NodeKind;
     use vampiro_cir::{
         CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, SourceSpan,
         StableId,
@@ -198,6 +209,8 @@ mod tests {
             name: Some(id.into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         }
     }
 

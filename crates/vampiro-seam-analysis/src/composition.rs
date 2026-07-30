@@ -20,7 +20,7 @@
 //! [`Shape::normalize`](vampiro_cir::Shape)d shapes per the approved
 //! canonicalization contract.
 
-use vampiro_cir::{CirGraph, ScalarKind, Shape, Totality, UnwrapKind};
+use vampiro_cir::{CirGraph, NodeKind, ScalarKind, Shape, Totality, UnwrapKind};
 
 use crate::finding::Finding;
 
@@ -202,67 +202,110 @@ impl CompositionAnalyzer {
             let Some(callee) = graph.node_by_id(&edge.target) else {
                 continue;
             };
-            let Some(caller) = graph.node_by_id(&edge.source) else {
+            let Some(source) = graph.node_by_id(&edge.source) else {
                 continue;
             };
 
-            // --- Return-boundary check (unchanged) ---
-            //
-            // Skip edges where the caller has a void/unit return type
-            // (Scalar as the unit type). There's no composition contract at
-            // the return boundary for void-returning functions, and the
-            // coarse Shape model already cannot distinguish different scalar
-            // types (u32, f64, bool are all `Scalar`), so this guard loses
-            // no precision while eliminating noise from unrelated call edges.
-            if caller.codomain != Shape::Scalar(ScalarKind::Unit) {
-                // For edges with Ordinary+Total unwrap evidence (e.g., `?`
-                // operator on Result/Option), the callee's effect wrapper is
-                // removed at the call site. Compare the unwrapped shape (the
-                // inner type parameter) instead of the full effect-wrapped
-                // codomain (vampiro-0j8).
-                let callee_shape = if let Some(ref ue) = edge.unwrap_evidence {
-                    if ue.kind == UnwrapKind::Ordinary && ue.totality == Totality::Total {
-                        unwrap_outer_effect(&callee.codomain).unwrap_or(&callee.codomain)
-                    } else {
-                        &callee.codomain
+            match source.kind {
+                NodeKind::Expression => {
+                    // --- Data-flow check (vampiro-uah) ---
+                    //
+                    // Expression-source edges represent data flowing from an
+                    // intermediate expression into a callee parameter. Compare
+                    // the expression's shape (source.codomain) against the
+                    // callee's expected domain at the edge's slot.
+                    //
+                    // This is the precise comparison that replaces the noisy
+                    // return-boundary check for argument-level data flow.
+                    if let Some(slot) = edge.slot {
+                        if let Some(expected) = callee.domain.domain_slot(slot) {
+                            if !matches!(expected, Shape::Opaque) {
+                                let value_shape = &source.codomain;
+                                match unify_shapes(value_shape, expected) {
+                                    Unification::Match | Unification::OpaqueExcluded => {}
+                                    Unification::Mismatch { .. } => {
+                                        findings.push(Finding::slot_mismatch(
+                                            edge.span.file.clone().into(),
+                                            edge.span.start_line..=edge.span.end_line,
+                                            slot,
+                                            expected.clone(),
+                                            value_shape.clone(),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
                     }
-                } else {
-                    &callee.codomain
-                };
-                let unification = unify_shapes(callee_shape, &caller.codomain);
-                if let Unification::Mismatch { unhandled } = unification {
-                    findings.push(Finding::composition_mismatch(
-                        edge.span.file.clone().into(),
-                        edge.span.start_line..=edge.span.end_line,
-                        caller.codomain.clone(),
-                        callee.codomain.clone(),
-                        unhandled,
-                    ));
                 }
-            }
+                NodeKind::Declaration => {
+                    // --- Return-boundary check ---
+                    //
+                    // Skip edges where the caller has a void/unit return type
+                    // (Scalar as the unit type). There's no composition
+                    // contract at the return boundary for void-returning
+                    // functions, and the coarse Shape model already cannot
+                    // distinguish different scalar types (u32, f64, bool are
+                    // all `Scalar`), so this guard loses no precision while
+                    // eliminating noise from unrelated call edges.
+                    if source.codomain != Shape::Scalar(ScalarKind::Unit) {
+                        // For edges with Ordinary+Total unwrap evidence
+                        // (e.g., `?` operator on Result/Option), the callee's
+                        // effect wrapper is removed at the call site. Compare
+                        // the unwrapped shape (the inner type parameter)
+                        // instead of the full effect-wrapped codomain
+                        // (vampiro-0j8).
+                        let callee_shape = if let Some(ref ue) = edge.unwrap_evidence {
+                            if ue.kind == UnwrapKind::Ordinary
+                                && ue.totality == Totality::Total
+                            {
+                                unwrap_outer_effect(&callee.codomain)
+                                    .unwrap_or(&callee.codomain)
+                            } else {
+                                &callee.codomain
+                            }
+                        } else {
+                            &callee.codomain
+                        };
+                        let unification = unify_shapes(callee_shape, &source.codomain);
+                        if let Unification::Mismatch { unhandled } = unification {
+                            findings.push(Finding::composition_mismatch(
+                                edge.span.file.clone().into(),
+                                edge.span.start_line..=edge.span.end_line,
+                                source.codomain.clone(),
+                                callee.codomain.clone(),
+                                unhandled,
+                            ));
+                        }
+                    }
 
-            // --- Slot-boundary check ---
-            //
-            // For edges with a known slot, compare the argument value shape
-            // (computed by the frontend from the argument expression) against
-            // the callee's expected domain at that slot. Only fires when the
-            // frontend could statically determine the argument's shape.
-            // When arg_shape is None (unknown), we skip without firing to
-            // avoid false positives from comparing unrelated types.
-            if let Some(slot) = edge.slot {
-                if let Some(expected) = callee.domain.domain_slot(slot) {
-                    if !matches!(expected, Shape::Opaque) {
-                        if let Some(ref value_shape) = edge.arg_shape {
-                            match unify_shapes(value_shape, expected) {
-                                Unification::Match | Unification::OpaqueExcluded => {}
-                                Unification::Mismatch { .. } => {
-                                    findings.push(Finding::slot_mismatch(
-                                        edge.span.file.clone().into(),
-                                        edge.span.start_line..=edge.span.end_line,
-                                        slot,
-                                        expected.clone(),
-                                        value_shape.clone(),
-                                    ));
+                    // --- Slot-boundary check (backward compat) ---
+                    //
+                    // For edges with a known slot, compare the argument value
+                    // shape (computed by the frontend from the argument
+                    // expression) against the callee's expected domain at that
+                    // slot. Only fires when the frontend could statically
+                    // determine the argument's shape via `arg_shape`.
+                    //
+                    // This is the legacy path for graphs serialized before
+                    // data-flow nodes were introduced. New graphs use
+                    // expression-source edges instead.
+                    if let Some(slot) = edge.slot {
+                        if let Some(expected) = callee.domain.domain_slot(slot) {
+                            if !matches!(expected, Shape::Opaque) {
+                                if let Some(ref value_shape) = edge.arg_shape {
+                                    match unify_shapes(value_shape, expected) {
+                                        Unification::Match
+                                        | Unification::OpaqueExcluded => {}
+                                        Unification::Mismatch { .. } => {
+                                            findings.push(Finding::slot_mismatch(
+                                                edge.span.file.clone().into(),
+                                                edge.span.start_line..=edge.span.end_line,
+                                                slot,
+                                                expected.clone(),
+                                                value_shape.clone(),
+                                            ));
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -407,6 +450,8 @@ mod tests {
             name: Some(id.into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         }
     }
 

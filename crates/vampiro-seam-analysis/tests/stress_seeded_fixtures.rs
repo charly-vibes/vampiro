@@ -31,7 +31,7 @@
 
 use std::path::{Path, PathBuf};
 
-use vampiro_cir::{ScalarKind, 
+use vampiro_cir::{NodeKind, ScalarKind, 
     BoundaryKind, CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, LatticeLevel,
     Provenance, Shape, SourceSpan, StableId, VisibilityFact, VisibilityFacts,
 };
@@ -66,6 +66,8 @@ fn node(id: &str, file: &str, line: usize, domain: Shape, codomain: Shape) -> Ci
         name: Some(id.into()),
         trust_provenance: Default::default(),
         is_test: false,
+        kind: NodeKind::Declaration,
+        containing_function: None,
     }
 }
 

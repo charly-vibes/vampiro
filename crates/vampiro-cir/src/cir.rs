@@ -6,10 +6,35 @@ use crate::provenance::{DiscardSpan, Provenance, SourceSpan, StableId};
 use crate::shape::Shape;
 use crate::TrustProvenance;
 
-/// A node in the Composition IR, representing a callable or declaration.
+/// The kind of a CIR node.
 ///
-/// Each node has a domain shape, codomain shape, and effect channel.
-/// Nodes carry a stable identity and source span for traceability.
+/// Distinguishes top-level declarations (functions, closures) from
+/// intermediate expressions (argument values flowing through call sites).
+/// The composition analyzer uses the kind to decide which comparison to run:
+/// declaration-source edges run the return-boundary check while
+/// expression-source edges run the data-flow (slot/domain) check.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub enum NodeKind {
+    /// A callable declaration (function, closure, method).
+    #[default]
+    Declaration,
+    /// An intermediate expression (e.g., an argument at a call site).
+    ///
+    /// For expression nodes, `domain` and `codomain` are both set to the
+    /// expression's inferred shape. The `effect` field is always `Plain`.
+    Expression,
+}
+
+/// A node in the Composition IR.
+///
+/// Nodes represent either callable declarations (functions, closures) or
+/// intermediate expressions (argument values). The node kind determines how
+/// the composition analyzer processes edges sourced from this node.
+///
+/// Declaration nodes carry domain/codomain/effect describing the callable's
+/// signature. Expression nodes carry domain=codomain=the expression's shape
+/// and are linked back to their containing declaration via
+/// `containing_function`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CirNode {
     /// Stable identity for this node.
@@ -22,7 +47,7 @@ pub struct CirNode {
     pub effect: EffectChannel,
     /// Source span in the original file.
     pub span: SourceSpan,
-    /// Optional name of the declaration.
+    /// Optional name of the declaration or expression.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// Trust provenance for this node's output value.
@@ -39,6 +64,21 @@ pub struct CirNode {
     /// noise in standard analysis output.
     #[serde(default)]
     pub is_test: bool,
+    /// The kind of this node (declaration or expression).
+    ///
+    /// Defaults to `Declaration` for backward compatibility with graphs
+    /// serialized before this field was added.
+    #[serde(default)]
+    pub kind: NodeKind,
+    /// For expression nodes, the stable ID of the declaration this
+    /// expression belongs to. `None` for declaration nodes or when the
+    /// containing function is unknown.
+    ///
+    /// Used by the composition analyzer for cross-function data-flow seam
+    /// detection and chained data-flow analysis (e.g., tracing a value from
+    /// `parse_amount` through a variable binding into `apply_discount`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub containing_function: Option<StableId>,
 }
 
 /// An edge in the Composition IR, representing a call site.
@@ -126,7 +166,7 @@ impl CirGraph {
     /// Create a new empty CIR graph for the given source file.
     pub fn new(source_file: impl Into<String>) -> Self {
         CirGraph {
-            version: "0.2.1".into(),
+            version: "0.3.0".into(),
             source_file: source_file.into(),
             nodes: Vec::new(),
             edges: Vec::new(),
@@ -176,6 +216,9 @@ impl CirGraph {
     /// - All edge source/target references point to existing nodes.
     /// - All effect channels are within the maximum depth limit.
     /// - All shapes are within the maximum depth limit.
+    /// - Expression nodes have `domain == codomain` and `effect == Plain`.
+    /// - Expression nodes' `containing_function` references point to existing
+    ///   Declaration nodes.
     ///
     /// Returns `Ok(())` if all invariants hold, or the first error encountered.
     pub fn validate(&self) -> Result<(), CirError> {
@@ -186,6 +229,32 @@ impl CirGraph {
                 return Err(CirError::DuplicateNode {
                     id: node.id.to_string(),
                 });
+            }
+        }
+
+        // Validate expression-node invariants and containing_function.
+        for node in &self.nodes {
+            if node.kind == NodeKind::Expression {
+                if node.domain != node.codomain {
+                    return Err(CirError::ExpressionInvariant {
+                        node_id: node.id.to_string(),
+                        detail: "domain != codomain".into(),
+                    });
+                }
+                if node.effect != EffectChannel::Plain {
+                    return Err(CirError::ExpressionInvariant {
+                        node_id: node.id.to_string(),
+                        detail: "effect != Plain".into(),
+                    });
+                }
+                if let Some(ref containing_id) = node.containing_function {
+                    if !node_ids.contains(containing_id) {
+                        return Err(CirError::OrphanedExpression {
+                            node_id: node.id.to_string(),
+                            containing_id: containing_id.to_string(),
+                        });
+                    }
+                }
             }
         }
 
@@ -271,6 +340,33 @@ mod tests {
             name: Some(name.into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
+        }
+    }
+
+    fn make_expr_node(
+        id: &str,
+        shape: Shape,
+        containing_fn: &str,
+    ) -> CirNode {
+        CirNode {
+            id: StableId::new(id),
+            domain: shape.clone(),
+            codomain: shape,
+            effect: EffectChannel::Plain,
+            span: SourceSpan {
+                file: "test.rs".into(),
+                start_line: 1,
+                start_column: 1,
+                end_line: 1,
+                end_column: 10,
+            },
+            name: None,
+            trust_provenance: Default::default(),
+            is_test: false,
+            kind: NodeKind::Expression,
+            containing_function: Some(StableId::new(containing_fn)),
         }
     }
 
@@ -310,7 +406,7 @@ mod tests {
         let json = serde_json::to_string_pretty(&graph).unwrap();
         let deserialized: CirGraph = CirGraph::from_json(&json).unwrap();
 
-        assert_eq!(deserialized.version, "0.2.1");
+        assert_eq!(deserialized.version, "0.3.0");
         assert_eq!(deserialized.source_file, "src/lib.rs");
         assert_eq!(deserialized.nodes.len(), 2);
         assert_eq!(deserialized.edges.len(), 1);
@@ -352,6 +448,8 @@ mod tests {
             name: Some("risky_fn".into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
 
         let edge = CirEdge {
@@ -449,6 +547,8 @@ mod tests {
             name: Some("custom_fn".into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
 
         let edge = CirEdge {
@@ -552,6 +652,8 @@ mod tests {
             name: None,
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
         graph.add_node(node);
 
@@ -586,6 +688,8 @@ mod tests {
             name: None,
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
         graph.add_node(node);
 
@@ -600,7 +704,7 @@ mod tests {
     #[test]
     fn cir_graph_from_json_valid() {
         let json = r#"{
-            "version": "0.2.1",
+            "version": "0.3.0",
             "source_file": "test.rs",
             "nodes": [{
                 "id": "n1",
@@ -635,7 +739,7 @@ mod tests {
     #[test]
     fn cir_graph_from_json_invalid_missing_node() {
         let json = r#"{
-            "version": "0.2.1",
+            "version": "0.3.0",
             "source_file": "test.rs",
             "nodes": [],
             "edges": [{
@@ -725,5 +829,144 @@ mod tests {
             .collect();
         assert_eq!(e2_from_edges.len(), 1);
         assert_eq!(e2_from_edges[0].slot, None);
+    }
+
+    #[test]
+    fn expression_node_round_trip() {
+        // Verify that expression nodes round-trip through JSON with kind+containing_function.
+        let mut graph = CirGraph::new("test.rs");
+        let caller = make_node("caller", "caller_fn", Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit));
+        let expr = make_expr_node("expr-1", Shape::Scalar(ScalarKind::Int), "caller");
+        let callee = make_node("callee", "callee_fn", Shape::Scalar(ScalarKind::Int), Shape::Scalar(ScalarKind::Unit));
+
+        graph.add_node(caller);
+        graph.add_node(expr);
+        graph.add_node(callee);
+
+        // Edge from expression node to callee (data-flow edge)
+        graph.add_edge(CirEdge {
+            id: StableId::new("e1"),
+            source: StableId::new("expr-1"),
+            target: StableId::new("callee"),
+            resolution: EffectResolution::Propagated,
+            unwrap_evidence: None,
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "test.rs".into(),
+                start_line: 5,
+                start_column: 1,
+                end_line: 5,
+                end_column: 10,
+            },
+            discard_spans: vec![],
+            trust_provenance: Default::default(),
+            slot: Some(0),
+            arg_shape: None,
+        });
+
+        let json = serde_json::to_string_pretty(&graph).unwrap();
+        let deserialized: CirGraph = CirGraph::from_json(&json).unwrap();
+
+        assert_eq!(deserialized.nodes.len(), 3);
+        // Find the expression node
+        let expr_node = deserialized.node_by_id(&StableId::new("expr-1")).unwrap();
+        assert_eq!(expr_node.kind, NodeKind::Expression);
+        assert_eq!(expr_node.codomain, Shape::Scalar(ScalarKind::Int));
+        assert_eq!(expr_node.containing_function, Some(StableId::new("caller")));
+
+        // Edge source should be the expression node
+        let edge = &deserialized.edges[0];
+        assert_eq!(edge.source, StableId::new("expr-1"));
+        assert_eq!(edge.slot, Some(0));
+    }
+
+    #[test]
+    fn expression_node_backward_compat() {
+        // JSON without kind/containing_function should deserialize with
+        // defaults (kind=Declaration, containing_function=None).
+        let json = r#"{
+            "version": "0.3.0",
+            "source_file": "test.rs",
+            "nodes": [{
+                "id": "n1",
+                "domain": {"scalar": "unit"},
+                "codomain": {"scalar": "unit"},
+                "effect": "plain",
+                "span": { "file": "test.rs", "start_line": 1, "start_column": 1, "end_line": 1, "end_column": 1 }
+            }],
+            "edges": []
+        }"#;
+        let graph = CirGraph::from_json(json).unwrap();
+        assert_eq!(graph.nodes[0].kind, NodeKind::Declaration);
+        assert_eq!(graph.nodes[0].containing_function, None);
+    }
+
+    #[test]
+    fn expression_node_validate_domain_codomain_mismatch() {
+        // Expression node with domain != codomain should be rejected.
+        let mut graph = CirGraph::new("test.rs");
+        let mut node = make_expr_node("expr-1", Shape::Scalar(ScalarKind::Int), "caller");
+        node.codomain = Shape::Scalar(ScalarKind::String);
+        graph.add_node(node);
+        let result = graph.validate();
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CirError::ExpressionInvariant { node_id, detail } => {
+                assert_eq!(node_id, "expr-1");
+                assert_eq!(detail, "domain != codomain");
+            }
+            other => panic!("expected ExpressionInvariant, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn expression_node_validate_effect_not_plain() {
+        // Expression node with effect != Plain should be rejected.
+        let mut graph = CirGraph::new("test.rs");
+        let mut node = make_expr_node("expr-2", Shape::Scalar(ScalarKind::Int), "caller");
+        node.effect = EffectChannel::Result;
+        graph.add_node(node);
+        let result = graph.validate();
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CirError::ExpressionInvariant { node_id, detail } => {
+                assert_eq!(node_id, "expr-2");
+                assert_eq!(detail, "effect != Plain");
+            }
+            other => panic!("expected ExpressionInvariant, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn expression_node_validate_orphaned_containing_function() {
+        // Expression node referencing a non-existent containing function.
+        let mut graph = CirGraph::new("test.rs");
+        let node = make_expr_node("expr-3", Shape::Scalar(ScalarKind::Int), "nonexistent");
+        graph.add_node(node);
+        let result = graph.validate();
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CirError::OrphanedExpression {
+                node_id,
+                containing_id,
+            } => {
+                assert_eq!(node_id, "expr-3");
+                assert_eq!(containing_id, "nonexistent");
+            }
+            other => panic!("expected OrphanedExpression, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn expression_node_validate_expression_only_graph() {
+        // A graph with only expression nodes (no declarations) should
+        // validate because expression nodes don't need containing_function
+        // to be set (they just shouldn't have orphaned references).
+        let mut graph = CirGraph::new("test.rs");
+        // Expression node with no containing_function is valid.
+        let mut node = make_expr_node("expr-1", Shape::Scalar(ScalarKind::Int), "caller");
+        node.containing_function = None;
+        graph.add_node(node);
+        assert!(graph.validate().is_ok());
     }
 }

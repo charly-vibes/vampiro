@@ -31,7 +31,7 @@ pub use category::{
     validate_category, validate_filtration, CategoryDecl, FiltrationDecl, FiltrationLevel,
     MorphismDecl, MorphismId, ValidatedCategory, ValidationError,
 };
-pub use cir::{CirEdge, CirGraph, CirNode};
+pub use cir::{CirEdge, CirGraph, CirNode, NodeKind};
 pub use effect::{EffectChannel, EffectResolution, Totality, UnwrapEvidence, UnwrapKind};
 pub use error::CirError;
 pub use frontend::Frontend;

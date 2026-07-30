@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
-use vampiro_cir::{ScalarKind, 
+use vampiro_cir::{NodeKind, ScalarKind, 
     CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, Shape, SourceSpan,
     StableId, Totality, UnwrapEvidence, UnwrapKind,
 };
@@ -47,6 +47,7 @@ pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> Extractio
         source,
         lines_cache,
         param_shapes: HashMap::new(),
+        local_shapes: HashMap::new(),
         is_test_context: false,
         pending_discard: false,
     };
@@ -88,6 +89,9 @@ struct Extractor<'src> {
     /// Populated when entering a function, used to resolve variable
     /// references in argument expressions for the slot-boundary check.
     param_shapes: HashMap<String, Shape>,
+    /// Local variable name → Shape map for `let x = expr;` bindings.
+    /// Cleared when entering a function, populated during block traversal.
+    local_shapes: HashMap<String, Shape>,
     /// Whether we are currently inside a `#[cfg(test)]` module or a `#[test]` function.
     is_test_context: bool,
     /// Whether the next visited call expression is in a discard context
@@ -387,6 +391,7 @@ impl<'src> Extractor<'src> {
 
         // Build parameter name → Shape map for argument expression resolution
         self.param_shapes.clear();
+        self.local_shapes.clear();
         for param in &func.sig.inputs {
             match param {
                 syn::FnArg::Typed(pat_type) => {
@@ -429,6 +434,8 @@ impl<'src> Extractor<'src> {
             name: Some(name.clone()),
             trust_provenance: Default::default(),
             is_test,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
 
         self.graph.add_node(node);
@@ -522,8 +529,9 @@ impl<'src> Extractor<'src> {
             // Path expression (variable/constant reference).
             syn::Expr::Path(expr_path) => {
                 let name = Self::path_name(expr_path);
-                // Look up in the current function's parameter shapes
+                // Check parameter shapes first, then local variable bindings.
                 self.param_shapes.get(&name).cloned()
+                    .or_else(|| self.local_shapes.get(&name).cloned())
             }
             // Method call — try the receiver.
             syn::Expr::MethodCall(mc) => self.extract_expr_shape(&mc.receiver),
@@ -709,9 +717,41 @@ impl<'src> Extractor<'src> {
         }
     }
 
-    /// Record an edge for a call site, if the callee resolves to a known node.
+    /// Emit an expression node for an intermediate expression value.
     ///
-    /// `resolution`/`unwrap_evidence` are supplied by the caller: `Propagated`/
+    /// Creates a `CirNode` with `kind: Expression`, domain=codomain=shape,
+    /// and `containing_function` set to the given declaration ID.
+    /// Returns the stable ID of the newly created node.
+    ///
+    /// The stable ID is content-sensitive (includes span + name), so
+    /// two expression nodes for the same expression on different lines
+    /// produce distinct IDs. The name `"expr_arg"` is a fixed prefix;
+    /// the slot index is not included because this method doesn't know
+    /// the slot (the caller sets it on the edge).
+    fn emit_expression_node(
+        &mut self,
+        shape: Shape,
+        span: &proc_macro2::Span,
+        containing_fn: &StableId,
+    ) -> StableId {
+        let id = self.make_id("expr_arg", span);
+        let node = CirNode {
+            id: id.clone(),
+            domain: shape.clone(),
+            codomain: shape,
+            effect: EffectChannel::Plain,
+            span: self.make_span_from_span(*span, &self.path.to_string_lossy()),
+            name: None,
+            trust_provenance: Default::default(),
+            is_test: false,
+            kind: NodeKind::Expression,
+            containing_function: Some(containing_fn.clone()),
+        };
+        self.graph.add_node(node);
+        id
+    }
+
+    /// Record an edge for a call site, if the callee resolves to a known node.
     /// `None` for ordinary calls, `Unwrapped`/evidence for `?` operands and
     /// `.unwrap()`/`.expect()` receiver edges. Dedup is by stable edge ID, so
     /// the first recorder wins — callers that need to tag an edge with unwrap
@@ -724,6 +764,7 @@ impl<'src> Extractor<'src> {
         unwrap_evidence: Option<UnwrapEvidence>,
         slot: Option<u32>,
         arg_shape: Option<Shape>,
+        expression_source: Option<StableId>,
     ) {
         if Self::is_builtin(callee_name) {
             return;
@@ -735,13 +776,16 @@ impl<'src> Extractor<'src> {
         };
         let edge_id = self.make_id(&suffix, &span);
 
-        let source_id = match self
-            .current_function
-            .as_ref()
-            .and_then(|fq| self.resolve_node(fq))
-        {
-            Some(id) => id.clone(),
-            None => return,
+        let source_id = match expression_source {
+            Some(id) => id,
+            None => match self
+                .current_function
+                .as_ref()
+                .and_then(|fq| self.resolve_node(fq))
+            {
+                Some(id) => id.clone(),
+                None => return,
+            },
         };
 
         let target_id = match self.resolve_node(callee_name) {
@@ -797,7 +841,7 @@ impl<'src> Extractor<'src> {
             },
             _ => return,
         };
-        self.add_call_edge(&name, span, resolution, evidence, None, None);
+        self.add_call_edge(&name, span, resolution, evidence, None, None, None);
     }
 
     /// Known Rust built-in functions/constructors that should not produce edges.
@@ -899,6 +943,18 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 self.pending_discard = false;
             }
             syn::Stmt::Local(local) => {
+                // Track `let x = expr;` for local variable shape resolution.
+                // This enables data-flow tracking through variable bindings:
+                // `let x = parse_amount(input);` → `x` has `parse_amount`'s codomain.
+                if let Some(init) = &local.init {
+                    if let syn::Pat::Ident(pat_ident) = &local.pat {
+                        if let Some(shape) = self.extract_expr_shape(&init.expr) {
+                            let name = pat_ident.ident.to_string();
+                            self.local_shapes.insert(name, shape);
+                        }
+                    }
+                }
+
                 // `let _ = expr;` — wildcard pattern discards the result.
                 let is_wildcard = matches!(&local.pat, syn::Pat::Wild(_));
                 if is_wildcard {
@@ -960,29 +1016,44 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         if let syn::Expr::Path(expr_path) = &*call.func {
             let callee_name = Self::path_name(expr_path);
             let span = expr_path.span();
-            // Emit one edge per argument with slot information so the
-            // composition analyzer can compare each argument's shape
-            // against the callee's expected domain at that parameter.
-            if call.args.is_empty() {
-                self.add_call_edge(
-                    &callee_name,
-                    span,
-                    resolution,
-                    None,
-                    None,
-                    None,
-                );
+
+            if Self::is_builtin(&callee_name) {
+                // Skip builtins entirely — no edges, no expression nodes.
+            } else if call.args.is_empty() {
+                // Zero-arg call: declaration→declaration edge for return-boundary check.
+                self.add_call_edge(&callee_name, span, resolution, None, None, None, None);
             } else {
+                // Get the current function's ID for expression node linking.
+                let current_fn_id = self
+                    .current_function
+                    .as_ref()
+                    .and_then(|fq| self.resolve_node(fq))
+                    .cloned();
+
+                // Emit a single declaration→declaration edge for the return-boundary
+                // check (no slot). This preserves the existing codomain comparison.
+                self.add_call_edge(&callee_name, span, resolution.clone(), None, None, None, None);
+
+                // Emit expression→declaration edges for each argument with a known
+                // shape. These are the data-flow edges: the composition analyzer
+                // compares the expression's shape against the callee's domain slot.
+                // Expression edges always use Propagated resolution since they
+                // represent data flowing into a parameter, not the call result.
                 for (i, arg) in call.args.iter().enumerate() {
-                    let arg_shape = self.extract_expr_shape(arg);
-                    self.add_call_edge(
-                        &callee_name,
-                        span,
-                        resolution.clone(),
-                        None,
-                        Some(i as u32),
-                        arg_shape,
-                    );
+                    if let Some(shape) = self.extract_expr_shape(arg) {
+                        if let Some(ref fn_id) = current_fn_id {
+                            let expr_id = self.emit_expression_node(shape, &arg.span(), fn_id);
+                            self.add_call_edge(
+                                &callee_name,
+                                arg.span(),
+                                EffectResolution::Propagated,
+                                None,
+                                Some(i as u32),
+                                None,
+                                Some(expr_id),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -995,6 +1066,11 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         // same-named function exists. Receiver-type-aware resolution is
         // future work; today this is safe-by-accident because methods like
         // `iter` rarely collide with a defined free function.
+        //
+        // NOTE: Expression nodes are NOT emitted for method call arguments.
+        // Method calls are already best-effort (bare name resolution), and
+        // the receiver shape is hard to determine statically. Data-flow
+        // edges for method calls are future work (vampiro-uah extension).
         let callee_name = call.method.to_string();
         let span = call.method.span();
         let (resolution, evidence) = Self::detect_method_unwrap(&callee_name);
@@ -1010,10 +1086,10 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 evidence.clone(),
                 None,
                 None,
-            );
+            None);
         } else {
             // Receiver at slot 0
-            self.add_call_edge(&callee_name, span, resolution.clone(), None, Some(0), None);
+            self.add_call_edge(&callee_name, span, resolution.clone(), None, Some(0), None, None);
             for (i, _arg) in call.args.iter().enumerate() {
                 self.add_call_edge(
                     &callee_name,
@@ -1022,7 +1098,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     None,
                     Some((i + 1) as u32),
                     None,
-                );
+                None);
             }
         }
         // For unwrap/expect/unwrap_unchecked, the effect being resolved is
@@ -1056,7 +1132,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     ordinary_total(),
                     None,
                     None,
-                );
+                None);
             }
             syn::Expr::Call(inner) => {
                 if let syn::Expr::Path(expr_path) = &*inner.func {
@@ -1075,7 +1151,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                             ordinary_total(),
                             None,
                             None,
-                        );
+                        None);
                     } else {
                         for i in 0..inner.args.len() {
                             self.add_call_edge(
@@ -1085,7 +1161,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                                 ordinary_total(),
                                 Some(i as u32),
                                 None,
-                            );
+                            None);
                         }
                     }
                 }
@@ -1105,7 +1181,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         ordinary_total(),
                         None,
                         None,
-                    );
+                    None);
                 } else {
                     self.add_call_edge(
                         &method_name,
@@ -1114,7 +1190,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         ordinary_total(),
                         Some(0),
                         None,
-                    );
+                    None);
                 }
             }
             _ => {}
@@ -1214,8 +1290,10 @@ mod tests {
         let source = "fn add(a: i32, b: i32) -> i32 { a + b }\nfn main() -> i32 { add(1, 2) }";
         let syntax = syn::parse_file(source).unwrap();
         let result = extract_graph(&syntax, Path::new("test.rs"), source);
-        assert_eq!(result.graph.nodes.len(), 2);
-        assert_eq!(result.graph.edges.len(), 2);
+        // 2 declaration nodes + 2 expression nodes (literals 1 and 2)
+        assert_eq!(result.graph.nodes.len(), 4);
+        // 1 declaration→declaration edge + 2 expression→declaration edges
+        assert_eq!(result.graph.edges.len(), 3);
         let slot0_edge = result
             .graph
             .edges

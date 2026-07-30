@@ -1,0 +1,1 @@
+Closed vampiro-uah (data-flow edges for Rust). Created 3 new P2 tickets for extending data-flow edges to Python, Clojure, and Julia frontends. Each needs: per-slot tracking, expression shape inference, expression node emission.

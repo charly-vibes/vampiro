@@ -6,7 +6,7 @@
 /// and test byte reproducibility.
 use serde::Deserialize;
 use std::path::Path;
-use vampiro_cir::{ScalarKind, 
+use vampiro_cir::{NodeKind, ScalarKind, 
     CirEdge, CirError, CirGraph, CirNode, EffectChannel, EffectResolution, Frontend, Provenance,
     Shape, SourceSpan,
 };
@@ -66,6 +66,8 @@ impl Frontend for MockValidFrontend {
             name: Some("caller_fn".into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
         let callee = CirNode {
             id: "callee".into(),
@@ -82,6 +84,8 @@ impl Frontend for MockValidFrontend {
             name: Some("callee_fn".into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
         let edge = CirEdge {
             id: "call-1".into(),
@@ -138,6 +142,8 @@ impl Frontend for MockDepthExceededEffectFrontend {
             name: Some("deep_fn".into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
         graph.add_node(node);
         // The frontend produces the graph, but it should be rejected by validate()
@@ -175,6 +181,8 @@ impl Frontend for MockDepthExceededShapeFrontend {
             name: Some("deep_fn".into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         };
         graph.add_node(node);
         Ok(graph)
@@ -229,7 +237,7 @@ fn frontend_valid_extraction_produces_graph() {
     let graph = frontend
         .extract("src/lib.rs", Path::new("src/lib.rs"))
         .expect("valid extraction should succeed");
-    assert_eq!(graph.version, "0.2.1");
+    assert_eq!(graph.version, "0.3.0");
     assert_eq!(graph.nodes.len(), 2);
     assert_eq!(graph.edges.len(), 1);
 }

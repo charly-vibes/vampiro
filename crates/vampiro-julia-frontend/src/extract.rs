@@ -7,7 +7,7 @@
 use std::path::Path;
 use tree_sitter::Node;
 use vampiro_cir::{
-    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, Provenance, ScalarKind, Shape,
+    CirEdge, CirGraph, CirNode, EffectChannel, EffectResolution, NodeKind, Provenance, ScalarKind, Shape,
     SourceSpan,
     StableId, TrustProvenance,
 };
@@ -67,6 +67,8 @@ fn process_node(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             });
             *node_counter += 1;
             // Extract call edges from body
@@ -96,6 +98,8 @@ fn process_node(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             });
             *node_counter += 1;
         }
@@ -115,6 +119,8 @@ fn process_node(
                 name: Some(name),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             });
             *node_counter += 1;
             // Recurse into module body
@@ -148,6 +154,8 @@ fn process_node(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             });
             *node_counter += 1;
         }
@@ -198,6 +206,8 @@ fn process_node(
                 name: Some(name.to_string()),
                 trust_provenance: TrustProvenance::default(),
                 is_test: false,
+                kind: NodeKind::Declaration,
+                containing_function: None,
             });
             *node_counter += 1;
             let mut c = node.walk();

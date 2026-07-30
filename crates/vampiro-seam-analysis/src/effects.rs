@@ -222,6 +222,7 @@ impl EffectHandlingAnalyzer {
 #[cfg(test)]
 mod tests {
     use vampiro_cir::ScalarKind;
+    use vampiro_cir::NodeKind;
     use super::*;
     use vampiro_cir::{
         CirEdge, CirGraph, CirNode, DiscardSpan, EffectChannel, EffectResolution, Provenance,
@@ -252,6 +253,8 @@ mod tests {
             name: Some(id.into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         }
     }
 

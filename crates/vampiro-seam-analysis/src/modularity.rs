@@ -211,6 +211,7 @@ impl ModularityAnalyzer {
 mod tests {
     use vampiro_cir::ScalarKind;
     use super::*;
+    use vampiro_cir::NodeKind;
     use vampiro_cir::{
         BoundaryKind, FacadeReexport, LatticeLevel, VisibilityFact, VisibilityFacts,
     };
@@ -243,6 +244,8 @@ mod tests {
             name: Some(name.into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         }
     }
 
@@ -460,6 +463,8 @@ mod tests {
             name: Some("caller".into()),
             trust_provenance: Default::default(),
             is_test: false,
+            kind: NodeKind::Declaration,
+            containing_function: None,
         });
         graph.add_edge(edge("e1", "caller", "exposed", 2));
 
