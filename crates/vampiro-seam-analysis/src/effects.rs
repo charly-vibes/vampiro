@@ -40,9 +40,12 @@ impl EffectHandlingAnalyzer {
     /// edge where an effect channel is swallowed/discarded (REQ-9, REQ-C4).
     ///
     /// Swallowed effects are identified by:
-    /// - Edge resolution is `Swallowed`, OR
-    /// - Edge resolution is `Unwrapped` with `UnwrapKind::Force` and
-    ///   `Totality::Partial` (panic/force unwrap without full handling).
+    /// - Edge resolution is `Swallowed` with no unwrap evidence (true discard
+    ///   — the return value is genuinely unused, e.g. `let _ = expr;`).
+    ///
+    /// Force unwraps (`.unwrap()`, `.expect()`, `.unwrap_unchecked()`) are
+    /// NOT classified as swallowed effects — they are panic risks, a separate
+    /// concern tracked by a different analysis.
     pub fn analyze(&self, graph: &CirGraph) -> Vec<Finding> {
         let mut findings = Vec::new();
 
@@ -99,35 +102,31 @@ impl EffectHandlingAnalyzer {
     }
 
     /// Classify an edge's effect resolution and return `(is_swallowed, totality_label)`.
+    ///
+    /// Only true discards (resolution = `Swallowed` with no unwrap evidence)
+    /// are classified as swallowed. Force unwraps (`.unwrap()`, `.expect()`,
+    /// `.unwrap_unchecked()`) are NOT swallowed — they are panic risks, a
+    /// separate concern tracked by a different analysis.
     fn classify_edge(&self, edge: &vampiro_cir::CirEdge) -> (bool, String) {
         match edge.resolution {
             EffectResolution::Swallowed => {
-                // REQ-C4: check unwrap_evidence for finer-grained totality.
-                if let Some(ref ue) = edge.unwrap_evidence {
-                    let totality = serde_json::to_value(&ue.totality)
-                        .map(|v| v.to_string())
-                        .unwrap_or_else(|_| "unknown".into());
-                    (true, totality)
-                } else {
+                // True discard: Swallowed without any unwrap evidence.
+                // (Force unwraps like .unwrap_unchecked() are labeled
+                // Swallowed+Force, but they are panic-risks, not true discards.)
+                if edge.unwrap_evidence.is_none() {
                     (true, "partial".into())
+                } else {
+                    // Has unwrap evidence (e.g., Force unwrap) → NOT a true discard.
+                    (false, "unknown".into())
                 }
             }
             EffectResolution::Unwrapped => {
-                // REQ-C4: panic/force unwrap is treated as swallowed unless
-                // every summand is intentionally handled (Total totality).
+                // Force unwraps are panic-risks, not swallowed effects.
+                // Ordinary unwraps are properly handled.
                 if let Some(ref ue) = edge.unwrap_evidence {
                     match ue.kind {
-                        UnwrapKind::Force => {
-                            let is_total = ue.totality == vampiro_cir::Totality::Total;
-                            let totality = serde_json::to_value(&ue.totality)
-                                .map(|v| v.to_string())
-                                .unwrap_or_else(|_| "unknown".into());
-                            (!is_total, totality)
-                        }
-                        UnwrapKind::Ordinary => {
-                            // Ordinary unwrap with Total totality → properly handled.
-                            (false, "total".into())
-                        }
+                        UnwrapKind::Force => (false, "unknown".into()),
+                        UnwrapKind::Ordinary => (false, "total".into()),
                     }
                 } else {
                     (false, "total".into())
@@ -480,10 +479,10 @@ mod tests {
         );
     }
 
-    // --- REQ-C4: force/panic partial unwrap IS swallowed ---
+    // --- Force/panic unwrap is NOT swallowed (it's a panic risk, not a discard) ---
 
     #[test]
-    fn force_partial_unwrap_raises_finding() {
+    fn force_partial_unwrap_does_not_raise_finding() {
         let mut graph = CirGraph::new("src/lib.rs");
         graph.add_node(node("caller", EffectChannel::Plain, 1));
         graph.add_node(node("callee", EffectChannel::Option, 5));
@@ -501,9 +500,10 @@ mod tests {
         ));
 
         let findings = EffectHandlingAnalyzer::new().analyze(&graph);
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule, "REQ-9");
-        assert_eq!(findings[0].axis, crate::finding::Axis::Robustness);
+        assert!(
+            findings.is_empty(),
+            "force+partial unwrap is a panic risk, not a swallowed effect"
+        );
     }
 
     // --- REQ-C4: force total unwrap (every summand handled) is NOT swallowed ---

@@ -387,11 +387,12 @@ fn fixtures_are_precise() {
     );
 
     // --- data-flow seam clean baseline ---
+    // Now produces one REQ-9 finding for the true discard of parse_amount's
+    // Option effect via `let _ = parse_amount(input);`.
     {
         let findings = analyze_source_file("data_flow_seam_clean");
-        assert!(
-            findings.is_empty(),
-            "data_flow_seam clean baseline must produce zero findings; got: {findings:#?}"
-        );
+        let (name, expected) = load_expected("data_flow_seam_clean");
+        assert_eq!(name, "data_flow_seam_clean");
+        assert_findings_match("data_flow_seam_clean", &findings, &expected);
     }
 }

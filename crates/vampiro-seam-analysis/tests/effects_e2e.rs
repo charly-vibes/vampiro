@@ -237,5 +237,8 @@ fn effects_e2e_force_partial_unwrap() {
         .iter()
         .filter(|f| f.axis == Axis::Robustness)
         .collect();
-    assert_eq!(robustness.len(), 1, "force+partial should raise finding");
+    assert!(
+        robustness.is_empty(),
+        "force+partial unwrap is a panic risk, not a swallowed effect"
+    );
 }

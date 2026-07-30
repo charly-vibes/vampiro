@@ -1,7 +1,7 @@
 {
   "version": "v1",
   "fixture": "data_flow_seam",
-  "description": "Slot-boundary composition break: total.codomain = Scalar does not match apply_discount.domain_slot(0) = Record([Scalar,Scalar]). One finding expected from the slot-boundary check.",
+  "description": "Slot-boundary composition break: total.codomain = Scalar does not match apply_discount.domain_slot(0) = Record([Scalar,Scalar]). One REQ-7 finding from the slot-boundary check. The outer apply_discount call is also a true discard (semicolon statement), but it returns f64 (Plain effect) so no REQ-9 finding from it.",
   "expected_findings": [
     {
       "rule": "REQ-7",

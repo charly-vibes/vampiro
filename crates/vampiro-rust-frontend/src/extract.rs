@@ -48,6 +48,7 @@ pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> Extractio
         lines_cache,
         param_shapes: HashMap::new(),
         is_test_context: false,
+        pending_discard: false,
     };
     visit::visit_file(&mut extractor, syntax);
     ExtractionResult {
@@ -89,6 +90,9 @@ struct Extractor<'src> {
     param_shapes: HashMap<String, Shape>,
     /// Whether we are currently inside a `#[cfg(test)]` module or a `#[test]` function.
     is_test_context: bool,
+    /// Whether the next visited call expression is in a discard context
+    /// (e.g., `let _ = expr;` or `expr;` as a statement).
+    pending_discard: bool,
 }
 
 impl<'src> Extractor<'src> {
@@ -876,6 +880,39 @@ impl<'src> Extractor<'src> {
 
 /// Visit functions and extract CIR nodes, visibility, and facades.
 impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
+    #[allow(clippy::borrow_deref_ref)]
+    fn visit_stmt(&mut self, stmt: &'ast syn::Stmt) {
+        // Detect true discards: expression statements and wildcard locals.
+        match stmt {
+            syn::Stmt::Expr(expr, semi) => {
+                // `expr;` — expression statement with semicolon, result is
+                // discarded. A tail expression (no semicolon) is the function's
+                // return value and is NOT a discard.
+                if semi.is_some()
+                    && matches!(&*expr, syn::Expr::Call(_) | syn::Expr::MethodCall(_))
+                {
+                    self.pending_discard = true;
+                }
+                visit::visit_stmt(self, stmt);
+                self.pending_discard = false;
+            }
+            syn::Stmt::Local(local) => {
+                // `let _ = expr;` — wildcard pattern discards the result.
+                let is_wildcard = matches!(&local.pat, syn::Pat::Wild(_));
+                if is_wildcard {
+                    if let Some(init) = &local.init {
+                        if matches!(&*init.expr, syn::Expr::Call(_) | syn::Expr::MethodCall(_)) {
+                            self.pending_discard = true;
+                        }
+                    }
+                }
+                visit::visit_stmt(self, stmt);
+                self.pending_discard = false;
+            }
+            _ => visit::visit_stmt(self, stmt),
+        }
+    }
+
     fn visit_item_fn(&mut self, func: &'ast syn::ItemFn) {
         self.extract_function(func, &func.attrs);
     }
@@ -900,6 +937,22 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
     }
 
     fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
+        // Use the discard resolution when in a discard context (true discard
+        // like `let _ = expr;` or `expr;`). Pre-recorded resolutions from
+        // `pre_record_receiver_unwrap` (e.g., `.unwrap()`) take priority via
+        // first-writer-wins dedup in add_edge.
+        //
+        // Consume the pending_discard flag so nested calls (e.g., arguments
+        // or receivers) are NOT also tagged as discarded — only the
+        // outermost call expression's result is discarded.
+        let is_discard = self.pending_discard;
+        self.pending_discard = false;
+        let resolution = if is_discard {
+            EffectResolution::Swallowed
+        } else {
+            EffectResolution::Propagated
+        };
+
         // Only direct path calls produce edges; calls through arbitrary
         // expressions have no callee name to resolve.
         if let syn::Expr::Path(expr_path) = &*call.func {
@@ -912,7 +965,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 self.add_call_edge(
                     &callee_name,
                     span,
-                    EffectResolution::Propagated,
+                    resolution,
                     None,
                     None,
                     None,
@@ -923,7 +976,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     self.add_call_edge(
                         &callee_name,
                         span,
-                        EffectResolution::Propagated,
+                        resolution.clone(),
                         None,
                         Some(i as u32),
                         arg_shape,

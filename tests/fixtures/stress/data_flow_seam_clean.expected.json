@@ -1,6 +1,13 @@
 {
   "version": "v1",
   "fixture": "data_flow_seam_clean",
-  "description": "Clean baseline for data_flow_seam: total.codomain = Scalar matches apply_discount.domain_slot(0) = Scalar → zero findings.",
-  "expected_findings": []
+  "description": "Clean baseline for data_flow_seam: total.codomain = Scalar matches apply_discount.domain_slot(0) = Scalar → zero composition findings. One REQ-9 finding for the true discard of parse_amount's Option effect via `let _ = parse_amount(input);`.",
+  "expected_findings": [
+    {
+      "rule": "REQ-9",
+      "axis": "robustness",
+      "classification": "swallowed-effect",
+      "severity": "medium"
+    }
+  ]
 }
