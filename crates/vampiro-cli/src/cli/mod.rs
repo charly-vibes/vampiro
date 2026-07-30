@@ -35,6 +35,12 @@ pub enum Commands {
         #[command(subcommand)]
         command: Option<ProveCommands>,
     },
+    /// Run diagnostic checks on the project
+    Doctor {
+        /// Auto-fix issues when possible
+        #[arg(long)]
+        fix: bool,
+    },
 }
 
 #[derive(Parser, Debug)]
@@ -76,7 +82,41 @@ impl Cli {
         match &self.command {
             Some(Commands::Check(args)) => run_check(args),
             Some(Commands::InitCi { provider }) => run_init_ci(provider),
+            Some(Commands::Doctor { fix }) => run_doctor(*fix),
             _ => ExitCode::Success,
+        }
+    }
+}
+
+fn run_doctor(fix: bool) -> ExitCode {
+    use genesis::doctor::DoctorRunner;
+
+    let runner = DoctorRunner::new(crate::doctor::default_checks());
+    let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+    match runner.run(&cwd, fix) {
+        Ok(report) => {
+            println!("vampiro doctor — {} pass, {} warn, {} fail",
+                report.summary.pass, report.summary.warn, report.summary.fail);
+
+            for entry in &report.checks {
+                let icon = match entry.status {
+                    genesis::doctor::CheckStatus::Pass => "✅",
+                    genesis::doctor::CheckStatus::Warn => "⚠️",
+                    genesis::doctor::CheckStatus::Fail => "❌",
+                };
+                println!("  {} {} — {}", icon, entry.name, entry.message);
+            }
+
+            if report.summary.fail > 0 {
+                ExitCode::PolicyFailure
+            } else {
+                ExitCode::Success
+            }
+        }
+        Err(e) => {
+            eprintln!("vampiro doctor: {e}");
+            ExitCode::InternalError
         }
     }
 }

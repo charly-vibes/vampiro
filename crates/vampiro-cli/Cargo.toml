@@ -13,7 +13,7 @@ name = "vampiro_cli"
 path = "src/lib.rs"
 
 [dependencies]
-genesis-vibes = "0.2"
+genesis-vibes = "0.3"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"

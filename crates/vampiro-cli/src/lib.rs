@@ -8,6 +8,7 @@
 pub mod aix;
 pub mod cli;
 pub mod config;
+pub mod doctor;
 pub mod exit_code;
 pub mod finding;
 
@@ -16,6 +17,7 @@ pub mod managed;
 pub mod output;
 pub mod policy;
 pub mod scan;
+pub mod status;
 pub use cli::Cli;
 pub use config::{vampiro_config_store, Config};
 pub use exit_code::ExitCode;

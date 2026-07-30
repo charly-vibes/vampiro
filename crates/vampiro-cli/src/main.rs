@@ -3,7 +3,7 @@ use genesis::guide::Guide;
 use vampiro_cli::exit_code::ExitCode;
 use vampiro_cli::Cli;
 
-const VAMPIRO_COMMANDS: &[&str] = &["check", "prove", "help"];
+const VAMPIRO_COMMANDS: &[&str] = &["check", "prove", "doctor", "help"];
 
 fn main() -> ExitCode {
     // CLI scaffold from genesis::guide. The Guide bundles vampiro's name/version,
