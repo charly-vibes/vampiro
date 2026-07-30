@@ -122,7 +122,8 @@ mod tests {
         let frontend = ClojureFrontend;
         let source = "(defn greet [name] (str \"Hello, \" name))";
         let graph = frontend.extract(source, Path::new("core.clj")).unwrap();
-        assert_eq!(graph.nodes.len(), 1);
+        // greet decl + expression node for "Hello, " str_lit argument
+        assert_eq!(graph.nodes.len(), 2);
         assert_eq!(graph.nodes[0].name.as_deref(), Some("greet"));
         // External call to `str` makes validation fail (no node for `str`)
     }
@@ -215,7 +216,8 @@ mod tests {
         let frontend = ClojureFrontend;
         let source = "(defn my-range [n] (lazy-seq (cons n (my-range (inc n)))))";
         let graph = frontend.extract(source, Path::new("core.clj")).unwrap();
-        assert_eq!(graph.nodes.len(), 1);
+        // my-range decl + expression node for (my-range (inc n)) as cons argument
+        assert_eq!(graph.nodes.len(), 2);
         // lazy-seq should produce Stream effect
         let effect_str = format!("{:?}", graph.nodes[0].effect);
         assert!(

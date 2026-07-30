@@ -35,8 +35,9 @@ fn clojure_runner_input_has_tagged_fns() {
     let path = fixture_path("runner-input.clj");
 
     let graph = frontend.extract(&source, &path).unwrap();
-    // 4 defns: add, greet, process, count-up-to
-    assert_eq!(graph.nodes.len(), 4);
+    // 4 defns + 3 expression nodes (str_lit args "Hello, " and "!" plus
+    // expression node for (count-up-to (inc n)) as cons argument)
+    assert_eq!(graph.nodes.len(), 7);
 
     let names: Vec<&str> = graph
         .nodes

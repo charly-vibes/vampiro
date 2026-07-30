@@ -638,26 +638,6 @@ fn extract_call_edges(
                     let callee_id = StableId::new(format!("clj:{}:{}", file_path, op));
                     let span = node_span(node, file_path);
 
-                    // Skip edges to nodes not in the graph (e.g. macros,
-                    // constructors like ->Response, or builtins like go-loop).
-                    if graph.node_by_id(&callee_id).is_none() {
-                        // Still recurse into arguments for nested calls.
-                        let mut cursor = node.walk();
-                        for child in node.children(&mut cursor) {
-                            extract_call_edges(
-                                child,
-                                source,
-                                file_path,
-                                caller_id,
-                                graph,
-                                node_counter,
-                                edge_counter,
-                                call_depth + 1,
-                                local_shapes,
-                            );
-                        }
-                        return;
-                    }
                     let provenance = if call_depth <= 3 {
                         Provenance::Direct
                     } else if call_depth <= 10 {
@@ -670,27 +650,11 @@ fn extract_call_edges(
                         }
                     };
 
-                    // Emit a single declaration->declaration edge for the return-boundary
-                    // check (no slot). This preserves the existing codomain comparison.
-                    let edge = CirEdge {
-                        id: StableId::new(format!("clj:edge:{}", *edge_counter)),
-                        source: caller_id.clone(),
-                        target: callee_id.clone(),
-                        resolution: EffectResolution::Propagated,
-                        unwrap_evidence: None,
-                        provenance: provenance.clone(),
-                        span: span.clone(),
-                        discard_spans: vec![],
-                        trust_provenance: TrustProvenance::default(),
-                        slot: None,
-                        arg_shape: None,
-                    };
-
-                    graph.add_edge(edge);
-                    *edge_counter += 1;
-
                     // Emit expression->declaration edges for each argument with a known
                     // shape. In Clojure, arguments start at index 2 (after '(' and operator).
+                    // These are emitted unconditionally — even when the callee is not in the
+                    // graph (e.g., builtins like +, str, concat) — because argument shapes
+                    // are valuable for composition analysis regardless of callee resolution.
                     let mut arg_cursor = node.walk();
                     let arg_nodes: Vec<Node> = node.children(&mut arg_cursor).collect();
                     // arg_nodes[0] = '(', arg_nodes[1] = operator, arg_nodes[2..] = arguments
@@ -726,6 +690,46 @@ fn extract_call_edges(
                             slot_index += 1;
                         }
                     }
+
+                    // Declaration->declaration edge (return-boundary check):
+                    // only emit when the callee is in the graph.
+                    if graph.node_by_id(&callee_id).is_none() {
+                        // Still recurse into arguments for nested calls.
+                        let mut cursor = node.walk();
+                        for child in node.children(&mut cursor) {
+                            extract_call_edges(
+                                child,
+                                source,
+                                file_path,
+                                caller_id,
+                                graph,
+                                node_counter,
+                                edge_counter,
+                                call_depth + 1,
+                                local_shapes,
+                            );
+                        }
+                        return;
+                    }
+
+                    // Emit a single declaration->declaration edge for the return-boundary
+                    // check (no slot). This preserves the existing codomain comparison.
+                    let edge = CirEdge {
+                        id: StableId::new(format!("clj:edge:{}", *edge_counter)),
+                        source: caller_id.clone(),
+                        target: callee_id.clone(),
+                        resolution: EffectResolution::Propagated,
+                        unwrap_evidence: None,
+                        provenance: provenance.clone(),
+                        span: span.clone(),
+                        discard_spans: vec![],
+                        trust_provenance: TrustProvenance::default(),
+                        slot: None,
+                        arg_shape: None,
+                    };
+
+                    graph.add_edge(edge);
+                    *edge_counter += 1;
                 }
 
                 // Recurse into arguments for nested calls
@@ -834,7 +838,7 @@ fn emit_expression_node(
 fn extract_expr_shape(node: Node, source: &str, graph: &CirGraph) -> Option<Shape> {
     match node.kind() {
         // Integer literal -> Scalar(Int)
-        "int_lit" => Some(Shape::Scalar(ScalarKind::Int)),
+        "int_lit" | "num_lit" => Some(Shape::Scalar(ScalarKind::Int)),
         // Float literal -> Scalar(Float)
         "float_lit" => Some(Shape::Scalar(ScalarKind::Float)),
         // String literal -> Scalar(String)

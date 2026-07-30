@@ -124,6 +124,19 @@ fn clojure_clean_baseline_is_precise() {
 }
 
 // ---------------------------------------------------------------------------
+// Clojure data-flow
+// ---------------------------------------------------------------------------
+
+#[test]
+fn clojure_composition_break_has_data_flow_edges() {
+    let source = read_source("composition_break.clj", "clojure");
+    let path = fixture_dir("clojure").join("composition_break.clj");
+    let frontend = vampiro_clojure_frontend::ClojureFrontend;
+    let graph = frontend.extract(&source, &path).unwrap();
+    assert_has_data_flow_edges("clojure", &graph);
+}
+
+// ---------------------------------------------------------------------------
 // Julia
 // ---------------------------------------------------------------------------
 
