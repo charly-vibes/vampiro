@@ -364,39 +364,44 @@ fn extract_call_edges(
                 *edge_counter += 1;
 
                 // Emit expression->declaration edges for each argument with a known
-                // shape. In Julia, arguments start at index 1 (after the function at index 0).
+                // shape. In Julia, call_expression children are [identifier, argument_list].
+                // The arguments are nested inside the argument_list child.
                 let mut arg_cursor = node.walk();
-                let arg_nodes: Vec<Node> = node.children(&mut arg_cursor).collect();
-                // arg_nodes[0] = function, arg_nodes[1..] = arguments
-                let mut slot_index: u32 = 0;
-                for arg in arg_nodes.iter().skip(1) {
-                    if arg.is_named() {
-                        if let Some(shape) = extract_expr_shape(*arg, source, graph) {
-                            let expr_id = emit_expression_node(
-                                shape,
-                                *arg,
-                                source,
-                                file_path,
-                                graph,
-                                node_counter,
-                                caller_id,
-                            );
-                            graph.add_edge(CirEdge {
-                                id: StableId::new(format!("jl:edge:expr_{}", *edge_counter)),
-                                source: expr_id,
-                                target: callee_id.clone(),
-                                resolution: EffectResolution::Propagated,
-                                unwrap_evidence: None,
-                                provenance: provenance.clone(),
-                                span: node_span(*arg, file_path),
-                                discard_spans: vec![],
-                                trust_provenance: TrustProvenance::default(),
-                                slot: Some(slot_index),
-                                arg_shape: None,
-                            });
-                            *edge_counter += 1;
+                let call_children: Vec<Node> = node.children(&mut arg_cursor).collect();
+                let arg_list = call_children.get(1);
+                if let Some(al) = arg_list {
+                    let mut al_cursor = al.walk();
+                    let actual_args: Vec<Node> = al.children(&mut al_cursor).collect();
+                    let mut slot_index: u32 = 0;
+                    for arg in actual_args.iter() {
+                        if arg.is_named() {
+                            if let Some(shape) = extract_expr_shape(*arg, source, graph) {
+                                let expr_id = emit_expression_node(
+                                    shape,
+                                    *arg,
+                                    source,
+                                    file_path,
+                                    graph,
+                                    node_counter,
+                                    caller_id,
+                                );
+                                graph.add_edge(CirEdge {
+                                    id: StableId::new(format!("jl:edge:expr_{}", *edge_counter)),
+                                    source: expr_id,
+                                    target: callee_id.clone(),
+                                    resolution: EffectResolution::Propagated,
+                                    unwrap_evidence: None,
+                                    provenance: provenance.clone(),
+                                    span: node_span(*arg, file_path),
+                                    discard_spans: vec![],
+                                    trust_provenance: TrustProvenance::default(),
+                                    slot: Some(slot_index),
+                                    arg_shape: None,
+                                });
+                                *edge_counter += 1;
+                            }
+                            slot_index += 1;
                         }
-                        slot_index += 1;
                     }
                 }
             }
@@ -632,5 +637,22 @@ mod tests {
         assert_eq!(struct_node.kind(), "struct_definition");
         let name = find_decl_name(struct_node, source);
         assert_eq!(name, Some("Point"));
+    }
+
+    #[test]
+    fn test_find_decl_name_with_args() {
+        // Function with arguments and NO type annotations — the name is
+        // inside signature > call_expression > identifier.
+        let source = "function add(x, y)\n    return x + y\nend";
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_julia::LANGUAGE.into())
+            .unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        let root = tree.root_node();
+        let func = root.child(0).unwrap();
+        assert_eq!(func.kind(), "function_definition");
+        let name = find_decl_name(func, source);
+        assert_eq!(name, Some("add"));
     }
 }

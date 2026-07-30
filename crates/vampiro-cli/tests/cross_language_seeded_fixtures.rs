@@ -15,10 +15,8 @@
 //!
 //! - **Python**: fully verified — type hints extracted, data-flow edges
 //!   emitted with correct slot indices.
-//! - **Clojure, Julia**: clean baseline verified. Data-flow edge verification
-//!   blocked by pre-existing frontend issues (builtin callee resolution in
-//!   Clojure, declaration naming in Julia) that are independent of the
-//!   data-flow edge implementation.
+//! - **Clojure, Julia**: fully verified — per-slot data-flow edges emitted
+//!   for all call arguments with known shapes.
 //!
 //! Run: `cargo test cross_language_seeded`
 
@@ -137,7 +135,20 @@ fn clojure_composition_break_has_data_flow_edges() {
 }
 
 // ---------------------------------------------------------------------------
-// Julia
+// Julia data-flow
+// ---------------------------------------------------------------------------
+
+#[test]
+fn julia_composition_break_has_data_flow_edges() {
+    let source = read_source("composition_break.jl", "julia");
+    let path = fixture_dir("julia").join("composition_break.jl");
+    let frontend = vampiro_julia_frontend::JuliaFrontend;
+    let graph = frontend.extract(&source, &path).unwrap();
+    assert_has_data_flow_edges("julia", &graph);
+}
+
+// ---------------------------------------------------------------------------
+// Julia clean baseline
 // ---------------------------------------------------------------------------
 
 #[test]
