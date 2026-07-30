@@ -1061,25 +1061,61 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
             syn::Expr::Call(inner) => {
                 if let syn::Expr::Path(expr_path) = &*inner.func {
                     let callee_name = Self::path_name(expr_path);
+                    let span = expr_path.span();
+                    // Must match the edge IDs produced by visit_expr_call.
+                    // Zero-arg calls use slot=None; multi-arg calls use
+                    // per-slot edges. Without this, the dedup in add_edge
+                    // fails and the ? operator's Unwrapped resolution is
+                    // lost (replaced by the call visitor's Propagated).
+                    if inner.args.is_empty() {
+                        self.add_call_edge(
+                            &callee_name,
+                            span,
+                            EffectResolution::Unwrapped,
+                            ordinary_total(),
+                            None,
+                            None,
+                        );
+                    } else {
+                        for i in 0..inner.args.len() {
+                            self.add_call_edge(
+                                &callee_name,
+                                span,
+                                EffectResolution::Unwrapped,
+                                ordinary_total(),
+                                Some(i as u32),
+                                None,
+                            );
+                        }
+                    }
+                }
+            }
+            syn::Expr::MethodCall(mc) => {
+                let method_name = mc.method.to_string();
+                let span = mc.method.span();
+                // Match the edge IDs produced by visit_expr_method_call.
+                // Zero-arg methods use slot=None; multi-arg methods use
+                // per-slot edges (receiver at slot 0, args at slots 1+).
+                let total_args = 1 + mc.args.len();
+                if total_args == 1 {
                     self.add_call_edge(
-                        &callee_name,
-                        expr_path.span(),
+                        &method_name,
+                        span,
                         EffectResolution::Unwrapped,
                         ordinary_total(),
                         None,
                         None,
                     );
+                } else {
+                    self.add_call_edge(
+                        &method_name,
+                        span,
+                        EffectResolution::Unwrapped,
+                        ordinary_total(),
+                        Some(0),
+                        None,
+                    );
                 }
-            }
-            syn::Expr::MethodCall(mc) => {
-                self.add_call_edge(
-                    &mc.method.to_string(),
-                    mc.method.span(),
-                    EffectResolution::Unwrapped,
-                    ordinary_total(),
-                    None,
-                    None,
-                );
             }
             _ => {}
         }
