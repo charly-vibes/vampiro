@@ -301,3 +301,55 @@ fn python_fixture_source_is_parseable() {
         );
     }
 }
+
+#[test]
+fn python_data_pipeline_has_slot_edges() {
+    // Use a simple inline source with literal arguments
+    let source = r#"
+def add(a, b):
+    return a + b
+
+def main():
+    result = add(42, 3.14)
+    print("hello")
+"#
+    .to_string();
+    let path = workspace_root().join("test_simple.py");
+    let frontend = vampiro_python_frontend::PythonFrontend;
+    let graph = frontend.extract(&source, &path).unwrap();
+
+    let slot_edges: Vec<_> = graph.edges.iter().filter(|e| e.slot.is_some()).collect();
+    let expr_nodes: Vec<_> = graph
+        .nodes
+        .iter()
+        .filter(|n| matches!(n.kind, vampiro_cir::NodeKind::Expression))
+        .collect();
+
+    assert!(
+        !slot_edges.is_empty(),
+        "expected at least one per-slot edge, got 0. Total edges: {}",
+        graph.edges.len()
+    );
+    assert!(
+        !expr_nodes.is_empty(),
+        "expected at least one expression node, got 0. Total nodes: {}",
+        graph.nodes.len()
+    );
+
+    let slots: Vec<u32> = slot_edges.iter().filter_map(|e| e.slot).collect();
+    assert!(
+        slots.iter().any(|&s| s == 0 || s == 1),
+        "expected slot 0 or 1, got {:?}",
+        slots
+    );
+
+    eprintln!(
+        "Python data-flow: {} slot edges, {} expression nodes, total edges={}, total nodes={}, slots={:?}",
+        slot_edges.len(),
+        expr_nodes.len(),
+        graph.edges.len(),
+        graph.nodes.len(),
+        slots
+    );
+}
+

@@ -694,33 +694,36 @@ fn extract_call_edges(
                     let mut arg_cursor = node.walk();
                     let arg_nodes: Vec<Node> = node.children(&mut arg_cursor).collect();
                     // arg_nodes[0] = '(', arg_nodes[1] = operator, arg_nodes[2..] = arguments
-                    let args_start = 2;
-                    for (i, arg) in arg_nodes.iter().enumerate().skip(args_start) {
-                        if let Some(shape) = extract_expr_shape(*arg, source, graph) {
-                            let expr_id = emit_expression_node(
-                                shape,
-                                *arg,
-                                source,
-                                file_path,
-                                graph,
-                                node_counter,
-                                caller_id,
-                            );
-                            let expr_edge = CirEdge {
-                                id: StableId::new(format!("clj:edge:expr_{}", *edge_counter)),
-                                source: expr_id,
-                                target: callee_id.clone(),
-                                resolution: EffectResolution::Propagated,
-                                unwrap_evidence: None,
-                                provenance: provenance.clone(),
-                                span: node_span(*arg, file_path),
-                                discard_spans: vec![],
-                                trust_provenance: TrustProvenance::default(),
-                                slot: Some(i as u32 - 2),
-                                arg_shape: None,
-                            };
-                            graph.add_edge(expr_edge);
-                            *edge_counter += 1;
+                    let mut slot_index: u32 = 0;
+                    for arg in arg_nodes.iter().skip(2) {
+                        if arg.is_named() {
+                            if let Some(shape) = extract_expr_shape(*arg, source, graph) {
+                                let expr_id = emit_expression_node(
+                                    shape,
+                                    *arg,
+                                    source,
+                                    file_path,
+                                    graph,
+                                    node_counter,
+                                    caller_id,
+                                );
+                                let expr_edge = CirEdge {
+                                    id: StableId::new(format!("clj:edge:expr_{}", *edge_counter)),
+                                    source: expr_id,
+                                    target: callee_id.clone(),
+                                    resolution: EffectResolution::Propagated,
+                                    unwrap_evidence: None,
+                                    provenance: provenance.clone(),
+                                    span: node_span(*arg, file_path),
+                                    discard_spans: vec![],
+                                    trust_provenance: TrustProvenance::default(),
+                                    slot: Some(slot_index),
+                                    arg_shape: None,
+                                };
+                                graph.add_edge(expr_edge);
+                                *edge_counter += 1;
+                            }
+                            slot_index += 1;
                         }
                     }
                 }
