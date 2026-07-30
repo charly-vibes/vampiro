@@ -622,6 +622,17 @@ fn extract_codomain_shape(node: Node, source: &str) -> Shape {
     }
 }
 
+/// Map a Python type name to a ScalarKind variant.
+fn python_type_to_scalar(name: &str) -> Option<ScalarKind> {
+    match name {
+        "int" => Some(ScalarKind::Int),
+        "float" => Some(ScalarKind::Float),
+        "str" => Some(ScalarKind::String),
+        "bool" => Some(ScalarKind::Bool),
+        _ => None,
+    }
+}
+
 /// Convert a Python type hint node to a CIR shape.
 fn type_hint_to_shape(node: Node, source: &str) -> Shape {
     match node.kind() {
@@ -638,7 +649,15 @@ fn type_hint_to_shape(node: Node, source: &str) -> Shape {
                 "identifier" => {
                     let name = node_text(first, source).unwrap_or_default();
                     match name.as_str() {
-                        "int" | "float" | "str" | "bool" | "bytes" | "None" | "Any" => {
+                        "int" | "float" | "str" | "bool" => {
+                            let name = node_text(first, source).unwrap_or_default();
+                            if let Some(kind) = python_type_to_scalar(&name) {
+                                Shape::Scalar(kind)
+                            } else {
+                                Shape::Scalar(ScalarKind::Unit)
+                            }
+                        }
+                        "bytes" | "None" | "Any" => {
                             Shape::Scalar(ScalarKind::Unit)
                         }
                         "list" | "set" | "frozenset" => {
@@ -654,8 +673,40 @@ fn type_hint_to_shape(node: Node, source: &str) -> Shape {
                                 Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
                             }
                         }
-                        "dict" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)]),
-                        "tuple" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+                        "dict" => {
+                            if children.len() > 4 {
+                                // dict[K, V] — children: identifier 'dict', [, K, , V, ]
+                                let k_shape = if children[2].kind() == "type" {
+                                    type_hint_to_shape(children[2], source)
+                                } else {
+                                    Shape::Scalar(ScalarKind::Unit)
+                                };
+                                let v_shape = if children[4].kind() == "type" {
+                                    type_hint_to_shape(children[4], source)
+                                } else {
+                                    Shape::Scalar(ScalarKind::Unit)
+                                };
+                                Shape::Record(vec![k_shape, v_shape])
+                            } else {
+                                Shape::Record(vec![Shape::Scalar(ScalarKind::Unit), Shape::Scalar(ScalarKind::Unit)])
+                            }
+                        }
+                        "tuple" => {
+                            if children.len() > 1 {
+                                let inner_shapes: Vec<Shape> = children[1..]
+                                    .iter()
+                                    .filter(|c| c.kind() == "type")
+                                    .map(|c| type_hint_to_shape(*c, source))
+                                    .collect();
+                                if inner_shapes.is_empty() {
+                                    Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
+                                } else {
+                                    Shape::Record(inner_shapes)
+                                }
+                            } else {
+                                Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
+                            }
+                        },
                         "Optional" => {
                             if children.len() > 1 {
                                 let inner = &children[1];
