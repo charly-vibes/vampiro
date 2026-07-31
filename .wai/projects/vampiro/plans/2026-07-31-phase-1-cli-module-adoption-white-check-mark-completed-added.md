@@ -1,0 +1,1 @@
+Phase 1 (CLI module adoption): ✅ Completed — added completions, init (scaffold), feedback commands using genesis modules (cli, scaffold, feedback, discovery). Updated main.rs with version-json pre-check. All 187 tests pass, clippy clean. Remaining: Phase 2 (fixture adoption in tests), Phase 3 (cleanup + docs).

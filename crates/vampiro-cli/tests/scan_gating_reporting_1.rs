@@ -10,68 +10,34 @@
 //!   detached/initial/shallow/non-Git, failed-fetch, no-silent-fallback,
 //!   explicit full, versioned cache invalidation
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
-/// Helper: create a temporary directory and initialize it as a git repo with
-/// an initial commit containing dummy .rs files.
-fn setup_git_repo() -> (tempfile::TempDir, PathBuf) {
-    let dir = tempfile::tempdir().unwrap();
-    let repo_path = dir.path().to_path_buf();
+use genesis::fixture::Fixture;
 
-    // Init git repo
-    Command::new("git")
-        .args(["init"])
-        .current_dir(&repo_path)
-        .output()
-        .expect("git init failed");
-
-    // Configure user
-    Command::new("git")
-        .args(["config", "user.email", "test@test.com"])
-        .current_dir(&repo_path)
-        .output()
-        .expect("git config email failed");
-    Command::new("git")
-        .args(["config", "user.name", "Test"])
-        .current_dir(&repo_path)
-        .output()
-        .expect("git config name failed");
-
-    // Create initial src/lib.rs
-    let src_dir = repo_path.join("src");
-    std::fs::create_dir_all(&src_dir).unwrap();
-    let lib_rs = src_dir.join("lib.rs");
-    std::fs::write(&lib_rs, "pub fn hello() -> u32 { 42 }").unwrap();
-
-    // Initial commit
-    Command::new("git")
-        .args(["add", "src/lib.rs"])
-        .current_dir(&repo_path)
-        .output()
-        .expect("git add failed");
-    Command::new("git")
-        .args(["commit", "-m", "initial commit"])
-        .current_dir(&repo_path)
-        .output()
-        .expect("git commit failed");
-
-    (dir, repo_path)
+/// Helper: create a temporary directory with an initialized git repo,
+/// using genesis::fixture for consistent test environment setup.
+fn setup_git_repo() -> Fixture {
+    Fixture::new()
+        .with_git_init()
+        .with_file("src/lib.rs", "pub fn hello() -> u32 { 42 }")
+        .build()
+        .expect("fixture build")
 }
 
 /// Helper: add a second commit with an additional file.
-fn add_second_commit(repo_path: &Path) {
-    let main_rs = repo_path.join("src/main.rs");
+fn add_second_commit(repo: &Fixture) {
+    let main_rs = repo.path("src/main.rs");
     std::fs::write(&main_rs, "pub fn main() { hello(); }").unwrap();
 
     Command::new("git")
         .args(["add", "src/main.rs"])
-        .current_dir(repo_path)
+        .current_dir(repo.root())
         .output()
         .expect("git add failed");
     Command::new("git")
         .args(["commit", "-m", "add main.rs"])
-        .current_dir(repo_path)
+        .current_dir(repo.root())
         .output()
         .expect("git commit failed");
 }
@@ -82,13 +48,14 @@ fn add_second_commit(repo_path: &Path) {
 
 #[test]
 fn test_1_1_synthetic_worktree_diff() {
-    let (_dir, repo_path) = setup_git_repo();
+    let repo = setup_git_repo();
+    let repo_path = repo.root();
 
     // Use vampiro_cli::scan::GitContext to compute local diff.
-    let ctx = vampiro_cli::scan::GitContext::open(&repo_path).unwrap();
+    let ctx = vampiro_cli::scan::GitContext::open(repo_path).unwrap();
 
     // Modify the file (simulate worktree changes)
-    let lib_rs = repo_path.join("src/lib.rs");
+    let lib_rs = repo.path("src/lib.rs");
     std::fs::write(&lib_rs, "pub fn goodbye() -> bool { false }").unwrap();
 
     let scope = ctx.local_diff().unwrap();
@@ -107,24 +74,25 @@ fn test_1_1_synthetic_worktree_diff() {
 
 #[test]
 fn test_1_1_staged_unstaged_untracked() {
-    let (_dir, repo_path) = setup_git_repo();
-    let ctx = vampiro_cli::scan::GitContext::open(&repo_path).unwrap();
+    let repo = setup_git_repo();
+    let repo_path = repo.root();
+    let ctx = vampiro_cli::scan::GitContext::open(repo_path).unwrap();
 
     // Staged: add a new file to index
-    let staged = repo_path.join("staged.rs");
+    let staged = repo.path("staged.rs");
     std::fs::write(&staged, "pub fn staged() -> u32 { 1 }").unwrap();
     Command::new("git")
         .args(["add", "staged.rs"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("git add staged failed");
 
     // Unstaged: modify a tracked file without staging
-    let lib_rs = repo_path.join("src/lib.rs");
+    let lib_rs = repo.path("src/lib.rs");
     std::fs::write(&lib_rs, "pub fn modified() -> u32 { 7 }").unwrap();
 
     // Untracked: create a new file without staging
-    let untracked = repo_path.join("untracked.rs");
+    let untracked = repo.path("untracked.rs");
     std::fs::write(&untracked, "pub fn untracked() -> u32 { 3 }").unwrap();
 
     let scope = ctx.local_diff().unwrap();
@@ -145,9 +113,10 @@ fn test_1_1_staged_unstaged_untracked() {
 
 #[test]
 fn test_1_1_explicit_target_base() {
-    let (_dir, repo_path) = setup_git_repo();
-    add_second_commit(&repo_path);
-    let ctx = vampiro_cli::scan::GitContext::open(&repo_path).unwrap();
+    let repo = setup_git_repo();
+    add_second_commit(&repo);
+    let repo_path = repo.root();
+    let ctx = vampiro_cli::scan::GitContext::open(repo_path).unwrap();
 
     let head = ctx.head_oid().unwrap();
     let first_parent = ctx.first_parent(head).unwrap();
@@ -165,13 +134,14 @@ fn test_1_1_explicit_target_base() {
 
 #[test]
 fn test_1_1_detached_head() {
-    let (_dir, repo_path) = setup_git_repo();
-    add_second_commit(&repo_path);
+    let repo = setup_git_repo();
+    add_second_commit(&repo);
+    let repo_path = repo.root();
 
     // Detach HEAD by checking out a specific commit.
     let head_oid = Command::new("git")
         .args(["rev-parse", "HEAD"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("rev-parse failed");
     let head_sha = String::from_utf8(head_oid.stdout)
@@ -182,19 +152,20 @@ fn test_1_1_detached_head() {
     // Detach HEAD
     Command::new("git")
         .args(["checkout", "--detach"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("checkout --detach failed");
 
-    let ctx = vampiro_cli::scan::GitContext::open(&repo_path).unwrap();
+    let ctx = vampiro_cli::scan::GitContext::open(repo_path).unwrap();
     let oid = ctx.head_oid().unwrap();
     assert_eq!(oid.to_string(), head_sha, "detached HEAD should resolve");
 }
 
 #[test]
 fn test_1_1_initial_commit_no_parent() {
-    let (_dir, repo_path) = setup_git_repo();
-    let ctx = vampiro_cli::scan::GitContext::open(&repo_path).unwrap();
+    let repo = setup_git_repo();
+    let repo_path = repo.root();
+    let ctx = vampiro_cli::scan::GitContext::open(repo_path).unwrap();
 
     let head = ctx.head_oid().unwrap();
     // First parent of the initial commit should return the empty tree.
@@ -205,13 +176,17 @@ fn test_1_1_initial_commit_no_parent() {
         .diff_between(&parent_or_empty.to_string(), &head.to_string())
         .unwrap();
     assert!(scope.is_diff());
-    assert_eq!(scope.files().len(), 1, "initial commit adds 1 .rs file");
+    assert_eq!(
+        scope.files().len(),
+        1,
+        "initial commit adds 1 .rs file (src/lib.rs)"
+    );
 }
 
 #[test]
 fn test_1_1_non_git_directory() {
-    let dir = tempfile::tempdir().unwrap();
-    let result = vampiro_cli::scan::GitContext::open(dir.path());
+    let repo = Fixture::new().build().expect("fixture build");
+    let result = vampiro_cli::scan::GitContext::open(repo.root());
     assert!(
         result.is_err(),
         "non-Git directory should return NotAGitRepository error"
@@ -220,9 +195,10 @@ fn test_1_1_non_git_directory() {
 
 #[test]
 fn test_1_1_explicit_full_scope() {
-    let (_dir, repo_path) = setup_git_repo();
-    add_second_commit(&repo_path);
-    let ctx = vampiro_cli::scan::GitContext::open(&repo_path).unwrap();
+    let repo = setup_git_repo();
+    add_second_commit(&repo);
+    let repo_path = repo.root();
+    let ctx = vampiro_cli::scan::GitContext::open(repo_path).unwrap();
 
     let scope = ctx.full_scope().unwrap();
     assert!(!scope.is_diff(), "full scope should not be diff");
@@ -272,18 +248,16 @@ fn test_1_1_versioned_cache_invalidation() {
 
 #[test]
 fn test_1_1_shallow_repo_detection() {
-    // Test via a non-shallow repo that is_shallow returns false.
-    // (Creating an actual shallow repo via git2 requires a remote; skip for now.)
-    let (_dir, repo_path) = setup_git_repo();
-    let ctx = vampiro_cli::scan::GitContext::open(&repo_path).unwrap();
+    let repo = setup_git_repo();
+    let ctx = vampiro_cli::scan::GitContext::open(repo.root()).unwrap();
     assert!(!ctx.is_shallow(), "fresh repo should not be shallow");
 }
 
 #[test]
 fn test_1_1_merge_base_nonexistent_shallow() {
     // Simulate: calling merge_base between two unrelated commits should fail.
-    let (_dir, repo_path) = setup_git_repo();
-    let ctx = vampiro_cli::scan::GitContext::open(&repo_path).unwrap();
+    let repo = setup_git_repo();
+    let ctx = vampiro_cli::scan::GitContext::open(repo.root()).unwrap();
 
     let head = ctx.head_oid().unwrap();
     // A non-existent OID will cause find_commit to fail in merge_base.

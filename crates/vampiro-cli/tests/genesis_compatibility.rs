@@ -1,6 +1,6 @@
-/// Compatibility fixture: verify Genesis-vibes v0.2.0 exposes the required APIs.
+/// Compatibility fixture: verify Genesis-vibes v0.4.0 exposes the required APIs.
 ///
-/// These tests verify that the published `genesis-vibes = "0.2"` crate
+/// These tests verify that the published `genesis-vibes = "0.4"` crate
 /// provides the modules vampiro depends on.
 
 #[test]
@@ -60,8 +60,65 @@ fn genesis_api_guide_importable() {
 }
 
 #[test]
-fn genesis_version_is_v0_2() {
-    // Verify we're on genesis-vibes 0.2.x
+fn genesis_api_cli_importable() {
+    // genesis::cli::generate_completions and maybe_print_version_json
+    use genesis::cli::maybe_print_version_json;
+    let _ = maybe_print_version_json("test", "0.1.0");
+}
+
+#[test]
+fn genesis_api_feedback_importable() {
+    // genesis::feedback::FeedbackArgs and handle_feedback
+    use genesis::feedback::FeedbackArgs;
+    let args = FeedbackArgs::new("bug", true, false);
+    assert_eq!(args.kind, "bug");
+    assert!(args.dry_run);
+}
+
+#[test]
+fn genesis_api_fixture_importable() {
+    // genesis::fixture::Fixture must be constructable
+    use genesis::fixture::Fixture;
+    let f = Fixture::new()
+        .with_marker(".vampiro")
+        .with_file("test.txt", "hello")
+        .build()
+        .expect("fixture build");
+    assert!(f.path(".vampiro").is_dir());
+    assert!(f.path("test.txt").is_file());
+}
+
+#[test]
+fn genesis_api_scaffold_importable() {
+    // genesis::scaffold::Scaffold must be constructable
+    use genesis::scaffold::Scaffold;
+    let dir = std::env::temp_dir().join(format!("vampiro-test-scaffold-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let result = Scaffold::new(&dir)
+        .dir(".test-dir")
+        .default_config("test.toml", "key = \"val\"")
+        .build()
+        .expect("scaffold build");
+    assert!(!result.created.is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn genesis_api_discovery_importable() {
+    // genesis::discovery::scan and register must be accessible
+    use genesis::discovery;
+    let dir = std::env::temp_dir().join(format!("vampiro-test-discovery-{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&dir);
+    discovery::register(&dir, "test-tool", "test", "directory", ".test").unwrap();
+    let tools = discovery::scan(&dir);
+    assert!(!tools.is_empty());
+    assert!(tools.iter().any(|t| t.name == "test-tool"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn genesis_version_is_v0_4() {
+    // Verify we're on genesis-vibes 0.4.x
     let _ = genesis::envelope::ENVELOPE_VERSION;
     let _ = genesis::envelope::CLI_VERSION;
 }

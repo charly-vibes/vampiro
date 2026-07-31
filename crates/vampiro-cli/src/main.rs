@@ -3,9 +3,15 @@ use genesis::guide::Guide;
 use vampiro_cli::exit_code::ExitCode;
 use vampiro_cli::Cli;
 
-const VAMPIRO_COMMANDS: &[&str] = &["check", "prove", "doctor", "help"];
+const VAMPIRO_COMMANDS: &[&str] = &["check", "init", "prove", "doctor", "feedback", "help"];
 
 fn main() -> ExitCode {
+    // Handle --version --json before clap parsing (clap's built-in --version
+    // doesn't participate in the global --json flag).
+    if genesis::cli::maybe_print_version_json("vampiro", env!("CARGO_PKG_VERSION")) {
+        return ExitCode::Success;
+    }
+
     // CLI scaffold from genesis::guide. The Guide bundles vampiro's name/version,
     // a CommandRegistry (for typo detection), and an ErrorSink (self-healing
     // error footer + feedback scratch).

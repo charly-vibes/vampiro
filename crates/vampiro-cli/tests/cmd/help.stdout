@@ -1,14 +1,17 @@
 A program analysis tool for verifying compliance with laws and policies
 
-Usage: vampiro [COMMAND]
+Usage: vampiro [OPTIONS] [COMMAND]
 
 Commands:
-  check    Analyze source files for composition, modularity, and robustness breaks
-  init-ci  Generate CI workflow configuration
-  prove    Reserved for proof commands
-  doctor   Run diagnostic checks on the project
-  help     Print this message or the help of the given subcommand(s)
+  check     Analyze source files for composition, modularity, and robustness breaks
+  init      Initialize project scaffolding for vampiro
+  init-ci   Generate CI workflow configuration
+  prove     Reserved for proof commands
+  doctor    Run diagnostic checks on the project
+  feedback  Report feedback — file a bug or feature request
+  help      Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help     Print help
-  -V, --version  Print version
+      --completions <SHELL>  Print shell completion script and exit [possible values: bash, elvish, fish, powershell, zsh]
+  -h, --help                 Print help
+  -V, --version              Print version

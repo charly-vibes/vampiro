@@ -1,0 +1,1 @@
+The previous session was working on adopting genesis v0.4.0 modules across the vampiro codebase. A wai plan was created (2026-07-31-adopt-all-genesis-v0-4-0-modules-across-vampiro-co.md) but the session crashed mid-edit on crates/vampiro-cli/src/cli/mod.rs, corrupting the file. The file has been restored to a clean state. Session is now resuming — need to re-approach the work.

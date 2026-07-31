@@ -1528,6 +1528,7 @@ name = "vampiro"
 version = "0.2.0"
 dependencies = [
  "clap",
+ "clap_complete",
  "genesis-vibes",
  "git2",
  "hex",

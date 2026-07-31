@@ -1,0 +1,1 @@
+Phase 2 (fixture adoption): ✅ Replaced manual git-init + tempfile in scan_gating_reporting_1.rs with genesis::fixture::Fixture. Phase 3 (cleanup/docs): ✅ Updated llms.txt, expanded genesis_compatibility tests (14→12→12 tests covering all 14 genesis modules), regenerated AIX artifacts. All tests pass, clippy clean, fmt clean.

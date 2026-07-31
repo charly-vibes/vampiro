@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use clap::CommandFactory;
 use clap::Parser;
 use vampiro_rust_frontend::visibility_adapter::to_visibility_facts;
 use vampiro_rust_frontend::RustFrontend;
@@ -18,12 +19,22 @@ use crate::scan::GitContext;
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
+
+    /// Print shell completion script and exit
+    #[arg(long, value_enum, value_name = "SHELL")]
+    pub completions: Option<clap_complete::Shell>,
 }
 
 #[derive(Parser, Debug)]
 pub enum Commands {
     /// Analyze source files for composition, modularity, and robustness breaks
     Check(CheckArgs),
+    /// Initialize project scaffolding for vampiro
+    Init {
+        /// Project path (default: current directory)
+        #[arg(long)]
+        path: Option<std::path::PathBuf>,
+    },
     /// Generate CI workflow configuration
     InitCi {
         /// CI provider (default: github-actions)
@@ -40,6 +51,20 @@ pub enum Commands {
         /// Auto-fix issues when possible
         #[arg(long)]
         fix: bool,
+    },
+    /// Report feedback — file a bug or feature request
+    Feedback {
+        /// Kind of feedback: bug, feature, question
+        #[arg(long, default_value = "bug")]
+        kind: String,
+
+        /// Dry run — only print the issue body
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Include last error scratch
+        #[arg(long)]
+        from_last_error: bool,
     },
 }
 
@@ -79,10 +104,23 @@ pub enum ProveCommands {}
 
 impl Cli {
     pub fn run(&self) -> ExitCode {
+        // Handle top-level flags first
+        if let Some(shell) = self.completions {
+            genesis::cli::generate_completions(&mut Cli::command(), shell)
+                .expect("failed to generate completions");
+            return ExitCode::Success;
+        }
+
         match &self.command {
             Some(Commands::Check(args)) => run_check(args),
+            Some(Commands::Init { path }) => run_init(path.as_deref()),
             Some(Commands::InitCi { provider }) => run_init_ci(provider),
             Some(Commands::Doctor { fix }) => run_doctor(*fix),
+            Some(Commands::Feedback {
+                kind,
+                dry_run,
+                from_last_error,
+            }) => run_feedback(kind, *dry_run, *from_last_error),
             _ => ExitCode::Success,
         }
     }
@@ -119,6 +157,81 @@ fn run_doctor(fix: bool) -> ExitCode {
         Err(e) => {
             eprintln!("vampiro doctor: {e}");
             ExitCode::InternalError
+        }
+    }
+}
+
+fn run_init(path: Option<&Path>) -> ExitCode {
+    use genesis::discovery;
+    use genesis::scaffold::Scaffold;
+
+    let project_root = path
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    println!(
+        "vampiro: initializing project at {}",
+        project_root.display()
+    );
+
+    match Scaffold::new(&project_root)
+        .dir(".vampiro")
+        .gitignore_entry(".vampiro/")
+        .build()
+    {
+        Ok(result) => {
+            for path in &result.created {
+                println!("  created: {}", path.display());
+            }
+            for path in &result.existed {
+                println!("  already exists: {}", path.display());
+            }
+
+            // Register in genesis tool manifest
+            if let Err(e) = discovery::register(
+                &project_root,
+                "vampiro",
+                "A program analysis tool for verifying compliance with laws and policies",
+                "directory",
+                ".vampiro",
+            ) {
+                eprintln!("vampiro: failed to register in genesis manifest: {e}");
+            }
+
+            ExitCode::Success
+        }
+        Err(e) => {
+            eprintln!("vampiro: failed to initialize project: {e}");
+            ExitCode::InternalError
+        }
+    }
+}
+
+fn run_feedback(kind: &str, dry_run: bool, from_last_error: bool) -> ExitCode {
+    use genesis::feedback::{handle_feedback, FeedbackArgs};
+
+    let args = FeedbackArgs::new(kind, dry_run, from_last_error);
+    let repo_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    match handle_feedback(
+        &args,
+        "vampiro",
+        env!("CARGO_PKG_VERSION"),
+        "charly/vampiro",
+        &repo_root,
+    ) {
+        Ok(_result) => {
+            if dry_run {
+                // handle_feedback already prints to stderr in dry_run mode
+                println!("vampiro: dry-run — feedback would be filed to GitHub");
+            } else {
+                println!("vampiro: feedback filed successfully");
+            }
+            ExitCode::Success
+        }
+        Err(e) => {
+            eprintln!("vampiro feedback: {e}");
+            ExitCode::UsageError
         }
     }
 }
