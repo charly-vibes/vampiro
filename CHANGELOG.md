@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.1] — 2026-07-31
+
+### Added
+
+- **crates.io release pipeline** — tag-triggered `release.yml` workflow builds the
+  `vampiro` CLI for Linux/macOS/Windows and publishes all 10 workspace crates to
+  crates.io in topological dependency order, then creates a GitHub Release with
+  pre-built binaries and checksums.
+- **`[workspace.package]` metadata inheritance** — `license`, `repository`,
+  `homepage`, `readme`, `keywords`, `categories`, and `rust-version` are now
+  shared across all crates via `*.workspace = true`.
+- **`just publish`** and **`just publish-dry <crate>`** recipes for local
+  release operations.
+
+### Changed
+
+- All 19 internal path dependencies now carry an explicit `version` field so
+  dependents package against the published crate version.
+
+### Notes
+
+- 0.3.0 was tagged but never published to crates.io; 0.3.1 is the first
+  actually-released version.
+
 ## [0.3.0] — 2026-07-31
 
 ### Added
