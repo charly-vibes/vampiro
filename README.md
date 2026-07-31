@@ -24,7 +24,7 @@ in the category it claims to compose in?**
 
 ## Current status
 
-**v0.2.0** — Working CLI with frontends for 4 languages:
+**v0.3.0** — Full genesis v0.4.0 module adoption across vampiro-cli:
 
 | Language | Frontend | Data-flow edges | Tests |
 |---|---|---|---|

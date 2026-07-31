@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.0] — 2026-07-31
+
+### Added
+
+- **Full genesis v0.4.0 module adoption across vampiro-cli** — all 14 modules
+  now imported and used.
+- **`vampiro init` command** — project scaffolding via `genesis::scaffold::Scaffold`,
+  including `.genesis/tools.toml` manifest registration via `genesis::discovery`.
+- **`vampiro feedback` command** — file bug/feature reports via
+  `genesis::feedback::handle_feedback` (scratch, redactor, gh).
+- **`vampiro --completions <SHELL>`** — shell completion generation via
+  `genesis::cli::generate_completions`.
+- **`--version --json` support** — pre-parse check via
+  `genesis::cli::maybe_print_version_json`.
+- **`genesis::fixture::Fixture` in test infra** — replaces manual `tempfile` + git
+  CLI setup in scan/gating tests.
+- **Genesis compatibility test suite** — 12 tests covering all 14 genesis modules.
+
+### Changed
+
+- `clap_complete` added as direct dependency.
+- Updated AIX artifacts (`llms.txt`) with genesis adoption table.
+- CLI help snapshot updated for new commands and options.
+
 ## [0.2.0] — 2026-07-30
 
 ### Added
