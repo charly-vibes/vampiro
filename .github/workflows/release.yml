@@ -132,6 +132,7 @@ jobs:
     name: Publish to crates.io + GitHub Release
     needs: [build-linux, build-darwin, build-windows]
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -155,11 +156,56 @@ jobs:
       #
       # Idempotent: a crate already on crates.io (e.g. from a partially-successful
       # prior run) is detected and skipped rather than aborting the sequence.
-      # crates.io rate-limits new-crate creation in bursts, so we sleep between
-      # publishes to stay under the limit.
+      #
+      # Self-healing against crates.io new-crate rate limits (429): crates.io uses
+      # a token bucket (~5 new crates burst, then ~1 per 10 min). On 429 the
+      # response includes "Please try again after <RFC date>"; we parse it, sleep
+      # until that time plus a buffer, and retry the same crate (up to 6 attempts).
       - name: Publish to crates.io (topological order)
         run: |
           set -uo pipefail
+
+          max_attempts=6
+          publish_one() {
+            local crate="$1" attempt=0
+            while :; do
+              attempt=$((attempt + 1))
+              local log
+              log="$(mktemp)"
+              if cargo publish --allow-dirty -p "${crate}" 2>&1 | tee "${log}"; then
+                echo "  published ${crate}"
+                rm -f "${log}"
+                return 0
+              elif grep -qiE "already exists|already uploaded|already been published" "${log}"; then
+                echo "  ${crate} already on crates.io — skipping"
+                rm -f "${log}"
+                return 0
+              elif grep -qi "429" "${log}"; then
+                # Parse "Please try again after <RFC2822-ish date> GMT" and wait.
+                local wait_until
+                wait_until="$(grep -oE 'try again after [^<]+GMT' "${log}" | sed -E 's/try again after //')"
+                rm -f "${log}"
+                if [ -n "${wait_until}" ] && [ ${attempt} -lt ${max_attempts} ]; then
+                  local target now sleep_secs
+                  target="$(date -u -d "${wait_until}" +%s 2>/dev/null || echo 0)"
+                  now="$(date -u +%s)"
+                  sleep_secs=$(( target - now + 30 ))
+                  if [ ${sleep_secs} -lt 5 ]; then sleep_secs=30; fi
+                  echo "  ${crate}: rate-limited (429). Waiting ${sleep_secs}s for ${wait_until} then retrying (attempt ${attempt}/${max_attempts})..."
+                  sleep ${sleep_secs}
+                  continue
+                fi
+                echo "  !! ${crate}: rate-limited and out of retries"
+                return 1
+              else
+                echo "  !! failed to publish ${crate}"
+                cat "${log}"
+                rm -f "${log}"
+                return 1
+              fi
+            done
+          }
+
           for crate in \
               vampiro-cir \
               vampiro-law \
@@ -172,21 +218,11 @@ jobs:
               vampiro-lifecycle-analysis \
               vampiro; do
             echo "::group::Publishing ${crate}"
-            log="$(mktemp)"
-            if cargo publish --allow-dirty -p "${crate}" 2>&1 | tee "${log}"; then
-              echo "  published ${crate}"
-            elif grep -qiE "already exists|already uploaded|already been published" "${log}"; then
-              echo "  ${crate} already on crates.io — skipping"
-            else
-              echo "  !! failed to publish ${crate}"
-              cat "${log}"
-              exit 1
-            fi
+            publish_one "${crate}" || exit 1
             echo "::endgroup::"
             # Give the crates.io index a moment to propagate before the next
-            # crate resolves its dependency on the just-published version,
-            # and to stay under crates.io's new-crate rate limit.
-            sleep 20
+            # crate resolves its dependency on the just-published version.
+            sleep 5
           done
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
