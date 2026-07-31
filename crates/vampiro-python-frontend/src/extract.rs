@@ -567,7 +567,10 @@ fn process_call_expression(
                                         caller_id,
                                     );
                                     let expr_edge = CirEdge {
-                                        id: StableId::new(format!("py:edge:expr_{}", *edge_counter)),
+                                        id: StableId::new(format!(
+                                            "py:edge:expr_{}",
+                                            *edge_counter
+                                        )),
                                         source: expr_id,
                                         target: callee_id.clone(),
                                         resolution: EffectResolution::Propagated,
