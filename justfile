@@ -131,9 +131,10 @@ publish-dry crate:
     cargo publish --dry-run --allow-dirty -p {{crate}}
 
 # Publish all crates to crates.io in topological dependency order.
-# Requires CARGO_REGISTRY_TOKEN in the environment.
+# Requires CARGO_REGISTRY_TOKEN in the environment. Idempotent: crates
+# already on crates.io are skipped.
 publish:
-    @set -e; \
+    @set -uo pipefail; \
     for crate in \
         vampiro-cir \
         vampiro-law \
@@ -146,8 +147,15 @@ publish:
         vampiro-lifecycle-analysis \
         vampiro; do \
         echo "→ Publishing $${crate}"; \
-        cargo publish --allow-dirty -p "$${crate}"; \
-        sleep 5; \
+        log=$$(mktemp); \
+        if cargo publish --allow-dirty -p "$${crate}" 2>&1 | tee "$${log}"; then \
+            :; \
+        elif grep -qiE "already exists|already uploaded|already been published" "$${log}"; then \
+            echo "  $${crate} already on crates.io — skipping"; \
+        else \
+            exit 1; \
+        fi; \
+        sleep 20; \
     done
     @echo "✅ All crates published"
 

@@ -152,9 +152,14 @@ jobs:
       # Publish crates in topological order. `--allow-dirty` guards against any
       # stray working-tree state in CI; the tag checkout is clean in practice.
       # `--no-verify` is NOT used — each crate is built from the published tarball.
+      #
+      # Idempotent: a crate already on crates.io (e.g. from a partially-successful
+      # prior run) is detected and skipped rather than aborting the sequence.
+      # crates.io rate-limits new-crate creation in bursts, so we sleep between
+      # publishes to stay under the limit.
       - name: Publish to crates.io (topological order)
         run: |
-          set -e
+          set -uo pipefail
           for crate in \
               vampiro-cir \
               vampiro-law \
@@ -167,11 +172,21 @@ jobs:
               vampiro-lifecycle-analysis \
               vampiro; do
             echo "::group::Publishing ${crate}"
-            cargo publish --allow-dirty -p "${crate}"
+            log="$(mktemp)"
+            if cargo publish --allow-dirty -p "${crate}" 2>&1 | tee "${log}"; then
+              echo "  published ${crate}"
+            elif grep -qiE "already exists|already uploaded|already been published" "${log}"; then
+              echo "  ${crate} already on crates.io — skipping"
+            else
+              echo "  !! failed to publish ${crate}"
+              cat "${log}"
+              exit 1
+            fi
             echo "::endgroup::"
             # Give the crates.io index a moment to propagate before the next
-            # crate resolves its dependency on the just-published version.
-            sleep 5
+            # crate resolves its dependency on the just-published version,
+            # and to stay under crates.io's new-crate rate limit.
+            sleep 20
           done
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
