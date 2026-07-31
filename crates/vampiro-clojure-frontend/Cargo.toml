@@ -1,16 +1,23 @@
 [package]
 name = "vampiro-clojure-frontend"
-version = "0.3.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 description = "Clojure language frontend for Vampiro — extracts CIR graphs from Clojure source using tree-sitter"
 
 [dependencies]
-vampiro-cir = { path = "../vampiro-cir" }
+vampiro-cir = { path = "../vampiro-cir", version = "0.3.0" }
 tree-sitter = "0.25"
 tree-sitter-clojure = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
-vampiro-frontend-harness = { path = "../vampiro-frontend-harness" }
+vampiro-frontend-harness = { path = "../vampiro-frontend-harness", version = "0.3.0" }
 tempfile = "3"

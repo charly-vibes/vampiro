@@ -1,3 +1,14 @@
 [workspace]
 resolver = "2"
 members = ["crates/*"]
+
+[workspace.package]
+version = "0.3.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/charly-vibes/vampiro"
+homepage = "https://github.com/charly-vibes/vampiro"
+readme = "README.md"
+keywords = ["static-analysis", "program-analysis", "compliance", "cir", "laws"]
+categories = ["command-line-utilities", "development-tools"]
+rust-version = "1.74"

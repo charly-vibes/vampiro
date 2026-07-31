@@ -124,6 +124,33 @@ check-planning:
 # Full planning check
 check: validate check-planning
 
+# === Release Commands ===
+
+# Dry-run publish for a single crate (verifies packaging without uploading)
+publish-dry crate:
+    cargo publish --dry-run --allow-dirty -p {{crate}}
+
+# Publish all crates to crates.io in topological dependency order.
+# Requires CARGO_REGISTRY_TOKEN in the environment.
+publish:
+    @set -e; \
+    for crate in \
+        vampiro-cir \
+        vampiro-law \
+        vampiro-frontend-harness \
+        vampiro-rust-frontend \
+        vampiro-seam-analysis \
+        vampiro-python-frontend \
+        vampiro-clojure-frontend \
+        vampiro-julia-frontend \
+        vampiro-lifecycle-analysis \
+        vampiro; do \
+        echo "→ Publishing $${crate}"; \
+        cargo publish --allow-dirty -p "$${crate}"; \
+        sleep 5; \
+    done
+    @echo "✅ All crates published"
+
 # === Utility Commands ===
 
 # Clean build artifacts

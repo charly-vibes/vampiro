@@ -1,13 +1,20 @@
 [package]
 name = "vampiro-seam-analysis"
-version = "0.3.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
 description = "Language-neutral seam analysis for Vampiro — composition, modularity, optionality, and robustness checks over CIR"
 
 [dependencies]
-vampiro-cir = { path = "../vampiro-cir" }
+vampiro-cir = { path = "../vampiro-cir", version = "0.3.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
-vampiro-rust-frontend = { path = "../vampiro-rust-frontend" }
+vampiro-rust-frontend = { path = "../vampiro-rust-frontend", version = "0.3.0" }
