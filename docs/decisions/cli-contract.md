@@ -23,7 +23,7 @@
 
 - **File:** `config.toml`
 - **Format:** TOML
-- **Case:** Lowercase, kebab-case keys (e.g., `scan-threads = 4`)
+- **Case:** Lowercase, kebab-case keys
 
 ### Rejected alternatives
 

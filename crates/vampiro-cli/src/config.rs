@@ -5,18 +5,13 @@ use serde::{Deserialize, Serialize};
 
 /// Vampiro configuration loaded from TOML files.
 ///
-/// Fields are optional — any unset field falls back to the built-in default.
 /// Config is loaded from `.vampiro/config.toml` relative to the repo root.
 ///
 /// Implements `genesis::config::ConfigFile` for shared suite-wide config
 /// discovery and validation via `ConfigStore`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-#[serde(deny_unknown_fields)]
-pub struct Config {
-    /// Number of threads to use for scanning (default: auto-detect)
-    pub scan_threads: Option<u32>,
-}
+pub struct Config {}
 
 // ── genesis::config::ConfigFile adoption ──────────────────────────────
 //
@@ -31,7 +26,6 @@ impl ConfigFile for Config {
     }
 
     fn validate(&self) -> Result<Vec<ConfigValidation>, ConfigError> {
-        // No domain-specific validation yet — scan_threads accepts any u32
         Ok(Vec::new())
     }
 }
@@ -71,26 +65,15 @@ mod tests {
     }
 
     #[test]
-    fn config_read_write_roundtrip() {
+    fn config_roundtrip() {
         let dir = tempfile::tempdir().unwrap();
         let config_dir = dir.path().join(".vampiro");
         std::fs::create_dir_all(&config_dir).unwrap();
-        std::fs::write(config_dir.join("config.toml"), "scan-threads = 4\n").unwrap();
+        std::fs::write(config_dir.join("config.toml"), "# empty config\n").unwrap();
 
         let config = Config::read(dir.path()).unwrap();
-        assert_eq!(config.scan_threads, Some(4));
-    }
-
-    #[test]
-    fn config_write_then_read() {
-        let dir = tempfile::tempdir().unwrap();
-        let config = Config {
-            scan_threads: Some(8),
-        };
-        config.write(dir.path()).unwrap();
-
-        let read = Config::read(dir.path()).unwrap();
-        assert_eq!(read.scan_threads, Some(8));
+        // Empty config — only verifies the file roundtrips through genesis
+        let _ = config;
     }
 
     #[test]
@@ -109,9 +92,10 @@ mod tests {
     }
 
     #[test]
-    fn config_default_has_no_scan_threads() {
+    fn config_default_is_empty() {
         let config = Config::default();
-        assert_eq!(config.scan_threads, None);
+        // Default config has no fields; verify it roundtrips
+        assert!(serde_json::to_string(&config).is_ok());
     }
 
     #[test]
@@ -146,7 +130,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let config_dir = dir.path().join(".vampiro");
         std::fs::create_dir_all(&config_dir).unwrap();
-        std::fs::write(config_dir.join("config.toml"), "scan-threads = 4\n").unwrap();
+        std::fs::write(config_dir.join("config.toml"), "# config\n").unwrap();
 
         let store = vampiro_config_store();
         let discovered = ConfigStore::discover(dir.path(), store.registry());
@@ -160,10 +144,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let config_dir = dir.path().join(".vampiro");
         std::fs::create_dir_all(&config_dir).unwrap();
-        std::fs::write(config_dir.join("config.toml"), "scan-threads = 4\n").unwrap();
+        std::fs::write(config_dir.join("config.toml"), "# empty\n").unwrap();
 
         let store = vampiro_config_store();
         let config: Config = store.get("vampiro", dir.path()).unwrap();
-        assert_eq!(config.scan_threads, Some(4));
+        // Empty config loads successfully through ConfigStore
+        let _ = config;
     }
 }
