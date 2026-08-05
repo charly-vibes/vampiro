@@ -124,7 +124,13 @@ fn python_cli_accepts_py_directory() {
 /// Helper: run `vampiro check --path <path>` and assert success.
 fn assert_check_succeeds(label: &str, path: &Path) {
     let output = Command::new(env!("CARGO_BIN_EXE_vampiro"))
-        .args(["check", "--path", &path.to_string_lossy(), "--mode", "guidance"])
+        .args([
+            "check",
+            "--path",
+            &path.to_string_lossy(),
+            "--mode",
+            "guidance",
+        ])
         .output()
         .unwrap_or_else(|_| panic!("{label} check command failed to start"));
 

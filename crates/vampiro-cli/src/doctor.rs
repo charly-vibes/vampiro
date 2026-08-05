@@ -231,11 +231,7 @@ mod tests {
         let dir = std::env::temp_dir().join("vampiro-doctor-test-config-valid");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join(".vampiro")).unwrap();
-        std::fs::write(
-            dir.join(".vampiro").join("config.toml"),
-            "[scan]\nthreads = 4\n",
-        )
-        .unwrap();
+        std::fs::write(dir.join(".vampiro").join("config.toml"), "# empty config\n").unwrap();
 
         let check = ConfigCheck;
         let results = check.run(&dir).unwrap();

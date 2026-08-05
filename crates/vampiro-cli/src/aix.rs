@@ -17,10 +17,9 @@ pub struct ProjectMeta {
 pub const VAMPIRO_META: ProjectMeta = ProjectMeta {
     name: "vampiro",
     tagline: "Cross-language Rust CLI (v0.2.0) for checking whether code composes correctly at call and module boundaries. Supports Python, Clojure, Julia, and Rust via tree-sitter frontends.",
-    description: "Cross-language Rust CLI (v0.2.0) that checks whether the pieces of a codebase actually compose. Uses tree-sitter frontends for Python, Clojure, Julia, and Rust to emit a shared Composition IR (CIR) with per-slot data-flow edges. Composition seam analysis achieves ~99.8% precision on clean baselines.",
+    description: "Cross-language Rust CLI (v0.3.1) that checks whether the pieces of a codebase actually compose. Uses tree-sitter frontends for Python, Clojure, Julia, and Rust to emit a shared Composition IR (CIR) with per-slot data-flow edges. Composition seam analysis achieves ~99.8% precision on clean baselines.",
     commands: &[
-        ("vampiro check", "Check for seam defects (default: diff-scoped)"),
-        ("vampiro scan", "Full repository scan"),
+        ("vampiro check", "Check source files for composition, modularity, and robustness breaks"),
     ],
 };
 

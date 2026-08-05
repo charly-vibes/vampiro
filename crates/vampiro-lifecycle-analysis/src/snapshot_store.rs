@@ -215,9 +215,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = SnapshotStore::new(dir.path()).unwrap();
 
-        store.write_snapshot(&FacadeSnapshot::new("ccccccc")).unwrap();
-        store.write_snapshot(&FacadeSnapshot::new("aaaaaaa")).unwrap();
-        store.write_snapshot(&FacadeSnapshot::new("bbbbbbb")).unwrap();
+        store
+            .write_snapshot(&FacadeSnapshot::new("ccccccc"))
+            .unwrap();
+        store
+            .write_snapshot(&FacadeSnapshot::new("aaaaaaa"))
+            .unwrap();
+        store
+            .write_snapshot(&FacadeSnapshot::new("bbbbbbb"))
+            .unwrap();
 
         let shas = store.list_snapshots().unwrap();
         assert_eq!(shas, vec!["aaaaaaa", "bbbbbbb", "ccccccc"]);
@@ -235,7 +241,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = SnapshotStore::new(dir.path()).unwrap();
 
-        store.write_snapshot(&FacadeSnapshot::new("abc1234")).unwrap();
+        store
+            .write_snapshot(&FacadeSnapshot::new("abc1234"))
+            .unwrap();
         assert!(store.has_snapshot("abc1234"));
 
         store.delete_snapshot("abc1234").unwrap();

@@ -3,7 +3,9 @@ use genesis::guide::Guide;
 use vampiro_cli::exit_code::ExitCode;
 use vampiro_cli::Cli;
 
-const VAMPIRO_COMMANDS: &[&str] = &["check", "init", "init-ci", "prove", "doctor", "feedback", "help"];
+const VAMPIRO_COMMANDS: &[&str] = &[
+    "check", "init", "init-ci", "prove", "doctor", "feedback", "help",
+];
 
 fn main() -> ExitCode {
     // Handle --version --json before clap parsing (clap's built-in --version

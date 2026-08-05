@@ -40,7 +40,10 @@ in the category it claims to compose in?**
   at call boundaries with ~99.8% precision on clean baselines.
 - **Cross-language verification**: seeded-fault E2E suite verifies data-flow
   edge structure across all 3 non-Rust frontends.
-- **Benchmarking**: 100 lines in ~10ms, 1k in ~270ms, 10k in ~21s.
+- **Law verification** and **lifecycle analysis** crates are available in the
+  workspace but not yet integrated into the CLI (`vampiro prove` prints a
+  placeholder message).
+- **Benchmarking**: 100 lines in ~10ms, 1k in ~65ms, 10k in ~0.63s.
 - **Specification**: EARS v1.3.0 approved. Active OpenSpec changes under
   `openspec/changes/`.
 
