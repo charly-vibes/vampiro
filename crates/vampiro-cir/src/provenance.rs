@@ -501,6 +501,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Requires non-shallow git history with specific commit SHAs — run with `cargo test -- --ignored` in a full clone"]
     fn traceability_via_commits() {
         // Verify each commit has the expected message pattern
         let output = std::process::Command::new("git")
