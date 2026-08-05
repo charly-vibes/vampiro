@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.4.0] — 2026-08-05
+
+### Added
+
+- **Non-Rust frontends in production CLI** — `vampiro check` now accepts `.py`,
+  `.clj`/`.cljs`, and `.jl` files and directories, dispatching to the Python,
+  Clojure, and Julia frontends respectively. Rust behavior unchanged. Integration
+  tests verify each language's file and directory scan paths.
+- **`--sarif` CLI flag** — `render_sarif()` was already implemented but
+  unreachable. Now wired to `vampiro check --sarif`.
+- **Rust build/test CI job** — `ci.yml` now runs `cargo build`, `cargo test`,
+  `cargo clippy`, and `cargo fmt --check` on every push/PR.
+
+### Changed
+
+- **genesis-vibes 0.4 → 0.6** — envelope API now requires `cli_version` as the
+  first argument (caller-supplied — `env!("CARGO_PKG_VERSION")`). Both call
+  sites in `output.rs` and `genesis_compatibility.rs` updated.
+- **Extension-aware file collection** — `collect_rs_files` replaced by
+  `collect_source_files` accepting `.rs`, `.py`, `.clj`, `.cljs`, `.jl`.
+- **`vampiro prove`** — no longer a silent no-op; prints "not yet implemented".
+
+### Fixed
+
+- **CI job** — first CI job for Rust code: build, test, clippy, fmt.
+- **Malformed YAML** — generated GitHub Actions workflow had `}}''` (extra quote)
+  on `--target`/`--base` lines.
+- **`init-ci` missing from typo registry** — added to `VAMPIRO_COMMANDS`.
+- **`scan_threads` dead config** — field removed from `Config` (was parsed but
+  never consulted).
+- **Doctor schema validation** — `ConfigCheck::run()` now uses `Config::read()`
+  instead of `toml::from_str::<toml::Value>`, validating the full schema.
+- **Path traversal risk** — `SnapshotStore::snapshot_path()` validates commit SHA
+  is hex-only (7–64 chars) before using as filename.
+- **Shallow-git test** — `traceability_via_commits` ignored (requires specific
+  commit SHAs).
+
+### Documentation
+
+- **README quickstart** — fixed to use `--path <file>` instead of positional arg.
+- **README test counts** — corrected from inflated "750+" to per-language counts
+  (73 Python, 37 Clojure, 31 Julia, 96 Rust; 811 workspace total).
+- **README benchmark numbers** — updated to post-optimization values.
+- **AIX/llms** — phantom `vampiro scan` removed, version bumped to v0.4.0.
+
 ## [0.3.1] — 2026-07-31
 
 ### Added

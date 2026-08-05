@@ -12,7 +12,7 @@ rust-version.workspace = true
 description = "Rust language frontend for Vampiro — extracts CIR graphs from Rust source using syn"
 
 [dependencies]
-vampiro-cir = { path = "../vampiro-cir", version = "0.3.1" }
+vampiro-cir = { path = "../vampiro-cir", version = "0.4.0" }
 syn = { version = "2", features = ["full", "visit", "extra-traits", "clone-impls"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 serde = { version = "1", features = ["derive"] }

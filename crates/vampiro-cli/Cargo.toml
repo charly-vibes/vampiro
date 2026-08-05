@@ -29,16 +29,16 @@ sha2 = "0.10"
 hex = "0.4"
 toml = "1.1.3"
 git2 = { version = "0.20", features = ["vendored-openssl"] }
-vampiro-cir = { path = "../vampiro-cir", version = "0.3.1" }
-vampiro-seam-analysis = { path = "../vampiro-seam-analysis", version = "0.3.1" }
-vampiro-rust-frontend = { path = "../vampiro-rust-frontend", version = "0.3.1" }
-vampiro-python-frontend = { path = "../vampiro-python-frontend", version = "0.3.1" }
-vampiro-clojure-frontend = { path = "../vampiro-clojure-frontend", version = "0.3.1" }
-vampiro-julia-frontend = { path = "../vampiro-julia-frontend", version = "0.3.1" }
+vampiro-cir = { path = "../vampiro-cir", version = "0.4.0" }
+vampiro-seam-analysis = { path = "../vampiro-seam-analysis", version = "0.4.0" }
+vampiro-rust-frontend = { path = "../vampiro-rust-frontend", version = "0.4.0" }
+vampiro-python-frontend = { path = "../vampiro-python-frontend", version = "0.4.0" }
+vampiro-clojure-frontend = { path = "../vampiro-clojure-frontend", version = "0.4.0" }
+vampiro-julia-frontend = { path = "../vampiro-julia-frontend", version = "0.4.0" }
 
 [dev-dependencies]
 tempfile = "3.27.0"
 trycmd = "0.15"
-vampiro-cir = { path = "../vampiro-cir", version = "0.3.1" }
-vampiro-clojure-frontend = { path = "../vampiro-clojure-frontend", version = "0.3.1" }
-vampiro-julia-frontend = { path = "../vampiro-julia-frontend", version = "0.3.1" }
+vampiro-cir = { path = "../vampiro-cir", version = "0.4.0" }
+vampiro-clojure-frontend = { path = "../vampiro-clojure-frontend", version = "0.4.0" }
+vampiro-julia-frontend = { path = "../vampiro-julia-frontend", version = "0.4.0" }

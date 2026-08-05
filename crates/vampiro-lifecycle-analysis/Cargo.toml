@@ -17,7 +17,7 @@ serde_json = "1.0.151"
 sha2 = "0.10"
 hex = "0.4"
 tempfile = "3.27.0"
-vampiro-cir = { path = "../vampiro-cir", version = "0.3.1" }
-vampiro-seam-analysis = { path = "../vampiro-seam-analysis", version = "0.3.1" }
+vampiro-cir = { path = "../vampiro-cir", version = "0.4.0" }
+vampiro-seam-analysis = { path = "../vampiro-seam-analysis", version = "0.4.0" }
 
 [dev-dependencies]

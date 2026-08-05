@@ -12,12 +12,12 @@ rust-version.workspace = true
 description = "Julia language frontend for Vampiro — extracts CIR graphs from Julia source using tree-sitter"
 
 [dependencies]
-vampiro-cir = { path = "../vampiro-cir", version = "0.3.1" }
+vampiro-cir = { path = "../vampiro-cir", version = "0.4.0" }
 tree-sitter = "0.25"
 tree-sitter-julia = "0.23"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
 [dev-dependencies]
-vampiro-frontend-harness = { path = "../vampiro-frontend-harness", version = "0.3.1" }
+vampiro-frontend-harness = { path = "../vampiro-frontend-harness", version = "0.4.0" }
 tempfile = "3"
