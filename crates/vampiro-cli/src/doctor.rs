@@ -12,6 +12,8 @@
 
 use std::path::Path;
 
+use crate::config::Config;
+use genesis::config::ConfigFile;
 use genesis::doctor::DoctorCheck;
 use genesis::suite_linter::{LintResult, Severity};
 
@@ -38,24 +40,13 @@ impl DoctorCheck for ConfigCheck {
             return Ok(results);
         }
 
-        let content = match std::fs::read_to_string(&config_path) {
-            Ok(c) => c,
-            Err(e) => {
-                results.push(LintResult::new(
-                    format!("Cannot read `.vampiro/config.toml`: {e}"),
-                    Severity::Error,
-                ));
-                return Ok(results);
-            }
-        };
-
-        match toml::from_str::<toml::Value>(&content) {
+        match Config::read(_repo) {
             Ok(_) => {
                 results.push(LintResult::new("Config is valid", Severity::Advisory));
             }
             Err(e) => {
                 results.push(LintResult::new(
-                    format!("Config parse error: {e}"),
+                    format!("Config error: {e}"),
                     Severity::Error,
                 ));
             }
