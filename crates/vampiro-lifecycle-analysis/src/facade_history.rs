@@ -253,6 +253,8 @@ pub enum FacadeHistoryError {
     NotAncestor(String),
     /// I/O error reading/writing snapshots.
     IoError(std::io::Error),
+    /// The commit SHA is not a valid hex string of length 7–64.
+    InvalidCommitSha(String),
 }
 
 impl std::fmt::Display for FacadeHistoryError {
@@ -262,6 +264,10 @@ impl std::fmt::Display for FacadeHistoryError {
                 write!(f, "no snapshot found for baseline {sha}")
             }
             FacadeHistoryError::NotAncestor(msg) => write!(f, "{msg}"),
+            FacadeHistoryError::InvalidCommitSha(sha) => write!(
+                f,
+                "invalid commit SHA '{sha}' (must be 7–64 lowercase hex chars)"
+            ),
             FacadeHistoryError::IoError(e) => write!(f, "I/O error: {e}"),
         }
     }
