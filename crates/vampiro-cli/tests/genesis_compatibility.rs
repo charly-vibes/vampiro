@@ -7,6 +7,7 @@
 fn genesis_api_envelope_importable() {
     // genesis::envelope::Envelope<T> must be accessible
     let _: genesis::envelope::Envelope<&str> = genesis::envelope::Envelope::success(
+        "test",
         genesis::envelope::EnvelopeKind::Ok,
         "test",
         vec![],
@@ -117,8 +118,7 @@ fn genesis_api_discovery_importable() {
 }
 
 #[test]
-fn genesis_version_is_v0_4() {
-    // Verify we're on genesis-vibes 0.4.x
+fn genesis_version_is_v0_6() {
+    // Verify we're on genesis-vibes 0.6.x
     let _ = genesis::envelope::ENVELOPE_VERSION;
-    let _ = genesis::envelope::CLI_VERSION;
 }

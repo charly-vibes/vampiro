@@ -323,6 +323,7 @@ pub fn render_json(result: &ScanResult) -> Result<String, Box<dyn std::error::Er
         .collect();
 
     let env = genesis::envelope::Envelope::success(
+        env!("CARGO_PKG_VERSION"),
         genesis::envelope::EnvelopeKind::Check,
         all_findings,
         all_warnings,
