@@ -17,5 +17,7 @@ Options:
           Severity threshold for gate mode (low, medium, high)
   -j, --json
           Output findings as JSON
+      --sarif
+          Output findings as SARIF 2.1.0
   -h, --help
           Print help

@@ -98,6 +98,10 @@ pub struct CheckArgs {
     /// Output findings as JSON
     #[arg(long, short)]
     pub json: bool,
+
+    /// Output findings as SARIF 2.1.0
+    #[arg(long)]
+    pub sarif: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -122,6 +126,10 @@ impl Cli {
                 dry_run,
                 from_last_error,
             }) => run_feedback(kind, *dry_run, *from_last_error),
+            Some(Commands::Prove { .. }) => {
+                eprintln!("vampiro: law verification not yet implemented");
+                ExitCode::Success
+            }
             _ => ExitCode::Success,
         }
     }
@@ -458,7 +466,11 @@ fn run_check(args: &CheckArgs) -> ExitCode {
         metadata,
     );
 
-    if args.json {
+    if args.sarif {
+        if let Ok(sarif) = crate::output::render_sarif(&result) {
+            println!("{sarif}");
+        }
+    } else if args.json {
         if let Ok(json) = crate::output::render_json(&result) {
             println!("{json}");
         }
