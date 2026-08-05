@@ -240,8 +240,8 @@ jobs:
       - name: Run scan and gate
         run: >
           vampiro check
-          --target "${{% raw %}}{{ github.event.pull_request.head.sha || github.sha }}{{ '% endraw %' }}""
-          --base "${{% raw %}}{{ github.event.pull_request.base.sha || github.event.before }}{{ '% endraw %' }}""
+          --target "${{% raw %}}{{ github.event.pull_request.head.sha || github.sha }}{{ '% endraw %' }}"
+          --base "${{% raw %}}{{ github.event.pull_request.base.sha || github.event.before }}{{ '% endraw %' }}"
           --mode gate
           --severity-threshold {threshold}
 "#,
