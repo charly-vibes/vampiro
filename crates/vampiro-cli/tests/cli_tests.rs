@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[test]
@@ -119,4 +119,77 @@ fn python_cli_accepts_py_directory() {
         stdout.contains("Files scanned") || stdout.contains("finding"),
         "Expected scan output, got: {stdout}"
     );
+}
+
+/// Helper: run `vampiro check --path <path>` and assert success.
+fn assert_check_succeeds(label: &str, path: &Path) {
+    let output = Command::new(env!("CARGO_BIN_EXE_vampiro"))
+        .args(["check", "--path", &path.to_string_lossy(), "--mode", "guidance"])
+        .output()
+        .unwrap_or_else(|_| panic!("{label} check command failed to start"));
+
+    assert!(
+        output.status.success(),
+        "{label} check failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
+/// Test that the CLI accepts Clojure files and dispatches to ClojureFrontend.
+#[test]
+fn clojure_cli_accepts_clj_file() {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("tests")
+        .join("fixtures")
+        .join("stress")
+        .join("cross-language")
+        .join("clojure")
+        .join("data_processing.clj");
+    assert_check_succeeds("clojure file", &fixture);
+}
+
+/// Test that the CLI accepts a directory containing Clojure files.
+#[test]
+fn clojure_cli_accepts_clj_directory() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("tests")
+        .join("fixtures")
+        .join("stress")
+        .join("cross-language")
+        .join("clojure");
+    assert_check_succeeds("clojure directory", &fixture_dir);
+}
+
+/// Test that the CLI accepts Julia files and dispatches to JuliaFrontend.
+#[test]
+fn julia_cli_accepts_jl_file() {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("tests")
+        .join("fixtures")
+        .join("stress")
+        .join("cross-language")
+        .join("julia")
+        .join("data_analysis.jl");
+    assert_check_succeeds("julia file", &fixture);
+}
+
+/// Test that the CLI accepts a directory containing Julia files.
+#[test]
+fn julia_cli_accepts_jl_directory() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("tests")
+        .join("fixtures")
+        .join("stress")
+        .join("cross-language")
+        .join("julia");
+    assert_check_succeeds("julia directory", &fixture_dir);
 }

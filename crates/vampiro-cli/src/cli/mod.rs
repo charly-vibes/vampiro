@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 
 use clap::CommandFactory;
 use clap::Parser;
+use vampiro_clojure_frontend::ClojureFrontend;
+use vampiro_julia_frontend::JuliaFrontend;
 use vampiro_python_frontend::PythonFrontend;
 use vampiro_rust_frontend::visibility_adapter::to_visibility_facts;
 use vampiro_rust_frontend::RustFrontend;
@@ -268,7 +270,13 @@ fn run_init_ci(provider: &str) -> ExitCode {
 }
 
 /// Supported source-file extensions, mapped to their language name.
-const SUPPORTED_EXTENSIONS: &[(&str, &str)] = &[("rs", "rust"), ("py", "python")];
+const SUPPORTED_EXTENSIONS: &[(&str, &str)] = &[
+    ("rs", "rust"),
+    ("py", "python"),
+    ("clj", "clojure"),
+    ("cljs", "clojure"),
+    ("jl", "julia"),
+];
 
 fn is_supported_source(path: &Path) -> bool {
     SUPPORTED_EXTENSIONS
@@ -367,6 +375,34 @@ fn scan_files(
                 // surface so composition analysis runs and modularity is a
                 // no-op (Python frontend owns advisory visibility separately).
                 let vis = vampiro_cir::VisibilityFacts::new("python-0.1.0");
+                let (findings, diagnostics) = analyze_with_visibility(&out.graph, &vis);
+                scanned_findings.extend(findings);
+                scanned_diagnostics.extend(diagnostics);
+            }
+            Some("clj") | Some("cljs") => {
+                let out = match ClojureFrontend.extract_full(&source, file) {
+                    Ok(o) => o,
+                    Err(e) => {
+                        eprintln!("vampiro: extraction failed for {}: {e}", file.display());
+                        continue;
+                    }
+                };
+
+                let vis = vampiro_cir::VisibilityFacts::new("clojure-0.1.0");
+                let (findings, diagnostics) = analyze_with_visibility(&out.graph, &vis);
+                scanned_findings.extend(findings);
+                scanned_diagnostics.extend(diagnostics);
+            }
+            Some("jl") => {
+                let out = match JuliaFrontend.extract_full(&source, file) {
+                    Ok(o) => o,
+                    Err(e) => {
+                        eprintln!("vampiro: extraction failed for {}: {e}", file.display());
+                        continue;
+                    }
+                };
+
+                let vis = vampiro_cir::VisibilityFacts::new("julia-0.1.0");
                 let (findings, diagnostics) = analyze_with_visibility(&out.graph, &vis);
                 scanned_findings.extend(findings);
                 scanned_diagnostics.extend(diagnostics);
