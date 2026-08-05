@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use clap::CommandFactory;
 use clap::Parser;
+use vampiro_python_frontend::PythonFrontend;
 use vampiro_rust_frontend::visibility_adapter::to_visibility_facts;
 use vampiro_rust_frontend::RustFrontend;
 use vampiro_seam_analysis::analyze_with_visibility;
@@ -258,17 +259,35 @@ fn run_init_ci(provider: &str) -> ExitCode {
     }
 }
 
-/// Collect all .rs files from the given paths, expanding directories recursively.
-fn collect_rs_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
+/// Supported source-file extensions, mapped to their language name.
+const SUPPORTED_EXTENSIONS: &[(&str, &str)] = &[("rs", "rust"), ("py", "python")];
+
+fn is_supported_source(path: &Path) -> bool {
+    SUPPORTED_EXTENSIONS
+        .iter()
+        .any(|(ext, _)| path.extension().and_then(|e| e.to_str()) == Some(*ext))
+}
+
+/// Collect all supported source files from the given paths, expanding
+/// directories recursively.
+fn collect_source_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
     for path in paths {
         if path.is_dir() {
-            collect_dir(path, &mut files)?;
+            collect_source_dir(path, &mut files)?;
         } else if path.is_file() {
-            if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            if is_supported_source(path) {
                 files.push(path.clone());
             } else {
-                return Err(format!("not a .rs file: {}", path.display()));
+                return Err(format!(
+                    "unsupported file type: {} (expected {})",
+                    path.display(),
+                    SUPPORTED_EXTENSIONS
+                        .iter()
+                        .map(|(ext, _)| format!(".{ext}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
             }
         } else {
             return Err(format!("path not found: {}", path.display()));
@@ -279,15 +298,15 @@ fn collect_rs_files(paths: &[PathBuf]) -> Result<Vec<PathBuf>, String> {
     Ok(files)
 }
 
-fn collect_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
+fn collect_source_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
     for entry in
         std::fs::read_dir(dir).map_err(|e| format!("failed to read dir {}: {e}", dir.display()))?
     {
         let entry = entry.map_err(|e| format!("failed to read entry: {e}"))?;
         let path = entry.path();
         if path.is_dir() {
-            collect_dir(&path, files)?;
-        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            collect_source_dir(&path, files)?;
+        } else if is_supported_source(&path) {
             files.push(path);
         }
     }
@@ -312,19 +331,43 @@ fn scan_files(
             }
         };
 
-        let out = match RustFrontend.extract_full(&source, file) {
-            Ok(o) => o,
-            Err(e) => {
-                eprintln!("vampiro: extraction failed for {}: {e}", file.display());
+        match file.extension().and_then(|e| e.to_str()) {
+            Some("rs") => {
+                let out = match RustFrontend.extract_full(&source, file) {
+                    Ok(o) => o,
+                    Err(e) => {
+                        eprintln!("vampiro: extraction failed for {}: {e}", file.display());
+                        continue;
+                    }
+                };
+
+                let vis = to_visibility_facts(&out);
+                let (findings, diagnostics) = analyze_with_visibility(&out.graph, &vis);
+                scanned_findings.extend(findings);
+                scanned_diagnostics.extend(diagnostics);
+            }
+            Some("py") => {
+                let out = match PythonFrontend.extract_full(&source, file) {
+                    Ok(o) => o,
+                    Err(e) => {
+                        eprintln!("vampiro: extraction failed for {}: {e}", file.display());
+                        continue;
+                    }
+                };
+
+                // Python has no enforced boundaries; pass an empty visibility
+                // surface so composition analysis runs and modularity is a
+                // no-op (Python frontend owns advisory visibility separately).
+                let vis = vampiro_cir::VisibilityFacts::new("python-0.1.0");
+                let (findings, diagnostics) = analyze_with_visibility(&out.graph, &vis);
+                scanned_findings.extend(findings);
+                scanned_diagnostics.extend(diagnostics);
+            }
+            _ => {
+                eprintln!("vampiro: unsupported file extension: {}", file.display());
                 continue;
             }
-        };
-
-        let vis = to_visibility_facts(&out);
-        let (findings, diagnostics) = analyze_with_visibility(&out.graph, &vis);
-
-        scanned_findings.extend(findings);
-        scanned_diagnostics.extend(diagnostics);
+        }
     }
 
     (scanned_findings, scanned_diagnostics)
@@ -334,7 +377,7 @@ fn run_check(args: &CheckArgs) -> ExitCode {
     // Resolve scan scope.
     let files: Vec<PathBuf> = if !args.path.is_empty() {
         // Explicit --path: use as-is
-        match collect_rs_files(&args.path) {
+        match collect_source_files(&args.path) {
             Ok(f) => f,
             Err(e) => {
                 eprintln!("vampiro: {e}");
@@ -444,50 +487,61 @@ mod tests {
     use super::*;
 
     #[test]
-    fn collect_rs_files_single_file() {
+    fn collect_source_files_single_file() {
         let paths = vec![PathBuf::from(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/minimal.rs"
         ))];
-        let files = collect_rs_files(&paths).unwrap();
+        let files = collect_source_files(&paths).unwrap();
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("minimal.rs"));
     }
 
     #[test]
-    fn collect_rs_files_directory() {
+    fn collect_source_files_directory() {
         let paths = vec![PathBuf::from(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures"
         ))];
-        let files = collect_rs_files(&paths).unwrap();
+        let files = collect_source_files(&paths).unwrap();
         assert!(!files.is_empty());
         assert!(files.iter().all(|f| f.extension().unwrap() == "rs"));
     }
 
     #[test]
-    fn collect_rs_files_non_existent_returns_error() {
+    fn collect_source_files_non_existent_returns_error() {
         let paths = vec![PathBuf::from("/nonexistent/path.rs")];
-        assert!(collect_rs_files(&paths).is_err());
+        assert!(collect_source_files(&paths).is_err());
     }
 
     #[test]
-    fn collect_rs_files_non_rs_file_returns_error() {
+    fn collect_source_files_unsupported_type_returns_error() {
         let paths = vec![PathBuf::from(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/Cargo.toml"
         ))];
-        assert!(collect_rs_files(&paths).is_err());
+        assert!(collect_source_files(&paths).is_err());
     }
 
     #[test]
-    fn collect_rs_files_multiple_paths() {
+    fn collect_source_files_multiple_paths() {
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures");
         let file = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/minimal.rs");
         let paths = vec![PathBuf::from(dir), PathBuf::from(file)];
-        let files = collect_rs_files(&paths).unwrap();
+        let files = collect_source_files(&paths).unwrap();
         assert!(!files.is_empty());
         // Dedup should handle the duplicate
         assert!(!files.is_empty());
+    }
+
+    #[test]
+    fn collect_source_files_accepts_py_file() {
+        let paths = vec![PathBuf::from(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/stress/cross-language/python/cli.py"
+        ))];
+        let files = collect_source_files(&paths).unwrap();
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("cli.py"));
     }
 }

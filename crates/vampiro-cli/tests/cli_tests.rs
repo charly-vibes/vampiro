@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::process::Command;
 
 #[test]
@@ -41,4 +42,81 @@ fn quickstart_smoke_test() {
     );
 
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Test that the CLI accepts Python files and dispatches to PythonFrontend.
+#[test]
+fn python_cli_accepts_py_file() {
+    let dir = std::env::temp_dir().join("vampiro-python-cli-test");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // Use the existing cross-language fixture
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("tests")
+        .join("fixtures")
+        .join("stress")
+        .join("cross-language")
+        .join("python")
+        .join("cli.py");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_vampiro"))
+        .args([
+            "check",
+            "--path",
+            &fixture.to_string_lossy(),
+            "--mode",
+            "guidance",
+        ])
+        .output()
+        .expect("python check command failed to start");
+
+    assert!(
+        output.status.success(),
+        "python check failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Test that the CLI accepts a directory containing Python files.
+#[test]
+fn python_cli_accepts_py_directory() {
+    let fixture_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("tests")
+        .join("fixtures")
+        .join("stress")
+        .join("cross-language")
+        .join("python");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_vampiro"))
+        .args([
+            "check",
+            "--path",
+            &fixture_dir.to_string_lossy(),
+            "--mode",
+            "guidance",
+        ])
+        .output()
+        .expect("python directory check command failed to start");
+
+    assert!(
+        output.status.success(),
+        "python directory check failed:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Verify we got composition analysis output (stdout should mention files)
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Files scanned") || stdout.contains("finding"),
+        "Expected scan output, got: {stdout}"
+    );
 }
