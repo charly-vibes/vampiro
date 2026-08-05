@@ -239,7 +239,7 @@ mod tests {
     fn doctor_config_valid() {
         let dir = std::env::temp_dir().join("vampiro-doctor-test-config-valid");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir.join(".vampiro")).unwrap();
+        std::fs::create_dir_all(dir.join(".vampiro")).unwrap();
         std::fs::write(
             dir.join(".vampiro").join("config.toml"),
             "[scan]\nthreads = 4\n",
@@ -270,7 +270,7 @@ mod tests {
     fn doctor_ci_workflow_present() {
         let dir = std::env::temp_dir().join("vampiro-doctor-test-ci-present");
         let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir.join(".github").join("workflows")).unwrap();
+        std::fs::create_dir_all(dir.join(".github").join("workflows")).unwrap();
         std::fs::write(
             dir.join(".github").join("workflows").join("ci.yml"),
             "name: CI\n",
