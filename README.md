@@ -24,14 +24,17 @@ in the category it claims to compose in?**
 
 ## Current status
 
-**v0.3.0** — Full genesis v0.4.0 module adoption across vampiro-cli:
+**v0.3.1** — Full genesis module adoption and cross-language frontends across vampiro-cli:
 
 | Language | Frontend | Data-flow edges | Tests |
 |---|---|---|---|
-| Python | ✅ | ✅ | 750+ |
-| Clojure | ✅ | ✅ | 750+ |
-| Julia | ✅ | ✅ | 750+ |
-| Rust | ✅ | Partial | 750+ |
+| Python | ✅ | ✅ | 73 |
+| Clojure | ✅ | ✅ | 37 |
+| Julia | ✅ | ✅ | 31 |
+| Rust | ✅ | Partial | 96 |
+
+> 811 tests across the workspace (frontend suites per language plus CLI, CIR,
+> seam-analysis, and lifecycle-analysis crates).
 
 - **Composition seam analysis**: active — detects structural shape mismatches
   at call boundaries with ~99.8% precision on clean baselines.
@@ -45,7 +48,7 @@ in the category it claims to compose in?**
 
 ```bash
 cargo build --release
-./target/release/vampiro check --full --mode guidance <file>
+./target/release/vampiro check --path <file> --mode guidance
 ```
 
 ## Documentation
