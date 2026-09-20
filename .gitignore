@@ -24,6 +24,15 @@ docs/book/
 .cache/
 
 # testaruda store (local SQLite DB)
+
+# bd (beads) integration: this project deliberately tracks the bd hooks and
+# the JSONL passive export (see .beads/README.md, .beads/.gitignore). These
+# negations override the global ~/.gitignore entry (.beads/) so bd's
+# auto-export can stage updates without -f; stale committed snapshots were
+# re-imported by the post-checkout/post-merge hooks and rolled back newer
+# issue state (vampiro-deh).
+!/.beads/
+!/.beads/**
 .testaruda/
 
 # RustRover
