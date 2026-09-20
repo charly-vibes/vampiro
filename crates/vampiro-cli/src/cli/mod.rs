@@ -15,6 +15,7 @@ use crate::output::ScanResultMetadata;
 use crate::output::ScopeKind;
 use crate::policy::{generate_github_actions_workflow, ScanMode, ScanPolicy};
 use crate::scan::GitContext;
+use crate::scan::{is_supported_source, SUPPORTED_EXTENSIONS};
 
 /// A program analysis tool for verifying compliance with laws and policies.
 #[derive(Parser, Debug)]
@@ -267,21 +268,6 @@ fn run_init_ci(provider: &str) -> ExitCode {
             ExitCode::UsageError
         }
     }
-}
-
-/// Supported source-file extensions, mapped to their language name.
-const SUPPORTED_EXTENSIONS: &[(&str, &str)] = &[
-    ("rs", "rust"),
-    ("py", "python"),
-    ("clj", "clojure"),
-    ("cljs", "clojure"),
-    ("jl", "julia"),
-];
-
-fn is_supported_source(path: &Path) -> bool {
-    SUPPORTED_EXTENSIONS
-        .iter()
-        .any(|(ext, _)| path.extension().and_then(|e| e.to_str()) == Some(*ext))
 }
 
 /// Collect all supported source files from the given paths, expanding
