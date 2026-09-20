@@ -51,3 +51,9 @@ docs/book/
 !.dont/config.toml
 !.dont/events.jsonl
 !.dont/db.cozo
+# dont requires seed/ for a valid project layout; check/init fail without it
+# (discovered by the CI epistemic gate — vampiro-bf6).
+!.dont/seed/
+!.dont/seed/**
+!/.dont/
+!/.dont/**
