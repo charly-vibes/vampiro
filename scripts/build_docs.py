@@ -13,17 +13,8 @@ SRC = ROOT / "docs" / "src"
 # Each entry maps change_id → list of capability slugs.
 # A change declares one capability per directory under its specs/ folder.
 CHANGES: dict[str, list[str]] = {
-    "add-rust-cli-foundation": ["cli-foundation"],
-    "add-cir-plugin-platform": ["cir-plugin-platform"],
-    "add-rust-analysis-frontend": ["rust-analysis"],
-    "add-core-seam-analysis": ["seam-analysis"],
-    "add-scan-gating-reporting": ["scan-workflows"],
     "add-law-and-proof-verification": ["law-verification"],
-    "add-lifecycle-safety-analysis": ["lifecycle-safety"],
     "add-python-clojure-julia-frontends": ["additional-frontends"],
-    "add-trust-boundary-analysis": ["trust-boundary-analysis"],
-    "depend-on-genesis": ["cli-foundation"],
-    "upgrade-genesis": ["cli-core", "config"],
 }
 
 

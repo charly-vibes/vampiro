@@ -32,6 +32,12 @@ fn bench_dir() -> PathBuf {
 
 /// Generate a Rust source file with `n_fns` functions by writing directly to disk.
 fn generate_rust_source(n_fns: usize, path: &Path) {
+    // The fixtures directory lives under target/ and is absent on fresh
+    // checkouts and CI runners — create it before writing.
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .unwrap_or_else(|e| panic!("failed to create {}: {e}", parent.display()));
+    }
     let mut f = std::fs::File::create(path)
         .unwrap_or_else(|e| panic!("failed to create {}: {e}", path.display()));
 
