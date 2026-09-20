@@ -180,3 +180,5 @@
 {"id":"int-8131b852","kind":"field_change","created_at":"2026-09-20T20:57:15.99991925Z","actor":"charly vibes","issue_id":"vampiro-5dc","extra":{"field":"priority","new_value":"2","old_value":"0"}}
 {"id":"int-27dfbbe6","kind":"field_change","created_at":"2026-09-20T20:57:16.676222621Z","actor":"charly vibes","issue_id":"vampiro-v9x","extra":{"field":"status","new_value":"closed","old_value":"open"}}
 {"id":"int-d36c932d","kind":"field_change","created_at":"2026-09-20T21:13:45.224559233Z","actor":"charly vibes","issue_id":"vampiro-5dc","extra":{"field":"status","new_value":"closed","old_value":"in_progress"}}
+{"id":"int-4ab8b0e0","kind":"field_change","created_at":"2026-09-20T21:36:14.94480143Z","actor":"charly vibes","issue_id":"vampiro-bf6","extra":{"field":"status","new_value":"closed","old_value":"in_progress"}}
+{"id":"int-1b4b7829","kind":"field_change","created_at":"2026-09-20T21:36:20.037916164Z","actor":"charly vibes","issue_id":"vampiro-deh","extra":{"field":"status","new_value":"closed","old_value":"open"}}
