@@ -43,7 +43,7 @@ vampiro-julia-frontend = { path = "../vampiro-julia-frontend", version = "0.4.0"
 
 [dev-dependencies]
 tempfile = "3.27.0"
-trycmd = "0.15"
+trycmd = "1.2"
 vampiro-cir = { path = "../vampiro-cir", version = "0.4.0" }
 vampiro-clojure-frontend = { path = "../vampiro-clojure-frontend", version = "0.4.0" }
 vampiro-julia-frontend = { path = "../vampiro-julia-frontend", version = "0.4.0" }
