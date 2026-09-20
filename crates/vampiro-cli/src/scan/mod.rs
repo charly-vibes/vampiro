@@ -9,6 +9,28 @@ use std::sync::Mutex;
 use sha2::{Digest, Sha256};
 
 // ---------------------------------------------------------------------------
+// Supported source registry
+// ---------------------------------------------------------------------------
+
+/// Source-file extensions handled by vampiro's tree-sitter frontends,
+/// mapped to their language name. Single source of truth for both explicit
+/// `--path` collection and git-based scope resolution (vampiro-gqy).
+pub const SUPPORTED_EXTENSIONS: &[(&str, &str)] = &[
+    ("rs", "rust"),
+    ("py", "python"),
+    ("clj", "clojure"),
+    ("cljs", "clojure"),
+    ("jl", "julia"),
+];
+
+/// Whether a path is a source file any frontend supports.
+pub fn is_supported_source(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| SUPPORTED_EXTENSIONS.iter().any(|(ext, _)| *ext == e))
+}
+
+// ---------------------------------------------------------------------------
 // ScanScope
 // ---------------------------------------------------------------------------
 
@@ -189,7 +211,7 @@ impl GitContext {
     }
 
     /// Get the diff between two trees, returning the list of changed (and
-    /// newly added) file paths that end with ".rs".
+    /// newly added) file paths with a supported source extension.
     fn diff_paths(
         &self,
         old_tree: Option<&git2::Tree>,
@@ -206,7 +228,7 @@ impl GitContext {
         diff.foreach(
             &mut |delta, _| {
                 if let Some(file) = delta.new_file().path() {
-                    if file.extension().is_some_and(|e| e == "rs") {
+                    if is_supported_source(file) {
                         paths.push(file.to_path_buf());
                     }
                 }
@@ -254,7 +276,7 @@ impl GitContext {
     }
 
     /// Resolve the default local diff scope: HEAD vs worktree (including
-    /// staged, unstaged, and untracked .rs files).
+    /// staged, unstaged, and untracked supported source files).
     pub fn local_diff(&self) -> Result<ScanScope, ScopeError> {
         let head_oid = self.head_oid()?;
         let head_commit = self
@@ -279,7 +301,7 @@ impl GitContext {
             diff.foreach(
                 &mut |delta, _| {
                     if let Some(file) = delta.new_file().path() {
-                        if file.extension().is_some_and(|e| e == "rs") {
+                        if is_supported_source(file) {
                             paths.push(file.to_path_buf());
                         }
                     }
@@ -303,7 +325,7 @@ impl GitContext {
             diff.foreach(
                 &mut |delta, _| {
                     if let Some(file) = delta.new_file().path() {
-                        if file.extension().is_some_and(|e| e == "rs") {
+                        if is_supported_source(file) {
                             paths.push(file.to_path_buf());
                         }
                     }
@@ -327,7 +349,7 @@ impl GitContext {
             for entry in statuses.iter() {
                 if let Some(path) = entry.path() {
                     let p = PathBuf::from(path);
-                    if p.extension().is_some_and(|e| e == "rs") {
+                    if is_supported_source(&p) {
                         paths.push(p);
                     }
                 }
@@ -347,7 +369,7 @@ impl GitContext {
         })
     }
 
-    /// Resolve the full scope: every .rs file in the repository.
+    /// Resolve the full scope: every supported source file in the repository.
     pub fn full_scope(&self) -> Result<ScanScope, ScopeError> {
         let mut files = Vec::new();
         let _workdir = self
@@ -367,7 +389,7 @@ impl GitContext {
         if let Some(oid) = head_oid {
             if let Ok(commit) = self.repo.find_commit(oid) {
                 if let Ok(tree) = commit.tree() {
-                    self.collect_rs_from_tree(&tree, PathBuf::new(), &mut files);
+                    self.collect_supported_from_tree(&tree, PathBuf::new(), &mut files);
                 }
             }
         }
@@ -381,7 +403,7 @@ impl GitContext {
             {
                 if let Some(path) = entry.path() {
                     let p = PathBuf::from(path);
-                    if p.extension().is_some_and(|e| e == "rs") {
+                    if is_supported_source(&p) {
                         files.push(p);
                     }
                 }
@@ -393,16 +415,21 @@ impl GitContext {
         Ok(ScanScope::Full { files })
     }
 
-    fn collect_rs_from_tree(&self, tree: &git2::Tree, prefix: PathBuf, files: &mut Vec<PathBuf>) {
+    fn collect_supported_from_tree(
+        &self,
+        tree: &git2::Tree,
+        prefix: PathBuf,
+        files: &mut Vec<PathBuf>,
+    ) {
         for entry in tree.iter() {
             let name = entry.name().unwrap_or("");
             let path = prefix.join(name);
             if let Ok(obj) = entry.to_object(&self.repo) {
                 if obj.kind() == Some(git2::ObjectType::Tree) {
                     if let Ok(subtree) = obj.peel_to_tree() {
-                        self.collect_rs_from_tree(&subtree, path, files);
+                        self.collect_supported_from_tree(&subtree, path, files);
                     }
-                } else if path.extension().is_some_and(|e| e == "rs") {
+                } else if is_supported_source(&path) {
                     files.push(path);
                 }
             }
@@ -720,6 +747,77 @@ mod tests {
         let files: Vec<&Path> = scope.files().iter().map(|p| p.as_path()).collect();
         assert!(files.contains(&Path::new("src/lib.rs")));
         assert!(files.contains(&Path::new("src/main.rs")));
+    }
+
+    /// Full scope must discover every language with a registered frontend
+    /// (vampiro-gqy): Python, Clojure, and Julia files must not be silently
+    /// skipped the way they were when the filter hardcoded `.rs`.
+    #[test]
+    fn test_full_scope_includes_all_supported_languages() {
+        let (dir, ctx) = init_git_repo();
+        for (name, content) in [
+            ("src/util.py", "def helper(): return 42\n"),
+            ("src/util.clj", "(defn helper [] 42)\n"),
+            ("src/util.jl", "helper() = 42\n"),
+        ] {
+            let path = dir.path().join(name);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, content).unwrap();
+        }
+
+        let scope = ctx.full_scope().unwrap();
+        let files: Vec<&Path> = scope.files().iter().map(|p| p.as_path()).collect();
+        for name in ["src/util.py", "src/util.clj", "src/util.jl"] {
+            assert!(
+                files.contains(&Path::new(name)),
+                "expected {name} in full scope, got: {files:?}"
+            );
+        }
+    }
+
+    /// Untracked non-Rust files must appear in the local diff scope.
+    #[test]
+    fn test_local_diff_includes_untracked_non_rust_files() {
+        let (dir, ctx) = init_git_repo();
+        std::fs::write(dir.path().join("new_script.py"), "x = 1\n").unwrap();
+
+        let scope = ctx.local_diff().unwrap();
+        let files: Vec<&Path> = scope.files().iter().map(|p| p.as_path()).collect();
+        assert!(
+            files.contains(&Path::new("new_script.py")),
+            "expected new_script.py in local diff, got: {files:?}"
+        );
+    }
+
+    /// Committed non-Rust files must appear in revision-to-revision diffs.
+    #[test]
+    fn test_diff_between_includes_committed_non_rust_files() {
+        let (dir, ctx) = init_git_repo();
+
+        // Commit a Python file on top of the two-commit fixture.
+        let py = dir.path().join("src/helper.py");
+        std::fs::write(&py, "def helper(): return 42\n").unwrap();
+        let repo = &ctx.repo;
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("src/helper.py")).unwrap();
+        let tree_oid = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_oid).unwrap();
+        let sig = git2::Signature::now("test", "test@test.com").unwrap();
+        let parent = repo.head().unwrap().target().unwrap();
+        let parent_commit = repo.find_commit(parent).unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "third", &tree, &[&parent_commit])
+            .unwrap();
+
+        let head = ctx.head_oid().unwrap();
+        let first_parent = ctx.first_parent(head).unwrap();
+        let scope = ctx
+            .diff_between(&first_parent.to_string(), &head.to_string())
+            .unwrap();
+        let files: Vec<&Path> = scope.files().iter().map(|p| p.as_path()).collect();
+        assert!(
+            files.contains(&Path::new("src/helper.py")),
+            "expected src/helper.py in diff, got: {files:?}"
+        );
     }
 
     #[test]
