@@ -347,7 +347,8 @@ impl GitContext {
                 .statuses(Some(&mut opts))
                 .map_err(|e| ScopeError::IoError(format!("status: {e}")))?;
             for entry in statuses.iter() {
-                if let Some(path) = entry.path() {
+                // git2 0.21: path() returns Result (Err for non-UTF-8 paths) — skip those.
+                if let Ok(path) = entry.path() {
                     let p = PathBuf::from(path);
                     if is_supported_source(&p) {
                         paths.push(p);
@@ -401,7 +402,8 @@ impl GitContext {
                 || status == git2::Status::WT_MODIFIED
                 || status == git2::Status::INDEX_MODIFIED
             {
-                if let Some(path) = entry.path() {
+                // git2 0.21: path() returns Result (Err for non-UTF-8 paths) — skip those.
+                if let Ok(path) = entry.path() {
                     let p = PathBuf::from(path);
                     if is_supported_source(&p) {
                         files.push(p);
