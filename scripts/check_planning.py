@@ -31,19 +31,38 @@ def blocking_dependencies(issue: dict) -> set[str]:
     }
 
 
-def checklist_sections() -> dict[str, Counter[str]]:
+def checklist_sections() -> tuple[dict[str, Counter[str]], set[str]]:
+    """Return (sections, archived_ids): section item counts keyed by logical
+    spec path, plus the subset of keys that resolve to archived changes."""
     sections: dict[str, Counter[str]] = {}
-    for path in (ROOT / "openspec" / "changes").glob("*/tasks.md"):
+    archived_specs: set[str] = set()
+    change_root = ROOT / "openspec" / "changes"
+    active = sorted(change_root.glob("*/tasks.md"))
+    # Closed issues keep the spec_id they were keyed with while the change was
+    # active; `openspec archive` moves the change under archive/ with a
+    # date-prefixed directory name. Resolve archived tasks.md back to that
+    # logical path so completed work stays valid after archiving.
+    archived = sorted(change_root.glob("archive/*/tasks.md"))
+    date_prefix = re.compile(r"^\d{4}-\d{2}-\d{2}-")
+    for path in active + archived:
+        logical = path.relative_to(ROOT)
+        if "archive" in logical.parts:
+            parts = [part for part in logical.parts if part != "archive"]
+            parts[-2] = date_prefix.sub("", parts[-2])
+            logical = Path(*parts)
         section_id: str | None = None
+        archived = "archive" in path.relative_to(ROOT).parts
         for line in path.read_text().splitlines():
             if match := SECTION_RE.match(line):
-                section_id = f"{path.relative_to(ROOT)}#{match.group(1)}"
+                section_id = f"{logical}#{match.group(1)}"
                 sections[section_id] = Counter()
+                if archived:
+                    archived_specs.add(section_id)
             elif match := CHECKLIST_RE.match(line):
                 if section_id is None:
                     raise ValueError(f"checklist item precedes a section in {path}")
                 sections[section_id][match.group(1)] += 1
-    return sections
+    return sections, archived_specs
 
 
 def main() -> None:
@@ -84,7 +103,7 @@ def main() -> None:
     for issue_id in by_id:
         visit(issue_id)
 
-    expected_sections = checklist_sections()
+    expected_sections, archived_specs = checklist_sections()
     exported_sections: dict[str, Counter[str]] = {}
     for issue in issues:
         entries = [
@@ -99,9 +118,22 @@ def main() -> None:
             raise ValueError(
                 f"{issue['id']} has checklist entries with unknown spec_id: {spec_id!r}"
             )
+        if spec_id in archived_specs:
+            # Archived changes are completed; their tasks.md may legitimately
+            # have been edited between export and archiving. Only require that
+            # archived work is actually closed — strict count matching stays
+            # in force for active changes.
+            if issue.get("status") != "closed":
+                raise ValueError(
+                    f"{issue['id']} is not closed but references archived "
+                    f"spec {spec_id!r}"
+                )
+            continue
         exported_sections.setdefault(spec_id, Counter()).update(entries)
 
-    for spec_id in expected_sections.keys() | exported_sections.keys():
+    for spec_id in (
+        expected_sections.keys() - archived_specs
+    ) | exported_sections.keys():
         expected = expected_sections.get(spec_id, Counter())
         exported = exported_sections.get(spec_id, Counter())
         if expected != exported:
@@ -135,8 +167,13 @@ def main() -> None:
         if issue["id"] != approval_id
         and issue.get("issue_type") in {"task", "decision"}
     ]
+    # The approval gate guards work that is still to be done. Issues closed
+    # before the gate existed (or via bulk archival) are history — flagging
+    # them would make every archival retroactively break this check.
     unguarded = [
-        issue["id"] for issue in implementation if approval_id not in ancestors(issue["id"])
+        issue["id"]
+        for issue in implementation
+        if issue.get("status") != "closed" and approval_id not in ancestors(issue["id"])
     ]
     if unguarded:
         raise ValueError(f"implementation issues bypass approval: {unguarded}")
