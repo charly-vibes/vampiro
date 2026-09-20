@@ -51,3 +51,14 @@ docs/book/
 !.dont/config.toml
 !.dont/events.jsonl
 !.dont/db.cozo
+# dont requires these dirs to exist for a valid project layout
+# (src/project.rs REQUIRED_SUBDIRS); check/init fail without them —
+# discovered by the CI epistemic gate (vampiro-bf6).
+!.dont/seed/
+!.dont/seed/**
+!.dont/vocab/
+!.dont/rules/
+!.dont/imports/
+!.dont/sessions/
+!.dont/schemas/
+# runtime files stay ignored: db.cozo.lock, tx.seq, sessions/* content

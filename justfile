@@ -58,8 +58,13 @@ fmt-check:
 # === CI Commands ===
 
 # Full CI pipeline
-ci: fmt-check lint test build-release
+ci: fmt-check lint check-claims test build-release
     @echo "✅ CI pipeline passed"
+
+# Epistemic gate (dont-bpuo ADR): fail on ungrounded claims / rule violations.
+# Runs via lefthook pre-commit and CI. See docs/src/contributing.md.
+check-claims:
+    @dont check
 
 # Pre-push checks (fast gate)
 pre-push: fmt-check lint test
