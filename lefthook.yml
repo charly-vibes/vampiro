@@ -10,6 +10,8 @@
 pre-commit:
   parallel: true
   commands:
+    dont-check:
+      run: just check-claims
     format-check:
       glob: "*.rs"
       run: just fmt-check
@@ -57,5 +59,3 @@ pre-push:
         To bypass (WIP only): git push --no-verify
 
         See docs/verification/dogfood-1.md for triage guide.
-    dont-check:
-      run: dont check

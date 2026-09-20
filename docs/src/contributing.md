@@ -22,6 +22,25 @@ python scripts/build_docs.py
 mdbook build
 ```
 
+## Epistemic gate (dont)
+
+Vampiro maintains a real `dont` claim corpus (`.dont/`), so per the
+`dont-bpuo` ADR the epistemic gate is adopted. The gate is
+`just check-claims`, which runs `dont check` and fails on ungrounded
+claims or rule violations.
+
+Wiring points:
+
+- **pre-commit** — `lefthook.yml` runs `just check-claims` before every
+  commit (bypass requires a `WIP` commit message per repo policy).
+- **CI** — the `planning` job runs `dont check` after validating the
+  OpenSpec specs and issue export.
+- **Local** — `just ci` includes the gate in the full pipeline.
+
+If a commit is rejected by the gate, run `dont list` to find the
+offending claim, then resolve it (`dont flag <id>` with evidence) or
+retract it (`dont forget`/`dont ignore` per the dont docs).
+
 ## Documentation rules
 
 - Do not hand-edit generated files under `docs/book/`.
