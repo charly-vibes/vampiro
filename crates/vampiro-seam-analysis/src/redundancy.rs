@@ -79,6 +79,21 @@ impl RedundancyAnalyzer {
                     if src_node.kind == NodeKind::Expression {
                         continue;
                     }
+                    // Skip enclosed call sites (vampiro-224.8): a frontend
+                    // call edge's source is the ENCLOSING FUNCTION of the
+                    // call site, so the source's span contains the edge's
+                    // span. Those edges are independent callers of a callee,
+                    // not alternative dataflow branches — their codomains
+                    // never flow into the target (the dont events.rs FP:
+                    // two callers of `is_leap` compared as int vs 6-tuple
+                    // "branches"). True branch feeders have disjoint spans
+                    // (the hand-built consumer/feeder pattern; the frontend
+                    // cannot produce a natural ≥2-inbound consumer).
+                    if src_node.span.start_line <= edge.span.start_line
+                        && src_node.span.end_line >= edge.span.end_line
+                    {
+                        continue;
+                    }
                 }
 
                 unique_sources.insert(src_id, edge);
@@ -479,6 +494,83 @@ mod tests {
         // The adapter only covers the cache path, not the primary path.
         // primary goes directly to use, not through the adapter.
         assert_eq!(findings.len(), 1, "adapter on one path but not all");
+    }
+
+    // --- Enclosed call sites are not branches (vampiro-224.8) ---
+
+    /// A frontend call edge's source is the ENCLOSING FUNCTION of the call
+    /// site: the source node's span contains the edge span. Two such callers
+    /// of one callee are independent call sites, not alternative dataflow
+    /// branches — the dogfood-5 FP class (dont events.rs:91: `days_in_month`
+    /// and `epoch_to_parts` both call `is_leap`; their codomains int vs
+    /// 6-tuple Record were reported as mismatched branch shapes). Edges whose
+    /// source encloses them must be excluded from branch grouping.
+    #[test]
+    fn enclosed_call_sites_not_grouped_as_branches() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Two caller fns (multi-line bodies) and the callee they both call.
+        let mut caller_a = node(
+            "caller_a",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Int),
+            86,
+        );
+        caller_a.span.end_line = 99;
+        let mut caller_b = node(
+            "caller_b",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Int); 6]),
+            101,
+        );
+        caller_b.span.end_line = 127;
+        graph.add_node(caller_a);
+        graph.add_node(caller_b);
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar(ScalarKind::Int),
+            Shape::Scalar(ScalarKind::Unit),
+            80,
+        ));
+        // Call sites INSIDE each caller's body (span contained by source).
+        graph.add_edge(edge("e1", "caller_a", "callee", 91));
+        graph.add_edge(edge("e2", "caller_b", "callee", 110));
+
+        let findings = RedundancyAnalyzer::new().analyze(&graph);
+        assert!(
+            findings.is_empty(),
+            "enclosed call sites are not branches; got {findings:?}"
+        );
+    }
+
+    /// Disjoint-span feeder edges (the hand-built consumer/feeder pattern —
+    /// the legit REQ-11 shape, see stress redundancy.rs fixture docs) must
+    /// still be grouped as branches.
+    #[test]
+    fn disjoint_span_feeders_still_grouped() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        graph.add_node(node(
+            "feeder_a",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Int),
+            1,
+        ));
+        graph.add_node(node(
+            "feeder_b",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Record(vec![Shape::Scalar(ScalarKind::Int); 6]),
+            5,
+        ));
+        graph.add_node(node(
+            "consumer",
+            Shape::Scalar(ScalarKind::Int),
+            Shape::Scalar(ScalarKind::Unit),
+            10,
+        ));
+        graph.add_edge(edge("e1", "feeder_a", "consumer", 12));
+        graph.add_edge(edge("e2", "feeder_b", "consumer", 13));
+
+        let findings = RedundancyAnalyzer::new().analyze(&graph);
+        assert_eq!(findings.len(), 1, "disjoint-span feeders are real branches");
     }
 
     // --- Exactly-one-axis (REQ-4) ---
