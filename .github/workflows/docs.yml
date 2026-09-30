@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/pages.yml"
+      - ".github/workflows/docs.yml"
       - "docs/**"
       - "openspec/**"
       - "scripts/build_docs.py"
@@ -13,7 +13,7 @@ on:
       - "vampiro-ears-spec.md"
   pull_request:
     paths:
-      - ".github/workflows/pages.yml"
+      - ".github/workflows/docs.yml"
       - "docs/**"
       - "openspec/**"
       - "scripts/build_docs.py"

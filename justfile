@@ -25,7 +25,7 @@ run *args:
 
 # Install locally to ~/.cargo/bin
 install:
-    cargo install --path .
+    cargo install --path crates/vampiro-cli
 
 # === Test Commands ===
 
@@ -58,7 +58,9 @@ fmt-check:
 # === CI Commands ===
 
 # Full CI pipeline
-ci: fmt-check lint check-claims test build-release
+# check-planning: OpenSpec + exported issue-graph validation (absorbed from the
+# old `planning` CI job when it was folded into `just ci` — standardization §1).
+ci: fmt-check lint check-claims validate check-planning test build-release
     @echo "✅ CI pipeline passed"
 
 # Epistemic gate (dont-bpuo ADR): fail on ungrounded claims / rule violations.

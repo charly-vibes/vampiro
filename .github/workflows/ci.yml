@@ -1,4 +1,10 @@
----
+# CI workflow - runs the same commands as local development
+#
+# Uses `just ci` to ensure parity between local and CI environments.
+# If CI fails, run `just ci` locally to reproduce the issue.
+# (Standardized per dulce-de-leche docs/standardization.md §1; the old
+# planning/rust/docs jobs were folded into the `ci` recipe + docs.yml.)
+
 name: CI
 
 on:
@@ -9,75 +15,44 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
 jobs:
-  planning:
-    name: Validate specifications and issue export
+  ci:
+    name: Test & Build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install just
+        uses: extractions/setup-just@v2
 
       - name: Install dont (epistemic gate)
         run: cargo install dont-cli --version 0.2.2 --locked
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Install OpenSpec
         run: npm install --global @fission-ai/openspec@0.19.0
 
-      - name: Validate OpenSpec
+      # Run the exact same command as local development
+      - name: Run CI pipeline
         env:
           DO_NOT_TRACK: "1"
-        run: openspec validate --all --strict --no-interactive
-
-      - name: Validate exported issue graph
-        run: python3 scripts/check_planning.py
-
-      - name: Epistemic gate — fail on ungrounded claims (vampiro-bf6)
-        run: dont check
-
-  rust:
-    name: Build and test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-
-      - name: Build
-        run: cargo build --workspace
-
-      - name: Run tests
-        run: cargo test --workspace
-
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Format check
-        run: cargo fmt --check
-
-  docs:
-    name: Build documentation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install mdBook
-        run: cargo install mdbook --version 0.5.2
-
-      - name: Assemble authoritative documentation
-        run: python scripts/build_docs.py
-
-      - name: Build documentation
-        run: mdbook build
+        run: just ci
