@@ -5,6 +5,29 @@
 **Pipeline:** `vampiro check --full --mode guidance --json` (vampiro 0.4.0, all 8 frontends, data-flow edges, is_test filtering)
 **Scope:** all 8 Rust repos of the dulce-de-leche family: `wai`, `dont`, `dulce-de-leche`, `espectacular`, `pretender`, `testaruda`, `vampiro`, `fotos` (fabbro excluded — Go)
 
+## Outcome (updated after the vampiro-224.3 fix, same day)
+
+R1 (unresolvable named types → Opaque, plus nested-opaque/bottom-aware
+`unify_shapes` exclusion, `Result<T>` alias arity, and effect-wrapper-vs-leaf
+exclusion) landed immediately after the triage:
+
+| Metric | Pre-fix | Post-R1 | Δ |
+|---|---:|---:|---:|
+| Total findings | 515 | **299** | −42% |
+| Composition-break | 393 | **185** | −53% |
+| All 5 acceptance-site composition-breaks | flagged | **clear** | ✅ |
+| Workspace tests | 829 | 831 | +2 new tests per fix |
+| Seeded-fixture TPs (soundness + precision) | pass | pass | ✅ no TP loss |
+
+Composition remainder maps 1:1 to the remaining tickets: 96 unit-shape (genuine
+`()` returns at the return-boundary approximation), 36 unknown-involving
+(heuristic misses), 53 resolved (R2–R5 classes: condition slots, rewraps,
+combinators). Redundancy noise (108) is vampiro-224.8.
+
+---
+
+## Original pre-fix results
+
 ## Why this round
 
 Prior rounds (dogfood-2..4) either ran on vampiro's own workspace or triaged only by
