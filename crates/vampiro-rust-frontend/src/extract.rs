@@ -643,7 +643,7 @@ impl<'src> Extractor<'src> {
             .first()
             .and_then(|arg| self.callee_or_closure_codomain(arg))
             .unwrap_or(Shape::Opaque);
-        let map_err = mc.method.to_string() == "map_err";
+        let map_err = mc.method == "map_err";
         match receiver {
             Shape::Parameterized { base, parameters } => {
                 let mut params = parameters.clone();
