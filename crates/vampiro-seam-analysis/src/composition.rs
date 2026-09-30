@@ -47,9 +47,15 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
     let expected = expected.normalize();
 
     // REQ-23: top-level opaque excludes the edge from composition-break
-    // checking. Nested opaque within a non-opaque compound is left to later
-    // refinement (degrades only that arm per the canonicalization decision).
+    // checking. Nested opaque within a non-opaque compound is refined below
+    // (see `differs_only_by_unknown`).
     if matches!(produced, Shape::Opaque) || matches!(expected, Shape::Opaque) {
+        return Unification::OpaqueExcluded;
+    }
+
+    // Bottom (the `!` type, or an uninferred leaf) coerces to / unifies with
+    // anything — treat like opaque rather than a break.
+    if matches!(produced, Shape::Bottom) || matches!(expected, Shape::Bottom) {
         return Unification::OpaqueExcluded;
     }
 
@@ -148,9 +154,116 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
         };
     }
 
+    // Nested opaque exclusion: when two compound shapes are structurally
+    // comparable and every differing sub-position involves an unknown
+    // (`Opaque`) on at least one side, the edge cannot be judged — exclude it
+    // instead of firing a break (post-224.3 the frontend emits Opaque for
+    // every unresolvable named type, so this is the common foreign-code case).
+    if differs_only_by_unknown(&produced, &expected) {
+        return Unification::OpaqueExcluded;
+    }
+
     // Cross-variant or leaf mismatch.
     Unification::Mismatch {
         unhandled: Vec::new(),
+    }
+}
+
+/// True when `a` and `b` are structurally comparable (same compound variant,
+/// same arity) and at least one sub-position differs while every differing
+/// sub-position has `Opaque` on at least one side. Leaves that differ without
+/// opaque involvement return `false` — those are genuine mismatches.
+fn differs_only_by_unknown(a: &Shape, b: &Shape) -> bool {
+    match (a, b) {
+        (Shape::Opaque, _) | (_, Shape::Opaque) => true,
+        (Shape::Bottom, _) | (_, Shape::Bottom) => true,
+        // Same-base positional comparison must run before the effect-wrapper
+        // arms below, so resolvable differences still fire as mismatches.
+        // `Result<T>` (type alias with defaulted error) vs `Result<T, E>`:
+        // the extra parameter is the error channel, auto-converted by `?` in
+        // compiling code — not a break. Common positions must agree.
+        (
+            Shape::Parameterized {
+                base: b1,
+                parameters: p1,
+                ..
+            },
+            Shape::Parameterized {
+                base: b2,
+                parameters: p2,
+                ..
+            },
+        ) if b1 == b2 => {
+            let position_differs = p1
+                .iter()
+                .zip(p2.iter())
+                .any(|(l, r)| l != r && differs_only_by_unknown(l, r));
+            let arity_alias = p1.len() != p2.len()
+                && (b1 == "Result" || b1 == "Option")
+                && p1
+                    .iter()
+                    .zip(p2.iter())
+                    .all(|(l, r)| l == r || differs_only_by_unknown(l, r));
+            position_differs || arity_alias
+        }
+        // Effect wrapper with an unknown parameter vs a different-shape /
+        // cross-variant operand: the wrapper's content cannot be judged
+        // (e.g. a `?`-unwrapped callee value vs a caller codomain
+        // `Result<PathBuf>` with Opaque inner).
+        (Shape::Parameterized { base, parameters }, _)
+            if (base == "Result" || base == "Option")
+                && parameters.iter().any(involves_unknown) =>
+        {
+            true
+        }
+        (_, Shape::Parameterized { base, parameters })
+            if (base == "Result" || base == "Option")
+                && parameters.iter().any(involves_unknown) =>
+        {
+            true
+        }
+        (
+            Shape::Parameterized {
+                base: _b1,
+                parameters: p1,
+                ..
+            },
+            Shape::Parameterized {
+                base: _b2,
+                parameters: p2,
+                ..
+            },
+        ) if p1.len() == p2.len() => {
+            let position_differs = p1
+                .iter()
+                .zip(p2.iter())
+                .any(|(l, r)| l != r && differs_only_by_unknown(l, r));
+            let bases_differ_with_unknown_params = _b1 != _b2 && p1.iter().any(involves_unknown);
+            position_differs || bases_differ_with_unknown_params
+        }
+        (Shape::Record(f1), Shape::Record(f2)) if f1.len() == f2.len() => {
+            f1.iter().zip(f2.iter()).any(|(l, r)| {
+                if l == r {
+                    false
+                } else {
+                    differs_only_by_unknown(l, r)
+                }
+            })
+        }
+        (Shape::Ref(x), Shape::Ref(y)) => x != y && differs_only_by_unknown(x, y),
+        _ => false,
+    }
+}
+
+/// Does this shape contain an unknown leaf (`Opaque`/`Bottom`) anywhere?
+fn involves_unknown(s: &Shape) -> bool {
+    match s {
+        Shape::Opaque | Shape::Bottom => true,
+        Shape::Parameterized { parameters, .. }
+        | Shape::Record(parameters)
+        | Shape::Union(parameters) => parameters.iter().any(involves_unknown),
+        Shape::Ref(inner) => involves_unknown(inner),
+        _ => false,
     }
 }
 
@@ -415,6 +528,138 @@ mod tests {
     fn unify_expected_opaque_excluded() {
         assert_eq!(
             unify_shapes(&Shape::Scalar(ScalarKind::Unit), &Shape::Opaque),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    // --- nested opaque exclusion (vampiro-224.3 follow-up, dogfood-5) ---
+
+    #[test]
+    fn unify_nested_opaque_in_same_base_excluded() {
+        // Vec<Opaque> vs Vec<Int> — inner type unknown on one side,
+        // the edge cannot be judged → excluded, not a break.
+        assert_eq!(
+            unify_shapes(
+                &Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: vec![Shape::Opaque],
+                },
+                &Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: vec![Shape::Scalar(ScalarKind::Int)],
+                }
+            ),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn unify_nested_opaque_across_bases_excluded() {
+        // Option<Opaque> vs Vec<Opaque> — both parameters unknown, the base
+        // difference alone is not evidence of a break.
+        assert_eq!(
+            unify_shapes(
+                &Shape::Parameterized {
+                    base: "Option".into(),
+                    parameters: vec![Shape::Opaque],
+                },
+                &Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: vec![Shape::Opaque],
+                }
+            ),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn unify_nested_opaque_with_resolvable_diff_still_mismatch() {
+        // Result<Int, Opaque> vs Result<Unit, Opaque>: the success parameter
+        // differs resolvably on both sides — genuine mismatch preserved.
+        let with = |succ: Shape| Shape::Parameterized {
+            base: "Result".into(),
+            parameters: vec![succ, Shape::Opaque],
+        };
+        assert_eq!(
+            unify_shapes(
+                &with(Shape::Scalar(ScalarKind::Int)),
+                &with(Shape::Scalar(ScalarKind::Unit))
+            ),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+    }
+
+    #[test]
+    fn unify_fully_resolved_param_diff_still_mismatch() {
+        // Vec<Int> vs Vec<String> — both sides resolved, real mismatch.
+        let with = |p: Shape| Shape::Parameterized {
+            base: "Vec".into(),
+            parameters: vec![p],
+        };
+        assert_eq!(
+            unify_shapes(
+                &with(Shape::Scalar(ScalarKind::Int)),
+                &with(Shape::Scalar(ScalarKind::String))
+            ),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+    }
+
+    #[test]
+    fn unify_bottom_excluded() {
+        // Bottom (! / uninferred) is compatible with everything.
+        assert_eq!(
+            unify_shapes(&Shape::Bottom, &Shape::Scalar(ScalarKind::Int)),
+            Unification::OpaqueExcluded
+        );
+        assert_eq!(
+            unify_shapes(
+                &Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: vec![Shape::Opaque],
+                },
+                &Shape::Bottom
+            ),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn unify_leaf_vs_effect_wrapper_with_unknown_param_excluded() {
+        // `?`-unwrapped callee value (String) vs caller codomain
+        // Result<PathBuf> where PathBuf is Opaque — the wrapper's content is
+        // unknown, no judgment possible (dogfood-5 wai mod.rs:319 class).
+        assert_eq!(
+            unify_shapes(
+                &Shape::Scalar(ScalarKind::String),
+                &Shape::Parameterized {
+                    base: "Result".into(),
+                    parameters: vec![Shape::Opaque],
+                }
+            ),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn unify_result_arity_alias_excluded() {
+        // Result<T> (alias with defaulted error) vs Result<T, E>: the extra
+        // parameter is the error channel, auto-converted by `?` (dogfood-5
+        // espectacular doctor.rs:686 class).
+        assert_eq!(
+            unify_shapes(
+                &Shape::Parameterized {
+                    base: "Result".into(),
+                    parameters: vec![Shape::Scalar(ScalarKind::Unit)],
+                },
+                &Shape::Parameterized {
+                    base: "Result".into(),
+                    parameters: vec![
+                        Shape::Scalar(ScalarKind::Unit),
+                        Shape::Scalar(ScalarKind::String),
+                    ],
+                }
+            ),
             Unification::OpaqueExcluded
         );
     }
