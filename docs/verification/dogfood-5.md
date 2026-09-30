@@ -13,16 +13,21 @@ exclusion) landed immediately after the triage:
 
 | Metric | Pre-fix | Post-R1 | Δ |
 |---|---:|---:|---:|
-| Total findings | 515 | **299** | −42% |
-| Composition-break | 393 | **185** | −53% |
+| Total findings (original 8 repos) | 515 | **299** | −42% |
+| Composition-break (original 8 repos) | 393 | **185** | −53% |
 | All 5 acceptance-site composition-breaks | flagged | **clear** | ✅ |
-| Workspace tests | 829 | 831 | +2 new tests per fix |
+| Workspace tests | 824 | 831 | +9 new tests |
 | Seeded-fixture TPs (soundness + precision) | pass | pass | ✅ no TP loss |
 
-Composition remainder maps 1:1 to the remaining tickets: 96 unit-shape (genuine
-`()` returns at the return-boundary approximation), 36 unknown-involving
-(heuristic misses), 53 resolved (R2–R5 classes: condition slots, rewraps,
-combinators). Redundancy noise (108) is vampiro-224.8.
+Per-repo, per-classification counts for both runs: `dogfood-5-corpus.json`
+(next to this file). **Post-fix FP rate is unmeasured** — the 185 remaining
+findings were not re-triaged as a set; the next round must re-triage before
+claiming progress toward the <5% target.
+
+Composition remainder maps to: 96 unit-shape (genuine `()` returns at the
+return-boundary approximation), 36 unknown-involving (heuristic misses), 53
+resolved (R2–R5 classes: condition slots, rewraps, combinators). Redundancy
+noise (108) is vampiro-224.8.
 
 ---
 
@@ -80,7 +85,7 @@ Rust frontend gives up (`Unit`) far too often.**
 
 | # | Root cause | Share of composition FPs | Ticket | Fix sketch |
 |---|---|---:|---|---|
-| R1 | `extract_shape()` maps **any non-generic named type to `Scalar(Unit)`** (`PathBuf`, custom structs, lifetime-only generics). `Result<PathBuf>` reads as `Result<unit>` and fires against anything. | **~83%** (327/393) | vampiro-224.3 | Return `Shape::Opaque` for unresolvable named types; `unify_shapes` already excludes Opaque |
+| R1 | `extract_shape()` maps **any non-generic named type to `Scalar(Unit)`** (`PathBuf`, custom structs, lifetime-only generics). `Result<PathBuf>` reads as `Result<unit>` and fires against anything. | 327/393 (83%) **involved a unit shape**; R1 removed the named-type-fallback subset (genuine `()` returns remain) | vampiro-224.3 | Return `Shape::Opaque` for unresolvable named types; `unify_shapes` already excludes Opaque |
 | R2 | `Ok(e)` / `Some(e)` / `Err(e)` rewraps not modeled — inner shape leaks through | ~4% | vampiro-224.4 | Wrap inferred inner shape in `Parameterized{Result\|Option}` |
 | R3 | Result **error parameter** compared, though `?` auto-converts errors in compiling code | ~3% | vampiro-224.5 | Compare success param only when both sides are `Result` |
 | R4 | Option/Result **combinators** (`is_some_and`, `find`, `ok().flatten()`, `unwrap_or`) mis-shape slots/codomains | ~5% | vampiro-224.6 | Combinator table → output shape; unknown methods → Opaque |
@@ -98,9 +103,11 @@ Rust frontend gives up (`Unit`) far too often.**
 
 ## What would make the value proposition true
 
-1. **R1 is the unlock**: a ~5-line change in `extract_shape()` removes ~83% of
-   composition noise on foreign code with near-zero TP cost (no compiling Rust code
-   has a real `unit`-vs-`Result<PathBuf>` break — the compiler catches those).
+1. **R1 is the unlock**: a ~10-line fallback change in `extract_shape()` (plus
+   nested-opaque/bottom-aware `unify_shapes` extensions) removes the
+   named-type-fallback share of composition noise on foreign code with
+   near-zero TP cost (no compiling Rust code has a real `unit`-vs-`Result<PathBuf>`
+   break — the compiler catches those). Measured: −53% composition, −42% total.
 2. R2–R5 are bounded frontend inference work; together with R1 they project to
    <15% residual composition FP on this corpus.
 3. R6 makes the redundancy axis usable at all (currently 100% FP on real code).
@@ -132,6 +139,11 @@ return-boundary concept itself (callee codomain vs caller codomain) is only
 sound for return-position calls; everywhere else it approximates and noise
 dominates. The data-flow check (uah) is the correct instrument for everything
 else.
+
+Methodology note: "compiling code ⇒ FP by construction" holds for Rust only.
+The Python-file finding above is FP by manual verification
+(`problems += check(path)` with `check -> list[str]` is correct code), not by
+construction.
 
 ## Reproduction
 

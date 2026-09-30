@@ -1,0 +1,88 @@
+{
+ "date": "2026-09-30",
+ "note": "pre = pre-R1 binary, post = post-R1 binary, original 8 repos; extension adds specodelic+bajan (post only)",
+ "post": {
+  "bajan": {
+   "composition-break": 3,
+   "redundancy-mismatch": 3
+  },
+  "dont": {
+   "composition-break": 30,
+   "redundancy-mismatch": 18
+  },
+  "dulce-de-leche": {
+   "composition-break": 22,
+   "redundancy-mismatch": 6
+  },
+  "espectacular": {
+   "composition-break": 9,
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "fotos": {
+   "composition-break": 4,
+   "redundancy-mismatch": 2
+  },
+  "pretender": {
+   "composition-break": 10,
+   "redundancy-mismatch": 14
+  },
+  "specodelic": {
+   "composition-break": 54,
+   "redundancy-mismatch": 18
+  },
+  "testaruda": {
+   "composition-break": 12,
+   "redundancy-mismatch": 4
+  },
+  "vampiro": {
+   "composition-break": 26,
+   "facade-leak": 1,
+   "redundancy-mismatch": 11,
+   "swallowed-effect": 4
+  },
+  "wai": {
+   "composition-break": 72,
+   "redundancy-mismatch": 37
+  }
+ },
+ "pre": {
+  "dont": {
+   "composition-break": 56,
+   "redundancy-mismatch": 19
+  },
+  "dulce-de-leche": {
+   "composition-break": 35,
+   "redundancy-mismatch": 9
+  },
+  "espectacular": {
+   "composition-break": 41,
+   "redundancy-mismatch": 15,
+   "swallowed-effect": 1
+  },
+  "fotos": {
+   "composition-break": 15,
+   "redundancy-mismatch": 2
+  },
+  "pretender": {
+   "composition-break": 27,
+   "redundancy-mismatch": 15
+  },
+  "testaruda": {
+   "composition-break": 32,
+   "redundancy-mismatch": 4
+  },
+  "vampiro": {
+   "composition-break": 42,
+   "facade-leak": 1,
+   "redundancy-mismatch": 14,
+   "swallowed-effect": 4
+  },
+  "wai": {
+   "composition-break": 145,
+   "redundancy-mismatch": 38
+  }
+ },
+ "round": "dogfood-5",
+ "tool": "vampiro 0.4.0 post-R1 (branch fix/r1-opaque-named-types)"
+}
