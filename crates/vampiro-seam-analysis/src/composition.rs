@@ -148,6 +148,13 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
             // caller's expected shape covers all arms.)
             return Unification::Match;
         }
+        // vampiro-224.12: arms whose only witness is unknown (Opaque/Bottom
+        // anywhere in the arm) cannot be judged — filter them out. If no
+        // concrete unhandled arm remains, the edge is excluded, not a break.
+        unhandled.retain(|arm| !involves_unknown(arm));
+        if unhandled.is_empty() {
+            return Unification::OpaqueExcluded;
+        }
         unhandled.sort_by_key(|s| serde_json::to_string(s).unwrap_or_default());
         unhandled.dedup();
         return Unification::Mismatch { unhandled };
@@ -508,13 +515,49 @@ mod tests {
 
     #[test]
     fn unify_union_subset_unhandled() {
-        // parse_amount case: produced union<Decimal,None>, expected Decimal.
+        // parse_amount-shaped case: produced union<Decimal,None>, expected
+        // Decimal. The unhandled arm here is Opaque — the only witness is
+        // unknown, so the edge cannot be judged (vampiro-224.12).
         let produced = Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]);
         let expected = Shape::Scalar(ScalarKind::Unit);
         assert_eq!(
             unify_shapes(&produced, &expected),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    // --- vampiro-224.12: unknown-only unhandled union arms don't witness ---
+
+    #[test]
+    fn union_opaque_arm_not_witness() {
+        // Produced union<int, Opaque> vs expected union<int, string>: the
+        // int arm is covered; the only unhandled arm is Opaque — the edge
+        // cannot be judged, so it must be excluded, not reported as a break.
+        let produced = Shape::Union(vec![Shape::Scalar(ScalarKind::Int), Shape::Opaque]);
+        let expected = Shape::Union(vec![
+            Shape::Scalar(ScalarKind::Int),
+            Shape::Scalar(ScalarKind::String),
+        ]);
+        assert_eq!(
+            unify_shapes(&produced, &expected),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn union_concrete_arm_still_witnesses_amid_unknown_arms() {
+        // Unknown-only unhandled arms are filtered, but concrete unhandled
+        // arms still witness a mismatch.
+        let produced = Shape::Union(vec![
+            Shape::Scalar(ScalarKind::Int),
+            Shape::Opaque,
+            Shape::Scalar(ScalarKind::String),
+        ]);
+        let expected = Shape::Scalar(ScalarKind::Int);
+        assert_eq!(
+            unify_shapes(&produced, &expected),
             Unification::Mismatch {
-                unhandled: vec![Shape::Opaque],
+                unhandled: vec![Shape::Scalar(ScalarKind::String)],
             }
         );
     }
@@ -1000,7 +1043,9 @@ mod tests {
         assert_eq!(f.line_range, crate::finding::LineRange::new(7, 7));
 
         // Now produces Union[Scalar|Opaque], caller returns Record[Scalar,Scalar].
-        // Neither union arm matches the Record → both arms are unhandled.
+        // Neither union arm matches the Record; the Opaque arm involves unknown
+        // and cannot witness (vampiro-224.12), so the concrete Unit arm is the
+        // only unhandled witness — the finding still fires.
         #[allow(irrefutable_let_patterns)]
         let crate::finding::Evidence::CompositionMismatch {
             caller_expected,
@@ -1021,10 +1066,7 @@ mod tests {
             callee_produced,
             &Shape::Union(vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)])
         );
-        assert_eq!(
-            unhandled,
-            &vec![Shape::Opaque, Shape::Scalar(ScalarKind::Unit)]
-        );
+        assert_eq!(unhandled, &vec![Shape::Scalar(ScalarKind::Unit)]);
     }
 
     #[test]
