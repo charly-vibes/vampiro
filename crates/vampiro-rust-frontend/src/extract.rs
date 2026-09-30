@@ -15,6 +15,30 @@ use vampiro_cir::{
 
 use crate::visibility::{FacadeDecl, FacadeEntry, Visibility};
 
+/// `Option<T>` shape constructor.
+fn option_shape(inner: Shape) -> Shape {
+    Shape::Parameterized {
+        base: "Option".to_string(),
+        parameters: vec![inner],
+    }
+}
+
+/// Parameter extraction for Option/Result wrappers.
+///
+/// `Option<T>`: index 0 → T. `Result<T, E>`: index 0 → T, index 1 → E.
+/// Any other base returns None (never guess).
+fn wrapper_param(r: &Shape, idx: usize) -> Option<Shape> {
+    if let Shape::Parameterized { base, parameters } = r {
+        if base == "Option" && idx == 0 {
+            return parameters.first().cloned();
+        }
+        if base == "Result" {
+            return parameters.get(idx).cloned();
+        }
+    }
+    None
+}
+
 /// Result of extracting a CIR graph and metadata from a syn file.
 pub struct ExtractionResult {
     /// The extracted CIR graph.
@@ -555,9 +579,99 @@ impl<'src> Extractor<'src> {
                     .cloned()
                     .or_else(|| self.local_shapes.get(&name).cloned())
             }
-            // Method call — try the receiver.
-            syn::Expr::MethodCall(mc) => self.extract_expr_shape(&mc.receiver),
+            // Method call — well-known std combinators map to the method's
+            // output shape; unknown methods return None rather than guessing
+            // the receiver's shape (vampiro-224.6).
+            syn::Expr::MethodCall(mc) => self.method_call_shape(mc),
             // Everything else: opaque.
+            _ => None,
+        }
+    }
+
+    /// Shape of a method-call expression (vampiro-224.6).
+    ///
+    /// Well-known Option/Result combinators map to their output shape; the
+    /// receiver's shape is NOT a guess for the call result — guessing
+    /// polluted slot inference and redundancy branch grouping (the wai
+    /// hooks.rs / dont managed_block.rs FP class). Unknown methods return
+    /// `None` (downstream: opaque, excluded from break checking).
+    fn method_call_shape(&self, mc: &syn::ExprMethodCall) -> Option<Shape> {
+        // Methods on `&T` behave like methods on `T` (auto-deref) — except
+        // `as_ref`, which inserts the reference the callee expects.
+        let receiver = self.extract_expr_shape(&mc.receiver).map(|r| match r {
+            Shape::Ref(inner) => *inner,
+            other => other,
+        });
+        match mc.method.to_string().as_str() {
+            // Predicates over Option/Result always produce bool.
+            "is_some" | "is_ok" | "is_none" | "is_err" | "is_some_and" | "is_ok_and" => {
+                Some(Shape::Scalar(ScalarKind::Bool))
+            }
+            // `as_ref` inserts the reference: Option<T> -> &Option<T>,
+            // Vec<T> -> &Vec<T> (which deref-coerces to &[T] — see 224.13).
+            "as_ref" => self
+                .extract_expr_shape(&mc.receiver)
+                .map(|r| Shape::Ref(Box::new(r))),
+            // ok()/err() swap the channel: Result<T, E> -> Option<T> / Option<E>.
+            "ok" => receiver
+                .as_ref()
+                .and_then(|r| wrapper_param(r, 0))
+                .map(option_shape),
+            "err" => receiver
+                .as_ref()
+                .and_then(|r| wrapper_param(r, 1))
+                .map(option_shape),
+            // unwrap/expect/unwrap_or* produce the inner (ok-side) type.
+            "unwrap" | "expect" | "unwrap_or" | "unwrap_or_default" | "unwrap_or_else" => {
+                receiver.as_ref().and_then(|r| wrapper_param(r, 0))
+            }
+            // find on a sequence produces Option<elem>; the elem type is not
+            // tracked — Opaque rather than a guess.
+            "find" => Some(option_shape(Shape::Opaque)),
+            // map/map_err keep the wrapper and remap one parameter.
+            "map" | "map_err" => receiver.map(|r| self.mapped_method_shape(&r, mc)),
+            _ => None,
+        }
+    }
+
+    /// Shape for `map`/`map_err`: same wrapper, with the mapped parameter
+    /// taken from the closure body or a resolvable function argument — or
+    /// Opaque when neither is inferable (never guess).
+    fn mapped_method_shape(&self, receiver: &Shape, mc: &syn::ExprMethodCall) -> Shape {
+        let mapped = mc
+            .args
+            .first()
+            .and_then(|arg| self.callee_or_closure_codomain(arg))
+            .unwrap_or(Shape::Opaque);
+        let map_err = mc.method.to_string() == "map_err";
+        match receiver {
+            Shape::Parameterized { base, parameters } => {
+                let mut params = parameters.clone();
+                let idx = if map_err { 1 } else { 0 };
+                if params.len() > idx {
+                    params[idx] = mapped;
+                } else {
+                    params.push(mapped);
+                }
+                Shape::Parameterized {
+                    base: base.clone(),
+                    parameters: params,
+                }
+            }
+            _ => Shape::Opaque,
+        }
+    }
+
+    /// Codomain of a `map`/`map_err` argument: a resolvable function path or
+    /// an inferable closure body.
+    fn callee_or_closure_codomain(&self, arg: &syn::Expr) -> Option<Shape> {
+        match arg {
+            syn::Expr::Path(p) => {
+                let name = Self::path_name(p);
+                let node_id = self.resolve_node(&name)?;
+                self.graph.node_by_id(node_id).map(|n| n.codomain.clone())
+            }
+            syn::Expr::Closure(c) => self.extract_expr_shape(&c.body),
             _ => None,
         }
     }
@@ -1984,5 +2098,106 @@ mod tests {
         // Same input re-extracted → same ID (repeatable).
         let ga2 = extract_graph(&syn::parse_file(a).unwrap(), Path::new("t.rs"), a);
         assert_eq!(&ga2.graph.nodes[0].id, id_a);
+    }
+}
+
+#[cfg(test)]
+mod method_shape_tests {
+    //! Method-combinator shape inference (vampiro-224.6).
+    //!
+    //! `extract_expr_shape` feeds slot-edge shapes: a method call used as a
+    //! call argument must produce the METHOD's output shape, not the
+    //! receiver's shape. Assertions run through the emitted expression nodes
+    //! (kind Expression) — the same shapes the composition and data-flow
+    //! tracers consume.
+
+    use super::*;
+    use std::path::Path;
+    use vampiro_cir::{NodeKind, Shape};
+
+    fn expr_codomains(source: &str) -> Vec<Shape> {
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        result
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| n.kind == NodeKind::Expression)
+            .map(|n| n.codomain.clone())
+            .collect()
+    }
+
+    fn option(inner: Shape) -> Shape {
+        Shape::Parameterized {
+            base: "Option".to_string(),
+            parameters: vec![inner],
+        }
+    }
+
+    /// `is_some_and` returns bool — not the receiver's Option shape.
+    #[test]
+    fn is_some_and_shape_is_bool() {
+        let source = "\
+fn opt() -> Option<String> { None }
+fn take(flag: bool) -> u32 { let _ = flag; 0 }
+fn main() { take(opt().is_some_and(|s| s.is_empty())); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&Shape::Scalar(ScalarKind::Bool)),
+            "is_some_and arg must be inferred as bool; codomains: {codomains:?}"
+        );
+    }
+
+    /// `unwrap_or_else` produces the receiver's inner type.
+    #[test]
+    fn unwrap_or_else_shape_is_inner() {
+        let source = "\
+fn opt() -> Option<String> { None }
+fn take(s: String) -> u32 { let _ = s; 0 }
+fn main() { take(opt().unwrap_or_else(String::new)); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&Shape::Scalar(ScalarKind::String)),
+            "unwrap_or_else arg must be inferred as the inner String; codomains: {codomains:?}"
+        );
+        assert!(
+            !codomains.contains(&option(Shape::Scalar(ScalarKind::String))),
+            "unwrap_or_else must not guess the receiver shape; codomains: {codomains:?}"
+        );
+    }
+
+    /// `ok()` swaps Result<T, E> to Option<T>.
+    #[test]
+    fn ok_shape_is_option_of_ok_param() {
+        let source = "\
+fn res() -> Result<u32, String> { Ok(1) }
+fn take(o: Option<u32>) -> u32 { let _ = o; 0 }
+fn main() { take(res().ok()); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&option(Shape::Scalar(ScalarKind::Int))),
+            "ok() arg must be inferred as Option<u32>; codomains: {codomains:?}"
+        );
+    }
+
+    /// Unknown methods must not guess the receiver's shape — no shape at all
+    /// (the arg emits no slot edge, downstream treats it as opaque).
+    #[test]
+    fn unknown_method_shape_is_none() {
+        let source = "\
+fn take(c: u32) -> u32 { let _ = c; 0 }
+fn go(v: Vec<String>) -> u32 { take(v.len()) }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            !codomains.contains(&Shape::Parameterized {
+                base: "Vec".to_string(),
+                parameters: vec![Shape::Scalar(ScalarKind::String)],
+            }),
+            "unknown method (len) must not guess the receiver shape; codomains: {codomains:?}"
+        );
     }
 }

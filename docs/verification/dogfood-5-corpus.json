@@ -184,5 +184,36 @@
   "fotos": {
    "redundancy-mismatch": 2
   }
+ },
+ "post-224.6": {
+  "note": "post-224.6 binary (224.10 scope filter + 224.13 Ref-Ref recursion + 224.6 method table, unknown methods opaque); fresh scans 2026-09-30, source dirs only; composition-break remaining = vampiro seeded fixture TPs only",
+  "wai": {
+   "redundancy-mismatch": 37
+  },
+  "dont": {
+   "redundancy-mismatch": 18
+  },
+  "dulce-de-leche": {
+   "redundancy-mismatch": 6
+  },
+  "espectacular": {
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "pretender": {
+   "redundancy-mismatch": 14
+  },
+  "testaruda": {
+   "redundancy-mismatch": 3
+  },
+  "vampiro": {
+   "composition-break": 5,
+   "facade-leak": 1,
+   "redundancy-mismatch": 5,
+   "swallowed-effect": 4
+  },
+  "fotos": {
+   "redundancy-mismatch": 2
+  }
  }
 }

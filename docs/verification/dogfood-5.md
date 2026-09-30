@@ -225,6 +225,39 @@ findings** — deprioritize; the remaining FPs are covered by 224.4/224.6
 Seeded-fixture TPs all still fire (composition slot-boundary, data-flow,
 try-operator, stress return-position).
 
+## Post-224.10/224.13/224.6: foreign composition FPs at zero
+
+Landed in sequence on the same branch, each TDD red→green:
+
+- **224.10** (f3e3b25): `tests/` dir files excluded at scan-scope level
+  (git scope resolution + CLI dir expansion); explicit `--path <file>` args
+  unfiltered. Placed at scope level, not frontend marking, because the
+  stress-fixture harness feeds absolute `tests/fixtures/` paths through
+  `analyze_with_visibility`.
+- **224.13** (ba2fc4b): `unify_shapes` recurses through `Ref`-`Ref` pairs —
+  `&Vec<T>`/`&mut Vec<T>` coerce to `&[T]`, `&mut T` to `&T`. Deref-to-non-Ref
+  deliberately NOT handled (rustc does not auto-deref in argument position);
+  a control test pins that.
+- **224.6** (this commit): `extract_expr_shape` method-output table —
+  `is_some*`/`is_ok*` → bool; `as_ref` → ref-inserted receiver; `ok`/`err`
+  → Option of the swapped param; `unwrap*` family → inner type; `find` →
+  `Option<Opaque>`; `map`/`map_err` → same wrapper, mapped param from the
+  closure body / resolvable fn arg / Opaque. **Unknown methods return None
+  (opaque) instead of guessing the receiver's shape** — that rule alone
+  cleared the espectacular `spec_path.clone()` FP (no struct-field registry
+  needed) and trimmed redundancy noise (testaruda 5→3, vampiro 21→15).
+
+Fresh scan of all 8 repos (source dirs only, post-224.6): composition-break
+**9 → 5**, all five in vampiro's own seeded fixtures (TPs by design).
+Foreign-code composition FPs: **0**. Per-repo totals in
+`dogfood-5-corpus.json` (`post-224.6`). Remaining foreign findings are
+redundancy-mismatch (REQ-11, 92) — the 224.8 branch-shape grouping class,
+tracked separately.
+
+Latent follow-up: bare field access (`s.spec_path` as a call argument) still
+infers the base expression's shape (no struct-field registry) — no current
+measured FP, filed as vampiro-224.14.
+
 ---
 
 ## Reproduction

@@ -130,3 +130,126 @@ pub fn needs_fallback_pass(
         "deref coercion must not produce composition findings; got {findings:?}"
     );
 }
+
+// --- Method-combinator shape inference (vampiro-224.6) ---
+
+/// `as_ref` on an Option inserts the reference the callee parameter expects
+/// (the dont main.rs:4839 FP: `check_evidence_uri(uri, mocks.as_ref(), ...)`
+/// flagged Option<HashMap> vs &Option<HashMap>).
+#[test]
+fn composition_e2e_option_as_ref_no_finding() {
+    let source = "\
+use std::collections::HashMap;
+
+struct MockEvidenceCheckResult;
+
+fn check_evidence_uri(
+    uri: &str,
+    mocks: Option<&HashMap<String, MockEvidenceCheckResult>>,
+) -> u32 {
+    let _ = uri;
+    let _ = mocks;
+    0
+}
+
+pub fn go(mocks: Option<HashMap<String, MockEvidenceCheckResult>>) -> u32 {
+    check_evidence_uri(\"u\", mocks.as_ref())
+}
+";
+    let graph = RustFrontend
+        .extract(source, Path::new("src/main.rs"))
+        .expect("frontend extraction must succeed");
+    let findings = analyze(&graph);
+    let composition: Vec<_> = findings
+        .iter()
+        .filter(|f| f.axis == Axis::Composition)
+        .collect();
+    assert!(
+        composition.is_empty(),
+        "as_ref must insert the reference the callee expects; got {findings:?}"
+    );
+}
+
+/// `is_some_and` returns bool, not the receiver's Option shape (the wai
+/// hooks.rs FP: read_hook(...).is_some_and(|c| ...) flagged Option<string>
+/// vs bool).
+#[test]
+fn composition_e2e_is_some_and_returns_bool() {
+    let source = "\
+fn take(flag: bool) -> u32 {
+    let _ = flag;
+    0
+}
+
+pub fn go(value: Option<String>) -> u32 {
+    take(value.is_some_and(|s| !s.is_empty()))
+}
+";
+    let graph = RustFrontend
+        .extract(source, Path::new("src/hooks.rs"))
+        .expect("frontend extraction must succeed");
+    let findings = analyze(&graph);
+    let composition: Vec<_> = findings
+        .iter()
+        .filter(|f| f.axis == Axis::Composition)
+        .collect();
+    assert!(
+        composition.is_empty(),
+        "is_some_and must produce bool; got {findings:?}"
+    );
+}
+
+/// `unwrap_or` returns the receiver's inner type, not the receiver shape.
+#[test]
+fn composition_e2e_unwrap_or_returns_inner() {
+    let source = "\
+fn take(name: String) -> u32 {
+    let _ = name;
+    0
+}
+
+pub fn go(value: Option<String>) -> u32 {
+    take(value.unwrap_or_else(|| \"fallback\".to_string()))
+}
+";
+    let graph = RustFrontend
+        .extract(source, Path::new("src/lib.rs"))
+        .expect("frontend extraction must succeed");
+    let findings = analyze(&graph);
+    let composition: Vec<_> = findings
+        .iter()
+        .filter(|f| f.axis == Axis::Composition)
+        .collect();
+    assert!(
+        composition.is_empty(),
+        "unwrap_or_else must produce the inner type; got {findings:?}"
+    );
+}
+
+/// Unknown methods must degrade to Opaque (excluded from composition-break
+/// checking) instead of guessing the receiver's shape.
+#[test]
+fn composition_e2e_unknown_method_is_opaque_excluded() {
+    let source = "\
+fn take(count: u32) -> u32 {
+    let _ = count;
+    0
+}
+
+pub fn go(items: Vec<String>) -> u32 {
+    take(items.len() as u32)
+}
+";
+    let graph = RustFrontend
+        .extract(source, Path::new("src/lib.rs"))
+        .expect("frontend extraction must succeed");
+    let findings = analyze(&graph);
+    let composition: Vec<_> = findings
+        .iter()
+        .filter(|f| f.axis == Axis::Composition)
+        .collect();
+    assert!(
+        composition.is_empty(),
+        "unknown methods (len) must not guess the receiver shape; got {findings:?}"
+    );
+}
