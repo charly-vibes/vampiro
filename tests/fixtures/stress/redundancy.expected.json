@@ -1,20 +1,8 @@
 {
   "version": "v1",
   "fixture": "redundancy",
-  "description": "Seeded redundancy mismatch (REQ-11): a consumer receives data from two branches with different codomain shapes (Record[Scalar,Scalar] vs Parameterized{Option,[Scalar]}) and no adapter reconciles them. The coarse composition tracer additionally flags each mismatched branch edge (REQ-7).",
+  "description": "Seeded redundancy mismatch (REQ-11): a consumer receives data from two branches with different codomain shapes (Record[Scalar,Scalar] vs Parameterized{Option,[Scalar]}) and no adapter reconciles them. The two REQ-7 composition-breaks that used to fire here were unit-callee-codomain return-boundary FPs (use_data's hand-modeled codomain is Scalar(Unit)) — suppressed since vampiro-s3e, which gates compiler-subsumed unit-vs-value return comparisons on same-language Rust boundaries. The seeded REQ-11 redundancy defect remains the TP.",
   "expected_findings": [
-    {
-      "rule": "REQ-7",
-      "axis": "composition",
-      "classification": "composition-break",
-      "severity": "medium"
-    },
-    {
-      "rule": "REQ-7",
-      "axis": "composition",
-      "classification": "composition-break",
-      "severity": "medium"
-    },
     {
       "rule": "REQ-11",
       "axis": "robustness",

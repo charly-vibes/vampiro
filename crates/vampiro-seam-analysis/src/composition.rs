@@ -297,6 +297,13 @@ fn unwrap_outer_effect(shape: &Shape) -> Option<&Shape> {
     }
 }
 
+/// vampiro-s3e: are both ends of this edge Rust source? A same-language
+/// Rust boundary is one where rustc already proves return-shape contracts,
+/// so compiler-subsumed checks (unit codomain) must not fire.
+fn same_language_rust(caller_file: &str, callee_file: &str) -> bool {
+    caller_file.ends_with(".rs") && callee_file.ends_with(".rs")
+}
+
 /// The composition tracer. See module docs.
 #[derive(Debug, Default, Clone)]
 pub struct CompositionAnalyzer;
@@ -387,15 +394,31 @@ impl CompositionAnalyzer {
                         } else {
                             &callee.codomain
                         };
-                        let unification = unify_shapes(callee_shape, &source.codomain);
-                        if let Unification::Mismatch { unhandled } = unification {
-                            findings.push(Finding::composition_mismatch(
-                                edge.span.file.clone().into(),
-                                edge.span.start_line..=edge.span.end_line,
-                                source.codomain.clone(),
-                                callee.codomain.clone(),
-                                unhandled,
-                            ));
+                        // vampiro-s3e: on a same-language Rust boundary, a
+                        // Scalar(Unit) callee codomain is the default /
+                        // unconstrained codomain, not Mismatch evidence —
+                        // rustc proves real unit-vs-value return breaks on
+                        // compiling Rust code by construction. The gate keys
+                        // on the RAW callee codomain: a `Result<T, E>` callee
+                        // with an unresolved `T` (post-unwrap `Scalar(Unit)`)
+                        // is an unresolved parameter, not a unit return, and
+                        // must still be compared. The gate is scoped to
+                        // same-language (`.rs` caller + `.rs` callee) edges:
+                        // at cross-language or trust boundaries rustc protects
+                        // nothing, so the comparison still fires there.
+                        let unit_callee_gated = callee.codomain == Shape::Scalar(ScalarKind::Unit)
+                            && same_language_rust(&edge.span.file, &callee.span.file);
+                        if !unit_callee_gated {
+                            let unification = unify_shapes(callee_shape, &source.codomain);
+                            if let Unification::Mismatch { unhandled } = unification {
+                                findings.push(Finding::composition_mismatch(
+                                    edge.span.file.clone().into(),
+                                    edge.span.start_line..=edge.span.end_line,
+                                    source.codomain.clone(),
+                                    callee.codomain.clone(),
+                                    unhandled,
+                                ));
+                            }
                         }
                     }
 
@@ -699,13 +722,17 @@ mod tests {
     };
 
     fn node(id: &str, domain: Shape, codomain: Shape) -> CirNode {
+        node_in(id, domain, codomain, "src/lib.rs")
+    }
+
+    fn node_in(id: &str, domain: Shape, codomain: Shape, file: &str) -> CirNode {
         CirNode {
             id: StableId::new(id),
             domain,
             codomain,
             effect: EffectChannel::Plain,
             span: SourceSpan {
-                file: "src/lib.rs".into(),
+                file: file.into(),
                 start_line: 1,
                 start_column: 1,
                 end_line: 1,
@@ -749,6 +776,62 @@ mod tests {
             slot,
             arg_shape: None,
         }
+    }
+
+    // --- vampiro-s3e: unit callee codomain gated on same-language Rust ---
+
+    #[test]
+    fn analyze_unit_callee_codomain_gated_on_rust_boundary() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Caller returns String; callee is a genuine unit-returning function.
+        // rustc proves unit-vs-value return breaks on compiling Rust code, so
+        // this edge must not fire a composition finding.
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::String),
+        ));
+        graph.add_node(node_in(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+            "src/other.rs",
+        ));
+        graph.add_edge(edge("e1", "caller", "callee", 7));
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            0,
+            "unit callee codomain must not fire on same-language Rust boundary"
+        );
+    }
+
+    #[test]
+    fn analyze_unit_callee_codomain_not_gated_cross_language() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Cross-language edge (Rust caller → non-Rust callee): rustc provides
+        // no protection here, so the gate must NOT apply and the mismatch
+        // still fires.
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::String),
+        ));
+        graph.add_node(node_in(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+            "src/ffi.py",
+        ));
+        graph.add_edge(edge("e1", "caller", "callee", 7));
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            1,
+            "cross-language unit-callee mismatch must still fire"
+        );
     }
 
     #[test]

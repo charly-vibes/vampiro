@@ -145,6 +145,29 @@ The Python-file finding above is FP by manual verification
 (`problems += check(path)` with `check -> list[str]` is correct code), not by
 construction.
 
+## Interim: vampiro-s3e (unit-callee-codomain gate)
+
+Fix: return-boundary check no longer fires when the RAW callee codomain is
+`Scalar(Unit)` on a same-language Rust boundary (both edge files `.rs`);
+the gate keys on the raw codomain so `?`-unwrapped `Result<T,_>` callees
+with unresolved `T` still compare (the try-operator TP fixture caught this
+ distinction during TDD). Cross-language edges are intentionally not gated
+(rustc protects nothing there).
+
+Measured on the original 8 repos: composition 185 → **162** (−23), total
+299 → **276**. Per-repo counts in `dogfood-5-corpus.json` (`post-s3e`).
+The projected −96 did not materialize: the surviving unit involvement is
+**nested** unit in the caller's compound codomain (`Result<()>` callers
+with statement-position calls — the classic
+`fn setup() -> Result<()> { other_thing(); Ok(()) }` idiom), which is the
+vampiro-224.9 class, not a raw unit callee. Fixing 224.9 next is expected
+to remove most of the remainder. One seeded-fixture expectation updated
+(`redundancy.expected.json`): the two REQ-7 composition-breaks there were
+themselves unit-callee FPs from the hand-built graph; the seeded REQ-11
+redundancy TP is unchanged.
+
+---
+
 ## Reproduction
 
 ```bash
