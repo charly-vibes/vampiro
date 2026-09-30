@@ -15,6 +15,30 @@ use vampiro_cir::{
 
 use crate::visibility::{FacadeDecl, FacadeEntry, Visibility};
 
+/// `Option<T>` shape constructor.
+fn option_shape(inner: Shape) -> Shape {
+    Shape::Parameterized {
+        base: "Option".to_string(),
+        parameters: vec![inner],
+    }
+}
+
+/// Parameter extraction for Option/Result wrappers.
+///
+/// `Option<T>`: index 0 → T. `Result<T, E>`: index 0 → T, index 1 → E.
+/// Any other base returns None (never guess).
+fn wrapper_param(r: &Shape, idx: usize) -> Option<Shape> {
+    if let Shape::Parameterized { base, parameters } = r {
+        if base == "Option" && idx == 0 {
+            return parameters.first().cloned();
+        }
+        if base == "Result" {
+            return parameters.get(idx).cloned();
+        }
+    }
+    None
+}
+
 /// Result of extracting a CIR graph and metadata from a syn file.
 pub struct ExtractionResult {
     /// The extracted CIR graph.
@@ -50,6 +74,8 @@ pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> Extractio
         local_shapes: HashMap::new(),
         is_test_context: false,
         pending_discard: false,
+        tail_depth: 0,
+        pending_return_position: false,
     };
     visit::visit_file(&mut extractor, syntax);
     ExtractionResult {
@@ -97,6 +123,15 @@ struct Extractor<'src> {
     /// Whether the next visited call expression is in a discard context
     /// (e.g., `let _ = expr;` or `expr;` as a statement).
     pending_discard: bool,
+    /// Block-nesting depth at which the visited expression is in return
+    /// position (tail expression, `return` operand, or `?`-propagated
+    /// tail). Zero means ordinary statement/argument context
+    /// (vampiro-224.9).
+    tail_depth: usize,
+    /// Tail-position flag handed to the next call visitor: the call's
+    /// result flows directly to the caller's return value. Consumed by
+    /// `add_call_edge` call sites to tag `CirEdge::return_position`.
+    pending_return_position: bool,
 }
 
 impl<'src> Extractor<'src> {
@@ -212,19 +247,25 @@ impl<'src> Extractor<'src> {
                             "char" => Shape::Scalar(ScalarKind::Char),
                             "String" | "str" => Shape::Scalar(ScalarKind::String),
                             _ => {
+                                // Named types we cannot resolve structurally
+                                // (std types like PathBuf, user structs,
+                                // lifetime-only generics) degrade to Opaque —
+                                // never Scalar(Unit), which would fabricate
+                                // composition mismatches (dogfood-5, R1 /
+                                // vampiro-224.3). Non-type generic arguments
+                                // (lifetimes, const generics) map to Opaque so
+                                // parameter arity is preserved.
                                 if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
                                     let params: Vec<Shape> = args
                                         .args
                                         .iter()
-                                        .filter_map(|arg| match arg {
-                                            syn::GenericArgument::Type(t) => {
-                                                Some(self.extract_shape(t))
-                                            }
-                                            _ => None,
+                                        .map(|arg| match arg {
+                                            syn::GenericArgument::Type(t) => self.extract_shape(t),
+                                            _ => Shape::Opaque,
                                         })
                                         .collect();
                                     if params.is_empty() {
-                                        Shape::Scalar(ScalarKind::Unit)
+                                        Shape::Opaque
                                     } else {
                                         Shape::Parameterized {
                                             base: ident,
@@ -232,7 +273,7 @@ impl<'src> Extractor<'src> {
                                         }
                                     }
                                 } else {
-                                    Shape::Scalar(ScalarKind::Unit)
+                                    Shape::Opaque
                                 }
                             }
                         }
@@ -449,7 +490,9 @@ impl<'src> Extractor<'src> {
 
         let prev = self.current_function.replace(fq);
 
-        visit::visit_block(self, &func.block);
+        self.tail_depth += 1;
+        self.visit_block(&func.block);
+        self.tail_depth -= 1;
 
         self.current_function = prev;
     }
@@ -536,9 +579,99 @@ impl<'src> Extractor<'src> {
                     .cloned()
                     .or_else(|| self.local_shapes.get(&name).cloned())
             }
-            // Method call — try the receiver.
-            syn::Expr::MethodCall(mc) => self.extract_expr_shape(&mc.receiver),
+            // Method call — well-known std combinators map to the method's
+            // output shape; unknown methods return None rather than guessing
+            // the receiver's shape (vampiro-224.6).
+            syn::Expr::MethodCall(mc) => self.method_call_shape(mc),
             // Everything else: opaque.
+            _ => None,
+        }
+    }
+
+    /// Shape of a method-call expression (vampiro-224.6).
+    ///
+    /// Well-known Option/Result combinators map to their output shape; the
+    /// receiver's shape is NOT a guess for the call result — guessing
+    /// polluted slot inference and redundancy branch grouping (the wai
+    /// hooks.rs / dont managed_block.rs FP class). Unknown methods return
+    /// `None` (downstream: opaque, excluded from break checking).
+    fn method_call_shape(&self, mc: &syn::ExprMethodCall) -> Option<Shape> {
+        // Methods on `&T` behave like methods on `T` (auto-deref) — except
+        // `as_ref`, which inserts the reference the callee expects.
+        let receiver = self.extract_expr_shape(&mc.receiver).map(|r| match r {
+            Shape::Ref(inner) => *inner,
+            other => other,
+        });
+        match mc.method.to_string().as_str() {
+            // Predicates over Option/Result always produce bool.
+            "is_some" | "is_ok" | "is_none" | "is_err" | "is_some_and" | "is_ok_and" => {
+                Some(Shape::Scalar(ScalarKind::Bool))
+            }
+            // `as_ref` inserts the reference: Option<T> -> &Option<T>,
+            // Vec<T> -> &Vec<T> (which deref-coerces to &[T] — see 224.13).
+            "as_ref" => self
+                .extract_expr_shape(&mc.receiver)
+                .map(|r| Shape::Ref(Box::new(r))),
+            // ok()/err() swap the channel: Result<T, E> -> Option<T> / Option<E>.
+            "ok" => receiver
+                .as_ref()
+                .and_then(|r| wrapper_param(r, 0))
+                .map(option_shape),
+            "err" => receiver
+                .as_ref()
+                .and_then(|r| wrapper_param(r, 1))
+                .map(option_shape),
+            // unwrap/expect/unwrap_or* produce the inner (ok-side) type.
+            "unwrap" | "expect" | "unwrap_or" | "unwrap_or_default" | "unwrap_or_else" => {
+                receiver.as_ref().and_then(|r| wrapper_param(r, 0))
+            }
+            // find on a sequence produces Option<elem>; the elem type is not
+            // tracked — Opaque rather than a guess.
+            "find" => Some(option_shape(Shape::Opaque)),
+            // map/map_err keep the wrapper and remap one parameter.
+            "map" | "map_err" => receiver.map(|r| self.mapped_method_shape(&r, mc)),
+            _ => None,
+        }
+    }
+
+    /// Shape for `map`/`map_err`: same wrapper, with the mapped parameter
+    /// taken from the closure body or a resolvable function argument — or
+    /// Opaque when neither is inferable (never guess).
+    fn mapped_method_shape(&self, receiver: &Shape, mc: &syn::ExprMethodCall) -> Shape {
+        let mapped = mc
+            .args
+            .first()
+            .and_then(|arg| self.callee_or_closure_codomain(arg))
+            .unwrap_or(Shape::Opaque);
+        let map_err = mc.method == "map_err";
+        match receiver {
+            Shape::Parameterized { base, parameters } => {
+                let mut params = parameters.clone();
+                let idx = if map_err { 1 } else { 0 };
+                if params.len() > idx {
+                    params[idx] = mapped;
+                } else {
+                    params.push(mapped);
+                }
+                Shape::Parameterized {
+                    base: base.clone(),
+                    parameters: params,
+                }
+            }
+            _ => Shape::Opaque,
+        }
+    }
+
+    /// Codomain of a `map`/`map_err` argument: a resolvable function path or
+    /// an inferable closure body.
+    fn callee_or_closure_codomain(&self, arg: &syn::Expr) -> Option<Shape> {
+        match arg {
+            syn::Expr::Path(p) => {
+                let name = Self::path_name(p);
+                let node_id = self.resolve_node(&name)?;
+                self.graph.node_by_id(node_id).map(|n| n.codomain.clone())
+            }
+            syn::Expr::Closure(c) => self.extract_expr_shape(&c.body),
             _ => None,
         }
     }
@@ -769,6 +902,11 @@ impl<'src> Extractor<'src> {
         slot: Option<u32>,
         arg_shape: Option<Shape>,
         expression_source: Option<StableId>,
+        // Whether the callee's result flows to the caller's return value
+        // (vampiro-224.9). Only call-result edges carry `true`; argument/
+        // receiver slot edges carry `false` (their values flow into
+        // parameters, covered by data-flow checks instead).
+        return_position: bool,
     ) {
         if Self::is_builtin(callee_name) {
             return;
@@ -810,6 +948,7 @@ impl<'src> Extractor<'src> {
             trust_provenance: Default::default(),
             slot,
             arg_shape,
+            return_position,
         };
 
         self.graph.add_edge(edge);
@@ -845,7 +984,18 @@ impl<'src> Extractor<'src> {
             },
             _ => return,
         };
-        self.add_call_edge(&name, span, resolution, evidence, None, None, None);
+        self.add_call_edge(
+            &name,
+            span,
+            resolution,
+            evidence,
+            None,
+            None,
+            None,
+            // The receiver's result flows onward through the unwrap; it is
+            // in return position exactly when the method chain is.
+            self.pending_return_position,
+        );
     }
 
     /// Known Rust built-in functions/constructors that should not produce edges.
@@ -930,6 +1080,124 @@ impl<'src> Extractor<'src> {
 
 /// Visit functions and extract CIR nodes, visibility, and facades.
 impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
+    // --- return-position tracking (vampiro-224.9) ---
+    //
+    // `tail_depth > 0` marks expressions whose value flows directly to the
+    // enclosing function's return value: the tail expression of a block in
+    // tail position, `return` operands, and `?`-propagated tails. Call
+    // visitors consume `pending_return_position` to tag call-result edges;
+    // argument/receiver contexts drop out of tail position because their
+    // values flow into callee slots (covered by data-flow checks instead).
+    fn visit_expr(&mut self, expr: &'ast syn::Expr) {
+        let in_tail = self.tail_depth > 0;
+        match expr {
+            // A call/method call grabs the current tail context for its own
+            // call-result edge; its arguments and receivers are NOT in
+            // return position.
+            syn::Expr::Call(_) | syn::Expr::MethodCall(_) => {
+                self.pending_return_position = in_tail;
+                let prev = self.tail_depth;
+                self.tail_depth = 0;
+                visit::visit_expr(self, expr);
+                self.tail_depth = prev;
+                self.pending_return_position = false;
+            }
+            // `return e;` — the operand is in return position even when the
+            // return is a mid-function statement.
+            syn::Expr::Return(ret) => {
+                self.tail_depth += 1;
+                if let Some(inner) = &ret.expr {
+                    self.visit_expr(inner);
+                }
+                self.tail_depth -= 1;
+            }
+            // `?` propagates the operand's unwrapped value onward, so it
+            // inherits the tail context; visit_expr_try consumes the pending
+            // flag to tag the operand call's edge.
+            syn::Expr::Try(_) => {
+                self.pending_return_position = in_tail;
+                visit::visit_expr(self, expr);
+                self.pending_return_position = false;
+            }
+            // Tail position flows through result-producing wrappers. If/match
+            // conditions and match guards are handled explicitly: a condition
+            // call's value drives control flow, it does not flow to return.
+            syn::Expr::If(e) if in_tail => {
+                let prev = self.tail_depth;
+                self.tail_depth = 0;
+                self.visit_expr(&e.cond);
+                self.tail_depth = 1;
+                self.visit_block(&e.then_branch);
+                self.tail_depth = prev;
+                if let Some((_, else_expr)) = &e.else_branch {
+                    self.tail_depth = 1;
+                    self.visit_expr(else_expr);
+                    self.tail_depth = prev;
+                }
+            }
+            syn::Expr::Match(e) if in_tail => {
+                let prev = self.tail_depth;
+                self.tail_depth = 0;
+                self.visit_expr(&e.expr);
+                self.tail_depth = 1;
+                for arm in &e.arms {
+                    if let Some((_, guard)) = &arm.guard {
+                        self.tail_depth = 0;
+                        self.visit_expr(guard);
+                        self.tail_depth = 1;
+                    }
+                    self.visit_expr(&arm.body);
+                }
+                self.tail_depth = prev;
+            }
+            syn::Expr::Await(_)
+            | syn::Expr::Block(_)
+            | syn::Expr::Unsafe(_)
+            | syn::Expr::Paren(_)
+            | syn::Expr::Group(_)
+                if in_tail =>
+            {
+                visit::visit_expr(self, expr);
+            }
+            // Everything else (binaries, assignments, condition calls in
+            // non-tail position, …): children are not in return position.
+            _ => {
+                let prev = self.tail_depth;
+                self.tail_depth = 0;
+                visit::visit_expr(self, expr);
+                self.tail_depth = prev;
+            }
+        }
+    }
+
+    fn visit_block(&mut self, block: &'ast syn::Block) {
+        if self.tail_depth == 0 {
+            visit::visit_block(self, block);
+            return;
+        }
+        // A block in tail position passes tail status only to its tail
+        // expression (last statement without a semicolon); every other
+        // statement — including `let` bindings and discarded calls — is
+        // ordinary statement context.
+        let tail_idx = match block.stmts.last() {
+            Some(syn::Stmt::Expr(_, None)) => Some(block.stmts.len() - 1),
+            _ => None,
+        };
+        let prev = self.tail_depth;
+        self.tail_depth = 0;
+        for (i, stmt) in block.stmts.iter().enumerate() {
+            if Some(i) != tail_idx {
+                self.visit_stmt(stmt);
+            }
+        }
+        self.tail_depth = prev;
+        if let Some(i) = tail_idx {
+            if let syn::Stmt::Expr(expr, None) = &block.stmts[i] {
+                self.visit_expr(expr);
+            }
+        }
+    }
+
     #[allow(clippy::borrow_deref_ref)]
     fn visit_stmt(&mut self, stmt: &'ast syn::Stmt) {
         // Detect true discards: expression statements and wildcard locals.
@@ -1024,7 +1292,16 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 // Skip builtins entirely — no edges, no expression nodes.
             } else if call.args.is_empty() {
                 // Zero-arg call: declaration→declaration edge for return-boundary check.
-                self.add_call_edge(&callee_name, span, resolution, None, None, None, None);
+                self.add_call_edge(
+                    &callee_name,
+                    span,
+                    resolution,
+                    None,
+                    None,
+                    None,
+                    None,
+                    self.pending_return_position,
+                );
             } else {
                 // Get the current function's ID for expression node linking.
                 let current_fn_id = self
@@ -1043,6 +1320,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     None,
                     None,
                     None,
+                    self.pending_return_position,
                 );
 
                 // Emit expression→declaration edges for each argument with a known
@@ -1062,6 +1340,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                                 Some(i as u32),
                                 None,
                                 Some(expr_id),
+                                false,
                             );
                         }
                     }
@@ -1090,6 +1369,8 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         // edge with slot=None for the receiver.
         let total_args = 1 + call.args.len(); // receiver + explicit args
         if total_args == 1 {
+            // Zero-arg method: the slot-less edge IS the call-result edge —
+            // tag it with the enclosing return-position context.
             self.add_call_edge(
                 &callee_name,
                 span,
@@ -1098,9 +1379,11 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 None,
                 None,
                 None,
+                self.pending_return_position,
             );
         } else {
-            // Receiver at slot 0
+            // Receiver at slot 0 — the receiver's value flows into the
+            // method, not to the caller's return, so never return position.
             self.add_call_edge(
                 &callee_name,
                 span,
@@ -1109,6 +1392,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 Some(0),
                 None,
                 None,
+                false,
             );
             for (i, _arg) in call.args.iter().enumerate() {
                 self.add_call_edge(
@@ -1119,6 +1403,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     Some((i + 1) as u32),
                     None,
                     None,
+                    false,
                 );
             }
         }
@@ -1154,6 +1439,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     None,
                     None,
                     None,
+                    self.pending_return_position,
                 );
             }
             syn::Expr::Call(inner) => {
@@ -1174,6 +1460,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                             None,
                             None,
                             None,
+                            self.pending_return_position,
                         );
                     } else {
                         for i in 0..inner.args.len() {
@@ -1185,6 +1472,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                                 Some(i as u32),
                                 None,
                                 None,
+                                false,
                             );
                         }
                     }
@@ -1206,6 +1494,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         None,
                         None,
                         None,
+                        self.pending_return_position,
                     );
                 } else {
                     self.add_call_edge(
@@ -1216,6 +1505,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         Some(0),
                         None,
                         None,
+                        false,
                     );
                 }
             }
@@ -1292,10 +1582,7 @@ mod tests {
             node.codomain,
             Shape::Parameterized {
                 base: "Result".into(),
-                parameters: vec![
-                    Shape::Scalar(ScalarKind::Int),
-                    Shape::Scalar(ScalarKind::Unit)
-                ],
+                parameters: vec![Shape::Scalar(ScalarKind::Int), Shape::Opaque],
             }
         );
     }
@@ -1374,6 +1661,42 @@ mod tests {
         assert_eq!(
             result.graph.nodes[0].domain,
             Shape::Ref(Box::new(Shape::Scalar(ScalarKind::String)))
+        );
+    }
+
+    #[test]
+    fn extract_shape_unresolvable_named_type_is_opaque() {
+        // Non-primitive, non-generic named types (std types like PathBuf,
+        // user structs) must not degrade to Scalar(Unit) — that turns
+        // `Result<PathBuf>` codomains into `Result<unit>` and fires false
+        // composition breaks against any resolved callee type (dogfood-5, R1).
+        for source in [
+            "fn foo(x: std::path::PathBuf) { }",
+            "fn foo(x: LintOutput) { }",
+        ] {
+            let syntax = syn::parse_file(source).unwrap();
+            let result = extract_graph(&syntax, Path::new("test.rs"), source);
+            assert_eq!(
+                result.graph.nodes[0].domain,
+                Shape::Opaque,
+                "domain of `{source}` should be Opaque"
+            );
+        }
+    }
+
+    #[test]
+    fn extract_shape_generic_named_type_keeps_base() {
+        // Generic named types keep their base + inferred params (only their
+        // unresolvable parameters become Opaque).
+        let source = "fn foo(x: HashMap<String, PathBuf>) { }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        assert_eq!(
+            result.graph.nodes[0].domain,
+            Shape::Parameterized {
+                base: "HashMap".into(),
+                parameters: vec![Shape::Scalar(ScalarKind::String), Shape::Opaque,],
+            }
         );
     }
 
@@ -1775,5 +2098,106 @@ mod tests {
         // Same input re-extracted → same ID (repeatable).
         let ga2 = extract_graph(&syn::parse_file(a).unwrap(), Path::new("t.rs"), a);
         assert_eq!(&ga2.graph.nodes[0].id, id_a);
+    }
+}
+
+#[cfg(test)]
+mod method_shape_tests {
+    //! Method-combinator shape inference (vampiro-224.6).
+    //!
+    //! `extract_expr_shape` feeds slot-edge shapes: a method call used as a
+    //! call argument must produce the METHOD's output shape, not the
+    //! receiver's shape. Assertions run through the emitted expression nodes
+    //! (kind Expression) — the same shapes the composition and data-flow
+    //! tracers consume.
+
+    use super::*;
+    use std::path::Path;
+    use vampiro_cir::{NodeKind, Shape};
+
+    fn expr_codomains(source: &str) -> Vec<Shape> {
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        result
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| n.kind == NodeKind::Expression)
+            .map(|n| n.codomain.clone())
+            .collect()
+    }
+
+    fn option(inner: Shape) -> Shape {
+        Shape::Parameterized {
+            base: "Option".to_string(),
+            parameters: vec![inner],
+        }
+    }
+
+    /// `is_some_and` returns bool — not the receiver's Option shape.
+    #[test]
+    fn is_some_and_shape_is_bool() {
+        let source = "\
+fn opt() -> Option<String> { None }
+fn take(flag: bool) -> u32 { let _ = flag; 0 }
+fn main() { take(opt().is_some_and(|s| s.is_empty())); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&Shape::Scalar(ScalarKind::Bool)),
+            "is_some_and arg must be inferred as bool; codomains: {codomains:?}"
+        );
+    }
+
+    /// `unwrap_or_else` produces the receiver's inner type.
+    #[test]
+    fn unwrap_or_else_shape_is_inner() {
+        let source = "\
+fn opt() -> Option<String> { None }
+fn take(s: String) -> u32 { let _ = s; 0 }
+fn main() { take(opt().unwrap_or_else(String::new)); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&Shape::Scalar(ScalarKind::String)),
+            "unwrap_or_else arg must be inferred as the inner String; codomains: {codomains:?}"
+        );
+        assert!(
+            !codomains.contains(&option(Shape::Scalar(ScalarKind::String))),
+            "unwrap_or_else must not guess the receiver shape; codomains: {codomains:?}"
+        );
+    }
+
+    /// `ok()` swaps Result<T, E> to Option<T>.
+    #[test]
+    fn ok_shape_is_option_of_ok_param() {
+        let source = "\
+fn res() -> Result<u32, String> { Ok(1) }
+fn take(o: Option<u32>) -> u32 { let _ = o; 0 }
+fn main() { take(res().ok()); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&option(Shape::Scalar(ScalarKind::Int))),
+            "ok() arg must be inferred as Option<u32>; codomains: {codomains:?}"
+        );
+    }
+
+    /// Unknown methods must not guess the receiver's shape — no shape at all
+    /// (the arg emits no slot edge, downstream treats it as opaque).
+    #[test]
+    fn unknown_method_shape_is_none() {
+        let source = "\
+fn take(c: u32) -> u32 { let _ = c; 0 }
+fn go(v: Vec<String>) -> u32 { take(v.len()) }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            !codomains.contains(&Shape::Parameterized {
+                base: "Vec".to_string(),
+                parameters: vec![Shape::Scalar(ScalarKind::String)],
+            }),
+            "unknown method (len) must not guess the receiver shape; codomains: {codomains:?}"
+        );
     }
 }

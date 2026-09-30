@@ -47,9 +47,15 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
     let expected = expected.normalize();
 
     // REQ-23: top-level opaque excludes the edge from composition-break
-    // checking. Nested opaque within a non-opaque compound is left to later
-    // refinement (degrades only that arm per the canonicalization decision).
+    // checking. Nested opaque within a non-opaque compound is refined below
+    // (see `differs_only_by_unknown`).
     if matches!(produced, Shape::Opaque) || matches!(expected, Shape::Opaque) {
+        return Unification::OpaqueExcluded;
+    }
+
+    // Bottom (the `!` type, or an uninferred leaf) coerces to / unifies with
+    // anything — treat like opaque rather than a break.
+    if matches!(produced, Shape::Bottom) || matches!(expected, Shape::Bottom) {
         return Unification::OpaqueExcluded;
     }
 
@@ -83,6 +89,17 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
                 }
             }
         }
+    }
+
+    // Deref coercion (vampiro-224.13): `&Vec<T>` / `&mut Vec<T>` coerce to
+    // `&[T]`, `&mut T` to `&T` — both sides keep their Ref, so compare the
+    // referents recursively (which picks up the Vec↔slice aliasing rule and
+    // everything else). The mut bit is not modeled; a `&mut T` passed where
+    // `&T` is expected is a valid coercion. Deref-to-non-Ref is intentionally
+    // NOT handled: rustc does not auto-deref in argument position, so a Ref
+    // against a non-Ref expected shape stays a genuine mismatch.
+    if let (Shape::Ref(p_inner), Shape::Ref(e_inner)) = (&produced, &expected) {
+        return unify_shapes(p_inner, e_inner);
     }
 
     // Parameterized base aliasing: Vec[T] ↔ slice[T] are structurally
@@ -148,9 +165,116 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
         };
     }
 
+    // Nested opaque exclusion: when two compound shapes are structurally
+    // comparable and every differing sub-position involves an unknown
+    // (`Opaque`) on at least one side, the edge cannot be judged — exclude it
+    // instead of firing a break (post-224.3 the frontend emits Opaque for
+    // every unresolvable named type, so this is the common foreign-code case).
+    if differs_only_by_unknown(&produced, &expected) {
+        return Unification::OpaqueExcluded;
+    }
+
     // Cross-variant or leaf mismatch.
     Unification::Mismatch {
         unhandled: Vec::new(),
+    }
+}
+
+/// True when `a` and `b` are structurally comparable (same compound variant,
+/// same arity) and at least one sub-position differs while every differing
+/// sub-position has `Opaque` on at least one side. Leaves that differ without
+/// opaque involvement return `false` — those are genuine mismatches.
+fn differs_only_by_unknown(a: &Shape, b: &Shape) -> bool {
+    match (a, b) {
+        (Shape::Opaque, _) | (_, Shape::Opaque) => true,
+        (Shape::Bottom, _) | (_, Shape::Bottom) => true,
+        // Same-base positional comparison must run before the effect-wrapper
+        // arms below, so resolvable differences still fire as mismatches.
+        // `Result<T>` (type alias with defaulted error) vs `Result<T, E>`:
+        // the extra parameter is the error channel, auto-converted by `?` in
+        // compiling code — not a break. Common positions must agree.
+        (
+            Shape::Parameterized {
+                base: b1,
+                parameters: p1,
+                ..
+            },
+            Shape::Parameterized {
+                base: b2,
+                parameters: p2,
+                ..
+            },
+        ) if b1 == b2 => {
+            let position_differs = p1
+                .iter()
+                .zip(p2.iter())
+                .any(|(l, r)| l != r && differs_only_by_unknown(l, r));
+            let arity_alias = p1.len() != p2.len()
+                && (b1 == "Result" || b1 == "Option")
+                && p1
+                    .iter()
+                    .zip(p2.iter())
+                    .all(|(l, r)| l == r || differs_only_by_unknown(l, r));
+            position_differs || arity_alias
+        }
+        // Effect wrapper with an unknown parameter vs a different-shape /
+        // cross-variant operand: the wrapper's content cannot be judged
+        // (e.g. a `?`-unwrapped callee value vs a caller codomain
+        // `Result<PathBuf>` with Opaque inner).
+        (Shape::Parameterized { base, parameters }, _)
+            if (base == "Result" || base == "Option")
+                && parameters.iter().any(involves_unknown) =>
+        {
+            true
+        }
+        (_, Shape::Parameterized { base, parameters })
+            if (base == "Result" || base == "Option")
+                && parameters.iter().any(involves_unknown) =>
+        {
+            true
+        }
+        (
+            Shape::Parameterized {
+                base: _b1,
+                parameters: p1,
+                ..
+            },
+            Shape::Parameterized {
+                base: _b2,
+                parameters: p2,
+                ..
+            },
+        ) if p1.len() == p2.len() => {
+            let position_differs = p1
+                .iter()
+                .zip(p2.iter())
+                .any(|(l, r)| l != r && differs_only_by_unknown(l, r));
+            let bases_differ_with_unknown_params = _b1 != _b2 && p1.iter().any(involves_unknown);
+            position_differs || bases_differ_with_unknown_params
+        }
+        (Shape::Record(f1), Shape::Record(f2)) if f1.len() == f2.len() => {
+            f1.iter().zip(f2.iter()).any(|(l, r)| {
+                if l == r {
+                    false
+                } else {
+                    differs_only_by_unknown(l, r)
+                }
+            })
+        }
+        (Shape::Ref(x), Shape::Ref(y)) => x != y && differs_only_by_unknown(x, y),
+        _ => false,
+    }
+}
+
+/// Does this shape contain an unknown leaf (`Opaque`/`Bottom`) anywhere?
+fn involves_unknown(s: &Shape) -> bool {
+    match s {
+        Shape::Opaque | Shape::Bottom => true,
+        Shape::Parameterized { parameters, .. }
+        | Shape::Record(parameters)
+        | Shape::Union(parameters) => parameters.iter().any(involves_unknown),
+        Shape::Ref(inner) => involves_unknown(inner),
+        _ => false,
     }
 }
 
@@ -182,6 +306,13 @@ fn unwrap_outer_effect(shape: &Shape) -> Option<&Shape> {
         }
         _ => None,
     }
+}
+
+/// vampiro-s3e: are both ends of this edge Rust source? A same-language
+/// Rust boundary is one where rustc already proves return-shape contracts,
+/// so compiler-subsumed checks (unit codomain) must not fire.
+fn same_language_rust(caller_file: &str, callee_file: &str) -> bool {
+    caller_file.ends_with(".rs") && callee_file.ends_with(".rs")
 }
 
 /// The composition tracer. See module docs.
@@ -251,6 +382,16 @@ impl CompositionAnalyzer {
                 NodeKind::Declaration => {
                     // --- Return-boundary check ---
                     //
+                    // vampiro-224.9: fire only for return-position calls.
+                    // The check compares callee codomain vs caller codomain,
+                    // which is meaningful only when the callee's result
+                    // actually flows to the caller's return (tail
+                    // expression / return operand, tagged by the frontend
+                    // as `return_position`). Statement-position, let-bound,
+                    // and argument-slot calls are definitionally FPs on
+                    // compiling code; their data flow is covered by the
+                    // slot-boundary and data-flow checks instead.
+                    //
                     // Skip edges where the caller has a void/unit return type
                     // (Scalar as the unit type). There's no composition
                     // contract at the return boundary for void-returning
@@ -258,7 +399,7 @@ impl CompositionAnalyzer {
                     // distinguish different scalar types (u32, f64, bool are
                     // all `Scalar`), so this guard loses no precision while
                     // eliminating noise from unrelated call edges.
-                    if source.codomain != Shape::Scalar(ScalarKind::Unit) {
+                    if edge.return_position && source.codomain != Shape::Scalar(ScalarKind::Unit) {
                         // For edges with Ordinary+Total unwrap evidence
                         // (e.g., `?` operator on Result/Option), the callee's
                         // effect wrapper is removed at the call site. Compare
@@ -274,15 +415,31 @@ impl CompositionAnalyzer {
                         } else {
                             &callee.codomain
                         };
-                        let unification = unify_shapes(callee_shape, &source.codomain);
-                        if let Unification::Mismatch { unhandled } = unification {
-                            findings.push(Finding::composition_mismatch(
-                                edge.span.file.clone().into(),
-                                edge.span.start_line..=edge.span.end_line,
-                                source.codomain.clone(),
-                                callee.codomain.clone(),
-                                unhandled,
-                            ));
+                        // vampiro-s3e: on a same-language Rust boundary, a
+                        // Scalar(Unit) callee codomain is the default /
+                        // unconstrained codomain, not Mismatch evidence —
+                        // rustc proves real unit-vs-value return breaks on
+                        // compiling Rust code by construction. The gate keys
+                        // on the RAW callee codomain: a `Result<T, E>` callee
+                        // with an unresolved `T` (post-unwrap `Scalar(Unit)`)
+                        // is an unresolved parameter, not a unit return, and
+                        // must still be compared. The gate is scoped to
+                        // same-language (`.rs` caller + `.rs` callee) edges:
+                        // at cross-language or trust boundaries rustc protects
+                        // nothing, so the comparison still fires there.
+                        let unit_callee_gated = callee.codomain == Shape::Scalar(ScalarKind::Unit)
+                            && same_language_rust(&edge.span.file, &callee.span.file);
+                        if !unit_callee_gated {
+                            let unification = unify_shapes(callee_shape, &source.codomain);
+                            if let Unification::Mismatch { unhandled } = unification {
+                                findings.push(Finding::composition_mismatch(
+                                    edge.span.file.clone().into(),
+                                    edge.span.start_line..=edge.span.end_line,
+                                    source.codomain.clone(),
+                                    callee.codomain.clone(),
+                                    unhandled,
+                                ));
+                            }
                         }
                     }
 
@@ -390,6 +547,63 @@ mod tests {
         assert_eq!(unify_shapes(&produced, &expected), Unification::Match);
     }
 
+    // --- Deref coercion (vampiro-224.13) ---
+
+    fn vec_int() -> Shape {
+        Shape::Parameterized {
+            base: "Vec".to_string(),
+            parameters: vec![Shape::Scalar(ScalarKind::Int)],
+        }
+    }
+
+    fn slice_int() -> Shape {
+        Shape::Parameterized {
+            base: "slice".to_string(),
+            parameters: vec![Shape::Scalar(ScalarKind::Int)],
+        }
+    }
+
+    /// `&mut Vec<T>` / `&Vec<T>` passed where `&[T]` is expected (the
+    /// testaruda engine.rs FP): both refs deref-coerce to the same slice.
+    #[test]
+    fn unify_ref_vec_vs_ref_slice_matches() {
+        assert_eq!(
+            unify_shapes(
+                &Shape::Ref(Box::new(vec_int())),
+                &Shape::Ref(Box::new(slice_int()))
+            ),
+            Unification::Match
+        );
+    }
+
+    /// Deref coercion direction only: covered by Ref-Ref recursion —
+    /// `&Vec<T>` coerces to `&[T]`, never to bare `[T]` in argument position.
+    #[test]
+    fn unify_ref_produced_derefs_to_expected_stays_mismatch() {
+        assert_eq!(
+            unify_shapes(&Shape::Ref(Box::new(vec_int())), &slice_int()),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+    }
+
+    /// Deref coercion must not mask genuine mismatches: different referents
+    /// still break, both through refs and through the deref path.
+    #[test]
+    fn unify_ref_mismatch_preserved_for_genuinely_different_referents() {
+        let record = Shape::Record(vec![Shape::Scalar(ScalarKind::String)]);
+        assert_eq!(
+            unify_shapes(
+                &Shape::Ref(Box::new(vec_int())),
+                &Shape::Ref(Box::new(record.clone()))
+            ),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+        assert_eq!(
+            unify_shapes(&Shape::Ref(Box::new(vec_int())), &record),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+    }
+
     #[test]
     fn unify_cross_variant_mismatch() {
         assert_eq!(
@@ -415,6 +629,138 @@ mod tests {
     fn unify_expected_opaque_excluded() {
         assert_eq!(
             unify_shapes(&Shape::Scalar(ScalarKind::Unit), &Shape::Opaque),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    // --- nested opaque exclusion (vampiro-224.3 follow-up, dogfood-5) ---
+
+    #[test]
+    fn unify_nested_opaque_in_same_base_excluded() {
+        // Vec<Opaque> vs Vec<Int> — inner type unknown on one side,
+        // the edge cannot be judged → excluded, not a break.
+        assert_eq!(
+            unify_shapes(
+                &Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: vec![Shape::Opaque],
+                },
+                &Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: vec![Shape::Scalar(ScalarKind::Int)],
+                }
+            ),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn unify_nested_opaque_across_bases_excluded() {
+        // Option<Opaque> vs Vec<Opaque> — both parameters unknown, the base
+        // difference alone is not evidence of a break.
+        assert_eq!(
+            unify_shapes(
+                &Shape::Parameterized {
+                    base: "Option".into(),
+                    parameters: vec![Shape::Opaque],
+                },
+                &Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: vec![Shape::Opaque],
+                }
+            ),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn unify_nested_opaque_with_resolvable_diff_still_mismatch() {
+        // Result<Int, Opaque> vs Result<Unit, Opaque>: the success parameter
+        // differs resolvably on both sides — genuine mismatch preserved.
+        let with = |succ: Shape| Shape::Parameterized {
+            base: "Result".into(),
+            parameters: vec![succ, Shape::Opaque],
+        };
+        assert_eq!(
+            unify_shapes(
+                &with(Shape::Scalar(ScalarKind::Int)),
+                &with(Shape::Scalar(ScalarKind::Unit))
+            ),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+    }
+
+    #[test]
+    fn unify_fully_resolved_param_diff_still_mismatch() {
+        // Vec<Int> vs Vec<String> — both sides resolved, real mismatch.
+        let with = |p: Shape| Shape::Parameterized {
+            base: "Vec".into(),
+            parameters: vec![p],
+        };
+        assert_eq!(
+            unify_shapes(
+                &with(Shape::Scalar(ScalarKind::Int)),
+                &with(Shape::Scalar(ScalarKind::String))
+            ),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+    }
+
+    #[test]
+    fn unify_bottom_excluded() {
+        // Bottom (! / uninferred) is compatible with everything.
+        assert_eq!(
+            unify_shapes(&Shape::Bottom, &Shape::Scalar(ScalarKind::Int)),
+            Unification::OpaqueExcluded
+        );
+        assert_eq!(
+            unify_shapes(
+                &Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: vec![Shape::Opaque],
+                },
+                &Shape::Bottom
+            ),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn unify_leaf_vs_effect_wrapper_with_unknown_param_excluded() {
+        // `?`-unwrapped callee value (String) vs caller codomain
+        // Result<PathBuf> where PathBuf is Opaque — the wrapper's content is
+        // unknown, no judgment possible (dogfood-5 wai mod.rs:319 class).
+        assert_eq!(
+            unify_shapes(
+                &Shape::Scalar(ScalarKind::String),
+                &Shape::Parameterized {
+                    base: "Result".into(),
+                    parameters: vec![Shape::Opaque],
+                }
+            ),
+            Unification::OpaqueExcluded
+        );
+    }
+
+    #[test]
+    fn unify_result_arity_alias_excluded() {
+        // Result<T> (alias with defaulted error) vs Result<T, E>: the extra
+        // parameter is the error channel, auto-converted by `?` (dogfood-5
+        // espectacular doctor.rs:686 class).
+        assert_eq!(
+            unify_shapes(
+                &Shape::Parameterized {
+                    base: "Result".into(),
+                    parameters: vec![Shape::Scalar(ScalarKind::Unit)],
+                },
+                &Shape::Parameterized {
+                    base: "Result".into(),
+                    parameters: vec![
+                        Shape::Scalar(ScalarKind::Unit),
+                        Shape::Scalar(ScalarKind::String),
+                    ],
+                }
+            ),
             Unification::OpaqueExcluded
         );
     }
@@ -454,13 +800,17 @@ mod tests {
     };
 
     fn node(id: &str, domain: Shape, codomain: Shape) -> CirNode {
+        node_in(id, domain, codomain, "src/lib.rs")
+    }
+
+    fn node_in(id: &str, domain: Shape, codomain: Shape, file: &str) -> CirNode {
         CirNode {
             id: StableId::new(id),
             domain,
             codomain,
             effect: EffectChannel::Plain,
             span: SourceSpan {
-                file: "src/lib.rs".into(),
+                file: file.into(),
                 start_line: 1,
                 start_column: 1,
                 end_line: 1,
@@ -503,7 +853,122 @@ mod tests {
             trust_provenance: Default::default(),
             slot,
             arg_shape: None,
+            return_position: true,
         }
+    }
+
+    // --- vampiro-s3e: unit callee codomain gated on same-language Rust ---
+
+    #[test]
+    fn analyze_unit_callee_codomain_gated_on_rust_boundary() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Caller returns String; callee is a genuine unit-returning function.
+        // rustc proves unit-vs-value return breaks on compiling Rust code, so
+        // this edge must not fire a composition finding.
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::String),
+        ));
+        graph.add_node(node_in(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+            "src/other.rs",
+        ));
+        graph.add_edge(edge("e1", "caller", "callee", 7));
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            0,
+            "unit callee codomain must not fire on same-language Rust boundary"
+        );
+    }
+
+    #[test]
+    fn analyze_unit_callee_codomain_not_gated_cross_language() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Cross-language edge (Rust caller → non-Rust callee): rustc provides
+        // no protection here, so the gate must NOT apply and the mismatch
+        // still fires.
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::String),
+        ));
+        graph.add_node(node_in(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+            "src/ffi.py",
+        ));
+        graph.add_edge(edge("e1", "caller", "callee", 7));
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            1,
+            "cross-language unit-callee mismatch must still fire"
+        );
+    }
+
+    // --- vampiro-224.9: return-boundary check fires only for return-position calls ---
+
+    #[test]
+    fn analyze_return_boundary_gated_for_non_return_position_call() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Caller returns String, callee produces Int — a codomain mismatch,
+        // but the call is statement-position: the callee's result never
+        // flows to the caller's return, so the return-boundary check must
+        // not fire (definitionally an FP on compiling code).
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::String),
+        ));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Int),
+        ));
+        let mut e = edge("e1", "caller", "callee", 7);
+        e.return_position = false;
+        graph.add_edge(e);
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            0,
+            "non-return-position call must not fire the return-boundary check"
+        );
+    }
+
+    #[test]
+    fn analyze_return_boundary_fires_for_return_position_call() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Same shapes as above, but the call is in return position (tail
+        // expression / return operand) — the codomain mismatch fires.
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::String),
+        ));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Int),
+        ));
+        let mut e = edge("e1", "caller", "callee", 7);
+        e.return_position = true;
+        graph.add_edge(e);
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            1,
+            "return-position codomain mismatch must fire"
+        );
     }
 
     #[test]
@@ -682,6 +1147,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: Some(0),
             arg_shape: Some(rec.clone()), // passes Record where Scalar expected
+            return_position: true,
         });
         let findings = CompositionAnalyzer::new().analyze(&graph);
         assert_eq!(findings.len(), 1, "expected 1 SlotMismatch finding");
@@ -742,6 +1208,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: Some(0),
             arg_shape: Some(Shape::Scalar(ScalarKind::Unit)), // passes Scalar where Record expected
+            return_position: true,
         });
         let findings = CompositionAnalyzer::new().analyze(&graph);
         assert_eq!(findings.len(), 1);
@@ -846,6 +1313,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -894,6 +1362,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -951,6 +1420,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);

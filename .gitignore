@@ -62,3 +62,4 @@ docs/book/
 !.dont/sessions/
 !.dont/schemas/
 # runtime files stay ignored: db.cozo.lock, tx.seq, sessions/* content
+.beads.gate.lock

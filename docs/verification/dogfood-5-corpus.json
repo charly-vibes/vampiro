@@ -1,0 +1,219 @@
+{
+ "date": "2026-09-30",
+ "note": "pre = pre-R1 binary, post = post-R1 binary, post-s3e = post vampiro-s3e (unit-callee-codomain gate, same-language Rust only); original 8 repos; extension adds specodelic+bajan (post only); post-224.9 = return-position gating (composition-break counts exclude target/ build artifacts; dont/testaruda drifted same-day; fotos unscannable due to .flatpak-builder permission)",
+ "post": {
+  "bajan": {
+   "composition-break": 3,
+   "redundancy-mismatch": 3
+  },
+  "dont": {
+   "composition-break": 30,
+   "redundancy-mismatch": 18
+  },
+  "dulce-de-leche": {
+   "composition-break": 22,
+   "redundancy-mismatch": 6
+  },
+  "espectacular": {
+   "composition-break": 9,
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "fotos": {
+   "composition-break": 4,
+   "redundancy-mismatch": 2
+  },
+  "pretender": {
+   "composition-break": 10,
+   "redundancy-mismatch": 14
+  },
+  "specodelic": {
+   "composition-break": 54,
+   "redundancy-mismatch": 18
+  },
+  "testaruda": {
+   "composition-break": 12,
+   "redundancy-mismatch": 4
+  },
+  "vampiro": {
+   "composition-break": 26,
+   "facade-leak": 1,
+   "redundancy-mismatch": 11,
+   "swallowed-effect": 4
+  },
+  "wai": {
+   "composition-break": 72,
+   "redundancy-mismatch": 37
+  }
+ },
+ "pre": {
+  "dont": {
+   "composition-break": 56,
+   "redundancy-mismatch": 19
+  },
+  "dulce-de-leche": {
+   "composition-break": 35,
+   "redundancy-mismatch": 9
+  },
+  "espectacular": {
+   "composition-break": 41,
+   "redundancy-mismatch": 15,
+   "swallowed-effect": 1
+  },
+  "fotos": {
+   "composition-break": 15,
+   "redundancy-mismatch": 2
+  },
+  "pretender": {
+   "composition-break": 27,
+   "redundancy-mismatch": 15
+  },
+  "testaruda": {
+   "composition-break": 32,
+   "redundancy-mismatch": 4
+  },
+  "vampiro": {
+   "composition-break": 42,
+   "facade-leak": 1,
+   "redundancy-mismatch": 14,
+   "swallowed-effect": 4
+  },
+  "wai": {
+   "composition-break": 145,
+   "redundancy-mismatch": 38
+  }
+ },
+ "round": "dogfood-5",
+ "tool": "vampiro 0.4.0 post-R1 (branch fix/r1-opaque-named-types)",
+ "post-s3e": {
+  "dulce-de-leche": {
+   "composition-break": 12,
+   "redundancy-mismatch": 6
+  },
+  "wai": {
+   "composition-break": 61,
+   "redundancy-mismatch": 37
+  },
+  "dont": {
+   "composition-break": 29,
+   "redundancy-mismatch": 18
+  },
+  "espectacular": {
+   "composition-break": 9,
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "pretender": {
+   "composition-break": 10,
+   "redundancy-mismatch": 14
+  },
+  "testaruda": {
+   "composition-break": 12,
+   "redundancy-mismatch": 4
+  },
+  "vampiro": {
+   "composition-break": 25,
+   "redundancy-mismatch": 11,
+   "facade-leak": 1,
+   "swallowed-effect": 4
+  },
+  "fotos": {
+   "composition-break": 4,
+   "redundancy-mismatch": 2
+  }
+ },
+ "post-224.9": {
+  "wai": {
+   "redundancy-mismatch": 37
+  },
+  "dont": {
+   "composition-break": 13,
+   "redundancy-mismatch": 234
+  },
+  "dulce-de-leche": {
+   "redundancy-mismatch": 6
+  },
+  "espectacular": {
+   "composition-break": 1,
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "pretender": {
+   "redundancy-mismatch": 14
+  },
+  "testaruda": {
+   "composition-break": 2
+  },
+  "vampiro": {
+   "composition-break": 5,
+   "facade-leak": 1,
+   "redundancy-mismatch": 11,
+   "swallowed-effect": 4
+  }
+ },
+ "post-224.9-checkpoint": {
+  "note": "post-224.9 binary, source dirs only (src, tests, crates, examples, extensions, adapters); fresh scans 2026-09-30; replaces the directional post-224.9 block whose repo-root scans were polluted by target/ artifact code (dont 234 redundancy) and same-day drift",
+  "wai": {
+   "redundancy-mismatch": 37
+  },
+  "dont": {
+   "composition-break": 1,
+   "redundancy-mismatch": 18
+  },
+  "dulce-de-leche": {
+   "redundancy-mismatch": 6
+  },
+  "espectacular": {
+   "composition-break": 1,
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "pretender": {
+   "redundancy-mismatch": 14
+  },
+  "testaruda": {
+   "composition-break": 2,
+   "redundancy-mismatch": 3
+  },
+  "vampiro": {
+   "composition-break": 5,
+   "facade-leak": 1,
+   "redundancy-mismatch": 11,
+   "swallowed-effect": 4
+  },
+  "fotos": {
+   "redundancy-mismatch": 2
+  }
+ },
+ "post-224.6": {
+  "note": "post-224.6 binary (224.10 scope filter + 224.13 Ref-Ref recursion + 224.6 method table, unknown methods opaque); fresh scans 2026-09-30, source dirs only; composition-break remaining = vampiro seeded fixture TPs only",
+  "wai": {
+   "redundancy-mismatch": 37
+  },
+  "dont": {
+   "redundancy-mismatch": 18
+  },
+  "dulce-de-leche": {
+   "redundancy-mismatch": 6
+  },
+  "espectacular": {
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "pretender": {
+   "redundancy-mismatch": 14
+  },
+  "testaruda": {
+   "redundancy-mismatch": 3
+  },
+  "vampiro": {
+   "composition-break": 5,
+   "facade-leak": 1,
+   "redundancy-mismatch": 5,
+   "swallowed-effect": 4
+  },
+  "fotos": {
+   "redundancy-mismatch": 2
+  }
+ }
+}

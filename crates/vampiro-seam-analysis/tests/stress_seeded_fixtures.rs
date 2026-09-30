@@ -84,6 +84,7 @@ fn edge(id: &str, source: &str, target: &str, file: &str, line: usize) -> CirEdg
         trust_provenance: Default::default(),
         slot: None,
         arg_shape: None,
+        return_position: true,
     }
 }
 

@@ -262,6 +262,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         }
     }
 

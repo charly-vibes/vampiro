@@ -360,6 +360,7 @@ fn extract_call_edges(
                     trust_provenance: TrustProvenance::default(),
                     slot: None,
                     arg_shape: None,
+                    return_position: true,
                 });
                 *edge_counter += 1;
 
@@ -397,6 +398,7 @@ fn extract_call_edges(
                                     trust_provenance: TrustProvenance::default(),
                                     slot: Some(slot_index),
                                     arg_shape: None,
+                                    return_position: true,
                                 });
                                 *edge_counter += 1;
                             }

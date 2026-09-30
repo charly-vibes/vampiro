@@ -541,6 +541,7 @@ fn process_call_expression(
                         trust_provenance: TrustProvenance::default(),
                         slot: None,
                         arg_shape: None,
+                        return_position: true,
                     };
 
                     graph.add_edge(edge);
@@ -581,6 +582,7 @@ fn process_call_expression(
                                         trust_provenance: TrustProvenance::default(),
                                         slot: Some(slot_index),
                                         arg_shape: None,
+                                        return_position: true,
                                     };
                                     graph.add_edge(expr_edge);
                                     *edge_counter += 1;

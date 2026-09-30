@@ -30,6 +30,17 @@ pub fn is_supported_source(path: &Path) -> bool {
         .is_some_and(|e| SUPPORTED_EXTENSIONS.iter().any(|(ext, _)| *ext == e))
 }
 
+/// Whether a path lives under a `tests/` directory (vampiro-224.10).
+///
+/// Integration-test crates are separate crates whose helper functions carry
+/// no `#[test]` attribute, so node-level is_test detection (`#[cfg(test)]`,
+/// `#[test]`) cannot filter them. Scope-level exclusion keeps their findings
+/// out entirely — the scan scope is the same place `SUPPORTED_EXTENSIONS`
+/// filtering happens. Explicit `--path <file>` arguments are not filtered.
+pub fn is_test_dir_file(path: &Path) -> bool {
+    path.components().any(|c| c.as_os_str() == "tests")
+}
+
 // ---------------------------------------------------------------------------
 // ScanScope
 // ---------------------------------------------------------------------------
@@ -228,7 +239,7 @@ impl GitContext {
         diff.foreach(
             &mut |delta, _| {
                 if let Some(file) = delta.new_file().path() {
-                    if is_supported_source(file) {
+                    if is_supported_source(file) && !is_test_dir_file(file) {
                         paths.push(file.to_path_buf());
                     }
                 }
@@ -301,7 +312,7 @@ impl GitContext {
             diff.foreach(
                 &mut |delta, _| {
                     if let Some(file) = delta.new_file().path() {
-                        if is_supported_source(file) {
+                        if is_supported_source(file) && !is_test_dir_file(file) {
                             paths.push(file.to_path_buf());
                         }
                     }
@@ -325,7 +336,7 @@ impl GitContext {
             diff.foreach(
                 &mut |delta, _| {
                     if let Some(file) = delta.new_file().path() {
-                        if is_supported_source(file) {
+                        if is_supported_source(file) && !is_test_dir_file(file) {
                             paths.push(file.to_path_buf());
                         }
                     }
@@ -350,7 +361,7 @@ impl GitContext {
                 // git2 0.21: path() returns Result (Err for non-UTF-8 paths) — skip those.
                 if let Ok(path) = entry.path() {
                     let p = PathBuf::from(path);
-                    if is_supported_source(&p) {
+                    if is_supported_source(&p) && !is_test_dir_file(&p) {
                         paths.push(p);
                     }
                 }
@@ -405,7 +416,7 @@ impl GitContext {
                 // git2 0.21: path() returns Result (Err for non-UTF-8 paths) — skip those.
                 if let Ok(path) = entry.path() {
                     let p = PathBuf::from(path);
-                    if is_supported_source(&p) {
+                    if is_supported_source(&p) && !is_test_dir_file(&p) {
                         files.push(p);
                     }
                 }
@@ -431,7 +442,7 @@ impl GitContext {
                     if let Ok(subtree) = obj.peel_to_tree() {
                         self.collect_supported_from_tree(&subtree, path, files);
                     }
-                } else if is_supported_source(&path) {
+                } else if is_supported_source(&path) && !is_test_dir_file(&path) {
                     files.push(path);
                 }
             }
@@ -684,6 +695,54 @@ mod tests {
 
         let ctx = GitContext { repo };
         (dir, ctx)
+    }
+
+    /// Files under a `tests/` directory must not enter the scan scope
+    /// (vampiro-224.10): integration-test crates are plain files whose
+    /// helpers carry no `#[test]`, so node-level is_test detection alone
+    /// cannot filter them. Covers both the tracked-tree walk and untracked
+    /// status collection.
+    #[test]
+    fn full_scope_excludes_tests_dir_files() {
+        let (dir, ctx) = init_git_repo();
+
+        // A committed integration-test file (exercises the HEAD-tree walk).
+        let committed = dir.path().join("tests/committed.rs");
+        std::fs::create_dir_all(committed.parent().unwrap()).unwrap();
+        std::fs::write(&committed, "fn test_helper() {}\n").unwrap();
+        let mut index = ctx.repo.index().unwrap();
+        index.add_path(Path::new("tests/committed.rs")).unwrap();
+        let tree_oid = index.write_tree().unwrap();
+        let tree = ctx.repo.find_tree(tree_oid).unwrap();
+        let sig = git2::Signature::now("test", "test@test.com").unwrap();
+        let parent = ctx.repo.head().unwrap().target().unwrap();
+        let parent_commit = ctx.repo.find_commit(parent).unwrap();
+        ctx.repo
+            .commit(
+                Some("HEAD"),
+                &sig,
+                &sig,
+                "tests file",
+                &tree,
+                &[&parent_commit],
+            )
+            .unwrap();
+
+        // An untracked integration-test file (exercises status collection).
+        std::fs::write(dir.path().join("tests/untracked.rs"), "fn other() {}\n").unwrap();
+
+        let scope = ctx.full_scope().unwrap();
+        let files: Vec<&Path> = scope.files().iter().map(|p| p.as_path()).collect();
+        assert!(
+            files.contains(&Path::new("src/lib.rs")),
+            "src files must stay in scope, got: {files:?}"
+        );
+        assert!(
+            !files
+                .iter()
+                .any(|f| f.components().any(|c| c.as_os_str() == "tests")),
+            "tests/ files must be excluded from scope, got: {files:?}"
+        );
     }
 
     #[test]
