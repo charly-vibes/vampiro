@@ -127,6 +127,32 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
         }
     }
 
+    // vampiro-224.5: the `?` operator auto-converts the error channel via
+    // From, so on compiling Rust code an error-parameter-only difference
+    // between two Result shapes is benign (espectacular lint.rs:
+    // anyhow::Result vs Result<_, String>). Compare only the success
+    // parameter (index 0); arity aliases (Result<T> vs Result<T, E>) are
+    // covered since .first() ignores the missing error param. A success-
+    // channel difference is still a composition break.
+    if let (
+        Shape::Parameterized {
+            base: b1,
+            parameters: p1,
+        },
+        Shape::Parameterized {
+            base: b2,
+            parameters: p2,
+        },
+    ) = (&produced, &expected)
+    {
+        if b1 == "Result" && b2 == "Result" {
+            return match (p1.first(), p2.first()) {
+                (Some(s1), Some(s2)) => unify_shapes(s1, s2),
+                _ => Unification::OpaqueExcluded,
+            };
+        }
+    }
+
     // Produced union, expected non-union: the caller handles the arms it
     // matches; the rest are unhandled → composition break (the parse_amount
     // case from the EARS worked example).
@@ -789,7 +815,9 @@ mod tests {
     fn unify_result_arity_alias_excluded() {
         // Result<T> (alias with defaulted error) vs Result<T, E>: the extra
         // parameter is the error channel, auto-converted by `?` (dogfood-5
-        // espectacular doctor.rs:686 class).
+        // espectacular doctor.rs:686 class). vampiro-224.5 supersedes the
+        // earlier OpaqueExcluded approximation: the success channels unify,
+        // so this is a proper Match.
         assert_eq!(
             unify_shapes(
                 &Shape::Parameterized {
@@ -804,7 +832,7 @@ mod tests {
                     ],
                 }
             ),
-            Unification::OpaqueExcluded
+            Unification::Match
         );
     }
 
@@ -1568,4 +1596,71 @@ mod tests {
             Unification::Mismatch { unhandled: vec![] }
         );
     }
+}
+
+#[test]
+fn result_error_param_difference_not_flagged() {
+    // vampiro-224.5: the ? operator auto-converts the error channel via
+    // From, so an error-parameter-only difference between two Result
+    // shapes is benign on compiling Rust code (espectacular lint.rs:
+    // anyhow::Result vs Result<_, String>).
+    let r1 = Shape::Parameterized {
+        base: "Result".into(),
+        parameters: vec![Shape::Scalar(ScalarKind::String), Shape::Opaque],
+    };
+    let r2 = Shape::Parameterized {
+        base: "Result".into(),
+        parameters: vec![
+            Shape::Scalar(ScalarKind::String),
+            Shape::Scalar(ScalarKind::Int),
+        ],
+    };
+    assert_eq!(
+        unify_shapes(&r1, &r2),
+        Unification::Match,
+        "Result<T, E1> vs Result<T, E2> must match on the success channel"
+    );
+}
+
+#[test]
+fn result_success_param_difference_still_flagged() {
+    // vampiro-224.5: only the error parameter is exempted; a success-channel
+    // difference remains a composition break.
+    let r1 = Shape::Parameterized {
+        base: "Result".into(),
+        parameters: vec![
+            Shape::Scalar(ScalarKind::String),
+            Shape::Scalar(ScalarKind::Int),
+        ],
+    };
+    let r2 = Shape::Parameterized {
+        base: "Result".into(),
+        parameters: vec![
+            Shape::Scalar(ScalarKind::Int),
+            Shape::Scalar(ScalarKind::Int),
+        ],
+    };
+    assert!(
+        matches!(unify_shapes(&r1, &r2), Unification::Mismatch { .. }),
+        "Result<T1, E> vs Result<T2, E> with T1 != T2 must still mismatch"
+    );
+}
+
+#[test]
+fn result_arity_alias_matches_on_success_channel() {
+    // Result<T> (alias with defaulted error) vs Result<T, E> matches via
+    // the success channel even when the error params are absent vs present.
+    let alias = Shape::Parameterized {
+        base: "Result".into(),
+        parameters: vec![Shape::Scalar(ScalarKind::String)],
+    };
+    let full = Shape::Parameterized {
+        base: "Result".into(),
+        parameters: vec![Shape::Scalar(ScalarKind::String), Shape::Opaque],
+    };
+    assert_eq!(
+        unify_shapes(&alias, &full),
+        Unification::Match,
+        "Result<T> alias vs Result<T, E> must match"
+    );
 }
