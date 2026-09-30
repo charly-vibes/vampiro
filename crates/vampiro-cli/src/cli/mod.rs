@@ -310,9 +310,12 @@ fn collect_source_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String
             // Skip `tests/` subtrees (vampiro-224.10): integration-test crates
             // are plain files whose helpers carry no `#[test]`, so node-level
             // is_test detection cannot filter them.
+            // Skip artifact/hidden subtrees (vampiro-y45): target/, dist/,
+            // node_modules/, dot-dirs hold build outputs or vendored code.
             if path
                 .file_name()
                 .is_some_and(|n| n == std::ffi::OsStr::new("tests"))
+                || crate::scan::is_artifact_dir_file(&path)
             {
                 continue;
             }
@@ -589,6 +592,31 @@ mod tests {
         std::fs::create_dir_all(dir.join("tests")).unwrap();
         std::fs::write(dir.join("src/lib.rs"), "pub fn a() {}\n").unwrap();
         std::fs::write(dir.join("tests/integ.rs"), "fn helper() {}\n").unwrap();
+
+        let files = collect_source_files(std::slice::from_ref(&dir)).unwrap();
+        assert_eq!(files, vec![dir.join("src/lib.rs")]);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Directory expansion must not descend into build-artifact or hidden
+    /// directories (vampiro-y45): vendored code under `target/` produced
+    /// 888 composition-breaks in one dogfood scan. Explicit `--path` roots
+    /// stay scannable; the exclusion applies to traversal descent.
+    #[test]
+    fn collect_source_files_skips_artifact_dirs() {
+        let dir = std::env::temp_dir().join("vampiro-scan-artifact-dirs-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src")).unwrap();
+        std::fs::create_dir_all(dir.join("target/scratch/actix")).unwrap();
+        std::fs::create_dir_all(dir.join("node_modules")).unwrap();
+        std::fs::create_dir_all(dir.join(".flatpak-builder")).unwrap();
+        std::fs::create_dir_all(dir.join("dist")).unwrap();
+        std::fs::write(dir.join("src/lib.rs"), "pub fn a() {}\n").unwrap();
+        std::fs::write(dir.join("target/scratch/actix/lib.rs"), "pub fn b() {}\n").unwrap();
+        std::fs::write(dir.join("node_modules/pkg.py"), "x = 1\n").unwrap();
+        std::fs::write(dir.join(".flatpak-builder/gen.rs"), "pub fn c() {}\n").unwrap();
+        std::fs::write(dir.join("dist/bundle.py"), "y = 2\n").unwrap();
 
         let files = collect_source_files(std::slice::from_ref(&dir)).unwrap();
         assert_eq!(files, vec![dir.join("src/lib.rs")]);
