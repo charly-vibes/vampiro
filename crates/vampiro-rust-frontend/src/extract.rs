@@ -212,19 +212,25 @@ impl<'src> Extractor<'src> {
                             "char" => Shape::Scalar(ScalarKind::Char),
                             "String" | "str" => Shape::Scalar(ScalarKind::String),
                             _ => {
+                                // Named types we cannot resolve structurally
+                                // (std types like PathBuf, user structs,
+                                // lifetime-only generics) degrade to Opaque —
+                                // never Scalar(Unit), which would fabricate
+                                // composition mismatches (dogfood-5, R1 /
+                                // vampiro-224.3). Non-type generic arguments
+                                // (lifetimes, const generics) map to Opaque so
+                                // parameter arity is preserved.
                                 if let syn::PathArguments::AngleBracketed(args) = &seg.arguments {
                                     let params: Vec<Shape> = args
                                         .args
                                         .iter()
-                                        .filter_map(|arg| match arg {
-                                            syn::GenericArgument::Type(t) => {
-                                                Some(self.extract_shape(t))
-                                            }
-                                            _ => None,
+                                        .map(|arg| match arg {
+                                            syn::GenericArgument::Type(t) => self.extract_shape(t),
+                                            _ => Shape::Opaque,
                                         })
                                         .collect();
                                     if params.is_empty() {
-                                        Shape::Scalar(ScalarKind::Unit)
+                                        Shape::Opaque
                                     } else {
                                         Shape::Parameterized {
                                             base: ident,
@@ -232,7 +238,7 @@ impl<'src> Extractor<'src> {
                                         }
                                     }
                                 } else {
-                                    Shape::Scalar(ScalarKind::Unit)
+                                    Shape::Opaque
                                 }
                             }
                         }
@@ -1292,10 +1298,7 @@ mod tests {
             node.codomain,
             Shape::Parameterized {
                 base: "Result".into(),
-                parameters: vec![
-                    Shape::Scalar(ScalarKind::Int),
-                    Shape::Scalar(ScalarKind::Unit)
-                ],
+                parameters: vec![Shape::Scalar(ScalarKind::Int), Shape::Opaque],
             }
         );
     }
@@ -1374,6 +1377,42 @@ mod tests {
         assert_eq!(
             result.graph.nodes[0].domain,
             Shape::Ref(Box::new(Shape::Scalar(ScalarKind::String)))
+        );
+    }
+
+    #[test]
+    fn extract_shape_unresolvable_named_type_is_opaque() {
+        // Non-primitive, non-generic named types (std types like PathBuf,
+        // user structs) must not degrade to Scalar(Unit) — that turns
+        // `Result<PathBuf>` codomains into `Result<unit>` and fires false
+        // composition breaks against any resolved callee type (dogfood-5, R1).
+        for source in [
+            "fn foo(x: std::path::PathBuf) { }",
+            "fn foo(x: LintOutput) { }",
+        ] {
+            let syntax = syn::parse_file(source).unwrap();
+            let result = extract_graph(&syntax, Path::new("test.rs"), source);
+            assert_eq!(
+                result.graph.nodes[0].domain,
+                Shape::Opaque,
+                "domain of `{source}` should be Opaque"
+            );
+        }
+    }
+
+    #[test]
+    fn extract_shape_generic_named_type_keeps_base() {
+        // Generic named types keep their base + inferred params (only their
+        // unresolvable parameters become Opaque).
+        let source = "fn foo(x: HashMap<String, PathBuf>) { }";
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        assert_eq!(
+            result.graph.nodes[0].domain,
+            Shape::Parameterized {
+                base: "HashMap".into(),
+                parameters: vec![Shape::Scalar(ScalarKind::String), Shape::Opaque,],
+            }
         );
     }
 
