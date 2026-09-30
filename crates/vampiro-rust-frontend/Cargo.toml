@@ -21,4 +21,7 @@ sha2 = "0.10"
 
 [dev-dependencies]
 tempfile = "3"
-vampiro-seam-analysis = { path = "../vampiro-seam-analysis", version = "0.5.0" }
+# Path-only (no explicit version): seam-analysis dev-depends on this crate
+# in turn, so version pins on both sides would create a publish deadlock —
+# `cargo publish` resolves versioned dev-deps against the registry.
+vampiro-seam-analysis = { path = "../vampiro-seam-analysis" }
