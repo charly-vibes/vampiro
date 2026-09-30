@@ -307,6 +307,15 @@ fn collect_source_dir(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), String
         let entry = entry.map_err(|e| format!("failed to read entry: {e}"))?;
         let path = entry.path();
         if path.is_dir() {
+            // Skip `tests/` subtrees (vampiro-224.10): integration-test crates
+            // are plain files whose helpers carry no `#[test]`, so node-level
+            // is_test detection cannot filter them.
+            if path
+                .file_name()
+                .is_some_and(|n| n == std::ffi::OsStr::new("tests"))
+            {
+                continue;
+            }
             collect_source_dir(&path, files)?;
         } else if is_supported_source(&path) {
             files.push(path);
@@ -566,6 +575,25 @@ mod tests {
         assert!(!files.is_empty());
         // Dedup should handle the duplicate
         assert!(!files.is_empty());
+    }
+
+    /// Directory expansion must not descend into `tests/` subdirectories
+    /// (vampiro-224.10): integration-test crates are plain files whose
+    /// helpers carry no `#[test]`, so node-level is_test detection alone
+    /// cannot filter them.
+    #[test]
+    fn collect_source_files_skips_tests_subdir() {
+        let dir = std::env::temp_dir().join("vampiro-scan-tests-subdir-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src")).unwrap();
+        std::fs::create_dir_all(dir.join("tests")).unwrap();
+        std::fs::write(dir.join("src/lib.rs"), "pub fn a() {}\n").unwrap();
+        std::fs::write(dir.join("tests/integ.rs"), "fn helper() {}\n").unwrap();
+
+        let files = collect_source_files(&[dir.clone()]).unwrap();
+        assert_eq!(files, vec![dir.join("src/lib.rs")]);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
