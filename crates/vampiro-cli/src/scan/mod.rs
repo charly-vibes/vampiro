@@ -718,7 +718,14 @@ mod tests {
         let parent = ctx.repo.head().unwrap().target().unwrap();
         let parent_commit = ctx.repo.find_commit(parent).unwrap();
         ctx.repo
-            .commit(Some("HEAD"), &sig, &sig, "tests file", &tree, &[&parent_commit])
+            .commit(
+                Some("HEAD"),
+                &sig,
+                &sig,
+                "tests file",
+                &tree,
+                &[&parent_commit],
+            )
             .unwrap();
 
         // An untracked integration-test file (exercises status collection).
@@ -731,9 +738,9 @@ mod tests {
             "src files must stay in scope, got: {files:?}"
         );
         assert!(
-            !files.iter().any(|f| f
-                .components()
-                .any(|c| c.as_os_str() == "tests")),
+            !files
+                .iter()
+                .any(|f| f.components().any(|c| c.as_os_str() == "tests")),
             "tests/ files must be excluded from scope, got: {files:?}"
         );
     }
