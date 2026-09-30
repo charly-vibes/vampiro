@@ -277,6 +277,15 @@ Seeded-fixture harness: `fixtures_are_sound` + `fixtures_are_precise` green
 because 224.10 excludes tests/ at scan scope). Per-repo totals in
 `dogfood-5-corpus.json` (`post-224.4`).
 
+### Post-y45: artifact/hidden dir exclusion at discovery (2026-09-30)
+
+`target/`, `node_modules/`, `dist/`, and any dot-directory are now excluded
+by default at the file-discovery layer (CLI dir expansion + GitContext tree
+walk + status collection) — same layer as the 224.10 tests/ filter; explicit
+`--path` roots stay scannable. Re-run of the polluted scan that motivated
+the ticket: testaruda full-repo scan **888 composition-breaks → 2** (both in
+`adapter-typescript/src/`, real code); zero findings under artifact dirs.
+
 ---
 
 ## Reproduction

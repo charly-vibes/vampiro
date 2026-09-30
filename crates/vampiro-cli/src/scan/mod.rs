@@ -41,6 +41,28 @@ pub fn is_test_dir_file(path: &Path) -> bool {
     path.components().any(|c| c.as_os_str() == "tests")
 }
 
+/// Well-known build-artifact / vendored directories (vampiro-y45).
+const ARTIFACT_DIRS: &[&str] = &["target", "node_modules", "dist"];
+
+/// Whether a path lives under a build-artifact or hidden directory
+/// (vampiro-y45).
+///
+/// `target/` (cargo), `node_modules/`, `dist/`, and any dot-directory
+/// (`.git`, `.flatpak-builder`, …) hold build outputs or vendored code
+/// that must never be analyzed — vendored `target/scratch/` actix code
+/// produced 888 composition-breaks in one dogfood scan. Only `Normal`
+/// path components are considered, so relative-prefix `.`/`..` never
+/// trip the dot rule. Explicit `--path <file-or-dir>` roots are not
+/// filtered (same policy as 224.10); the exclusion applies to descent.
+pub fn is_artifact_dir_file(path: &Path) -> bool {
+    path.components().any(|c| match c {
+        std::path::Component::Normal(s) => s
+            .to_str()
+            .is_some_and(|s| s.starts_with('.') || ARTIFACT_DIRS.contains(&s)),
+        _ => false,
+    })
+}
+
 // ---------------------------------------------------------------------------
 // ScanScope
 // ---------------------------------------------------------------------------
@@ -416,7 +438,8 @@ impl GitContext {
                 // git2 0.21: path() returns Result (Err for non-UTF-8 paths) — skip those.
                 if let Ok(path) = entry.path() {
                     let p = PathBuf::from(path);
-                    if is_supported_source(&p) && !is_test_dir_file(&p) {
+                    if is_supported_source(&p) && !is_test_dir_file(&p) && !is_artifact_dir_file(&p)
+                    {
                         files.push(p);
                     }
                 }
@@ -442,7 +465,13 @@ impl GitContext {
                     if let Ok(subtree) = obj.peel_to_tree() {
                         self.collect_supported_from_tree(&subtree, path, files);
                     }
-                } else if is_supported_source(&path) && !is_test_dir_file(&path) {
+                } else if
+                // Scope-level exclusion (224.10 tests/, y45 artifact dirs):
+                // build outputs and vendored code must never be analyzed.
+                is_supported_source(&path)
+                    && !is_test_dir_file(&path)
+                    && !is_artifact_dir_file(&path)
+                {
                     files.push(path);
                 }
             }
@@ -742,6 +771,66 @@ mod tests {
                 .iter()
                 .any(|f| f.components().any(|c| c.as_os_str() == "tests")),
             "tests/ files must be excluded from scope, got: {files:?}"
+        );
+    }
+
+    /// Files under build-artifact / hidden directories must not enter the
+    /// scan scope (vampiro-y45): vendored code under `target/scratch/`
+    /// produced 888 composition-breaks in one dogfood scan.
+    #[test]
+    fn full_scope_excludes_artifact_dirs() {
+        let (dir, ctx) = init_git_repo();
+
+        // A committed vendored file (exercises the HEAD-tree walk).
+        let vendored = dir.path().join("target/scratch/actix/lib.rs");
+        std::fs::create_dir_all(vendored.parent().unwrap()).unwrap();
+        std::fs::write(&vendored, "pub fn vendored() {}\n").unwrap();
+        let mut index = ctx.repo.index().unwrap();
+        index
+            .add_path(Path::new("target/scratch/actix/lib.rs"))
+            .unwrap();
+        let tree_oid = index.write_tree().unwrap();
+        let tree = ctx.repo.find_tree(tree_oid).unwrap();
+        let sig = git2::Signature::now("test", "test@test.com").unwrap();
+        let parent = ctx.repo.head().unwrap().target().unwrap();
+        let parent_commit = ctx.repo.find_commit(parent).unwrap();
+        ctx.repo
+            .commit(
+                Some("HEAD"),
+                &sig,
+                &sig,
+                "vendored file",
+                &tree,
+                &[&parent_commit],
+            )
+            .unwrap();
+
+        // Untracked files in artifact/hidden dirs (exercises status collection).
+        std::fs::create_dir_all(dir.path().join("node_modules/pkg")).unwrap();
+        std::fs::write(dir.path().join("node_modules/pkg/mod.py"), "x = 1\n").unwrap();
+        std::fs::create_dir_all(dir.path().join(".flatpak-builder")).unwrap();
+        std::fs::write(
+            dir.path().join(".flatpak-builder/gen.rs"),
+            "pub fn g() {}\n",
+        )
+        .unwrap();
+
+        let scope = ctx.full_scope().unwrap();
+        let files: Vec<&Path> = scope.files().iter().map(|p| p.as_path()).collect();
+        assert!(
+            files.contains(&Path::new("src/lib.rs")),
+            "src files must stay in scope, got: {files:?}"
+        );
+        assert!(
+            !files.iter().any(|f| {
+                f.components().any(|c| {
+                    matches!(
+                        c.as_os_str().to_str(),
+                        Some("target") | Some("node_modules")
+                    ) || c.as_os_str().to_str().is_some_and(|s| s.starts_with('.'))
+                })
+            }),
+            "artifact/hidden dir files must be excluded from scope, got: {files:?}"
         );
     }
 
