@@ -325,6 +325,26 @@ on main). Precision is strictly improved — 6 new E2E regression tests pin
 the registry behavior (`crates/vampiro-rust-frontend/tests/
 field_access_shapes.rs`). Seeded-fixture harness sound + precise.
 
+---
+
+### Post-224.5 + 224.7: deferred tickets completed, epic backlog empty (2026-09-30)
+
+- **224.5** (PR #29): `unify_shapes` compares only the success parameter
+  (index 0) when both sides are `Result` — the `?` operator auto-converts
+  the error channel via `From` on compiling Rust code. `Result<T>` alias
+  vs `Result<T, E>` now properly Matches (supersedes the earlier
+  `OpaqueExcluded` approximation). Success-channel differences still fire.
+- **224.7** (PR #30): the R5 FP (`if is_leap(year)` → bool vs int) was the
+  pre-224.9 return-boundary check comparing codomains on *every* call edge;
+  224.9's return-position gating already removed the mechanism and the FP
+  does not reproduce on main. Completed as a regression guard:
+  `tests/condition_slots.rs` pins if / match-scrutinee / while condition
+  contexts produce no findings.
+
+Measured (post-224.5/224.7, source dirs only): composition **0** and
+redundancy **0 on all 8 dogfood repos** — unchanged. Epic 224 has zero
+issues left in any state (all children closed; none deferred).
+
 ## Reproduction
 
 ```bash
