@@ -91,6 +91,17 @@ pub fn unify_shapes(produced: &Shape, expected: &Shape) -> Unification {
         }
     }
 
+    // Deref coercion (vampiro-224.13): `&Vec<T>` / `&mut Vec<T>` coerce to
+    // `&[T]`, `&mut T` to `&T` — both sides keep their Ref, so compare the
+    // referents recursively (which picks up the Vec↔slice aliasing rule and
+    // everything else). The mut bit is not modeled; a `&mut T` passed where
+    // `&T` is expected is a valid coercion. Deref-to-non-Ref is intentionally
+    // NOT handled: rustc does not auto-deref in argument position, so a Ref
+    // against a non-Ref expected shape stays a genuine mismatch.
+    if let (Shape::Ref(p_inner), Shape::Ref(e_inner)) = (&produced, &expected) {
+        return unify_shapes(p_inner, e_inner);
+    }
+
     // Parameterized base aliasing: Vec[T] ↔ slice[T] are structurally
     // compatible when their type parameters unify.
     if let (
@@ -534,6 +545,63 @@ mod tests {
         let produced = Shape::Scalar(ScalarKind::Unit);
         let expected = Shape::Union(vec![Shape::Scalar(ScalarKind::Unit), Shape::Opaque]);
         assert_eq!(unify_shapes(&produced, &expected), Unification::Match);
+    }
+
+    // --- Deref coercion (vampiro-224.13) ---
+
+    fn vec_int() -> Shape {
+        Shape::Parameterized {
+            base: "Vec".to_string(),
+            parameters: vec![Shape::Scalar(ScalarKind::Int)],
+        }
+    }
+
+    fn slice_int() -> Shape {
+        Shape::Parameterized {
+            base: "slice".to_string(),
+            parameters: vec![Shape::Scalar(ScalarKind::Int)],
+        }
+    }
+
+    /// `&mut Vec<T>` / `&Vec<T>` passed where `&[T]` is expected (the
+    /// testaruda engine.rs FP): both refs deref-coerce to the same slice.
+    #[test]
+    fn unify_ref_vec_vs_ref_slice_matches() {
+        assert_eq!(
+            unify_shapes(
+                &Shape::Ref(Box::new(vec_int())),
+                &Shape::Ref(Box::new(slice_int()))
+            ),
+            Unification::Match
+        );
+    }
+
+    /// Deref coercion direction only: covered by Ref-Ref recursion —
+    /// `&Vec<T>` coerces to `&[T]`, never to bare `[T]` in argument position.
+    #[test]
+    fn unify_ref_produced_derefs_to_expected_stays_mismatch() {
+        assert_eq!(
+            unify_shapes(&Shape::Ref(Box::new(vec_int())), &slice_int()),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+    }
+
+    /// Deref coercion must not mask genuine mismatches: different referents
+    /// still break, both through refs and through the deref path.
+    #[test]
+    fn unify_ref_mismatch_preserved_for_genuinely_different_referents() {
+        let record = Shape::Record(vec![Shape::Scalar(ScalarKind::String)]);
+        assert_eq!(
+            unify_shapes(
+                &Shape::Ref(Box::new(vec_int())),
+                &Shape::Ref(Box::new(record.clone()))
+            ),
+            Unification::Mismatch { unhandled: vec![] }
+        );
+        assert_eq!(
+            unify_shapes(&Shape::Ref(Box::new(vec_int())), &record),
+            Unification::Mismatch { unhandled: vec![] }
+        );
     }
 
     #[test]

@@ -92,3 +92,41 @@ fn composition_e2e_negative_fixture() {
         "side-by-side shapes must differ in a composition finding"
     );
 }
+
+/// Deref coercion (vampiro-224.13): `&mut Vec<(u32,)>` passed where
+/// `&[(u32,)]` is expected compiles via Deref coercion and must not produce
+/// a composition-break slot mismatch (the testaruda engine.rs FP class).
+/// The call is statement-position, as in the original finding.
+#[test]
+fn composition_e2e_deref_coercion_no_finding() {
+    let source = "\
+struct AscentProgram;
+struct SelectionContext;
+
+fn build_ascent_program(ctx: &SelectionContext, comp_fallback: &[(u32,)]) -> AscentProgram {
+    let _ = ctx;
+    AscentProgram
+}
+
+pub fn needs_fallback_pass(
+    ctx: &SelectionContext,
+    comp_fallback: &mut Vec<(u32,)>,
+) -> AscentProgram {
+    let mut prog2 = build_ascent_program(ctx, comp_fallback);
+    prog2.run();
+    prog2
+}
+";
+    let graph = RustFrontend
+        .extract(source, Path::new("src/engine.rs"))
+        .expect("frontend extraction must succeed");
+    let findings = analyze(&graph);
+    let composition: Vec<_> = findings
+        .iter()
+        .filter(|f| f.axis == Axis::Composition)
+        .collect();
+    assert!(
+        composition.is_empty(),
+        "deref coercion must not produce composition findings; got {findings:?}"
+    );
+}
