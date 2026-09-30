@@ -107,6 +107,32 @@ Rust frontend gives up (`Unit`) far too often.**
 4. Re-run this exact round (same 8 repos) as the acceptance test for the epic.
    Success criterion: composition FP rate <25% post-R1, <5% after the full epic.
 
+## Extension: specodelic + bajan (same day)
+
+Re-ran the post-R1 binary over two more family repos. specodelic exercised the
+Python frontend on real foreign code (`scripts/check_section_sync.py`) — the
+cross-language claim is live, but its annotations have the R1 problem in their
+own mapping (`list[str]` → Unit, vampiro-224.11).
+
+| Repo | Total | Composition | Redundancy | Notes |
+|---|---:|---:|---:|---|
+| specodelic | 72 | 54 | 18 | ~25 findings are one new FP class (see 224.9) |
+| bajan | 6 | 3 | 3 | all FP, mostly 224.9 |
+
+### New root causes filed
+
+| # | Root cause | Ticket | Evidence |
+|---|---|---|---|
+| R7 | **Return-boundary check fires for statement-position / let-bound calls** — compares callee result to the caller's return type even when the result is never returned. In compiling code, definitionally FP. Biggest remaining class. | vampiro-224.9 (P1) | specodelic main.rs:936 `emit_report(...); return 2;` (×25), bajan nodes.rs:204 |
+| R8 | `tests/` directory files not marked as test code (is_test only detects `#[cfg(test)]`/`#[test]`) | vampiro-224.10 | specodelic tests/cli.rs:581, tests/sibling_blockers.rs:51-53 |
+| R9 | Python frontend subscripted annotations (`list[str]`, `dict[K,V]`) degrade to Unit — Python's own R1 | vampiro-224.11 | check_section_sync.py:125/128 |
+
+Note: R7 is arguably the most important finding of the whole round — the
+return-boundary concept itself (callee codomain vs caller codomain) is only
+sound for return-position calls; everywhere else it approximates and noise
+dominates. The data-flow check (uah) is the correct instrument for everything
+else.
+
 ## Reproduction
 
 ```bash
