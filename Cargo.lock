@@ -1397,6 +1397,7 @@ dependencies = [
  "syn 2.0.119",
  "tempfile",
  "vampiro-cir",
+ "vampiro-seam-analysis",
 ]
 
 [[package]]

@@ -72,17 +72,49 @@ pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> Extractio
         lines_cache,
         param_shapes: HashMap::new(),
         local_shapes: HashMap::new(),
+        param_types: HashMap::new(),
+        local_types: HashMap::new(),
+        struct_fields: HashMap::new(),
         is_test_context: false,
         pending_discard: false,
         tail_depth: 0,
         pending_return_position: false,
     };
+    // Struct-field registry pre-pass (vampiro-224.14): record declared
+    // field shapes before traversal so field accesses resolve regardless
+    // of declaration order. Includes structs nested in inline modules.
+    extractor.collect_struct_fields(&syntax.items);
     visit::visit_file(&mut extractor, syntax);
     ExtractionResult {
         graph: extractor.graph,
         facades: extractor.facades,
         visibility: extractor.visibility,
     }
+}
+
+/// Last path segment of a named type (`&Ctx` → `Ctx`, `(T)`/groups
+/// unwrapped). Returns `None` for non-path types (tuples, slices, trait
+/// objects, …).
+fn type_last_segment(ty: &syn::Type) -> Option<String> {
+    match ty {
+        syn::Type::Path(type_path) => type_path
+            .path
+            .segments
+            .last()
+            .map(|seg| seg.ident.to_string()),
+        syn::Type::Reference(type_ref) => type_last_segment(&type_ref.elem),
+        syn::Type::Group(group) => type_last_segment(&group.elem),
+        syn::Type::Paren(paren) => type_last_segment(&paren.elem),
+        _ => None,
+    }
+}
+
+/// A registered struct field: its declared shape and, when the field's
+/// type is a named path type, that type's last segment (for chained
+/// `outer.inner.name` resolution through the registry).
+struct FieldInfo {
+    shape: Shape,
+    type_name: Option<String>,
 }
 
 /// The extraction visitor.
@@ -118,6 +150,19 @@ struct Extractor<'src> {
     /// Local variable name → Shape map for `let x = expr;` bindings.
     /// Cleared when entering a function, populated during block traversal.
     local_shapes: HashMap<String, Shape>,
+    /// Parameter name → declared type's last path segment (e.g. `ctx` →
+    /// `ScenarioContext`), for field-access resolution through the
+    /// struct-field registry (vampiro-224.14).
+    param_types: HashMap<String, String>,
+    /// Annotated local binding name → declared type's last path segment
+    /// (`let ctx: &Ctx = ...` → `ctx` → `Ctx`). Only annotated bindings
+    /// are recorded; unannotated ones have no statically known type.
+    local_types: HashMap<String, String>,
+    /// Struct-field registry: struct name → field name → declared field
+    /// info (shape + type name for chained resolution). Populated by a
+    /// pre-pass over the file's items before traversal, so field accesses
+    /// resolve regardless of declaration order (vampiro-224.14).
+    struct_fields: HashMap<String, HashMap<String, FieldInfo>>,
     /// Whether we are currently inside a `#[cfg(test)]` module or a `#[test]` function.
     is_test_context: bool,
     /// Whether the next visited call expression is in a discard context
@@ -436,13 +481,18 @@ impl<'src> Extractor<'src> {
         // Build parameter name → Shape map for argument expression resolution
         self.param_shapes.clear();
         self.local_shapes.clear();
+        self.param_types.clear();
+        self.local_types.clear();
         for param in &func.sig.inputs {
             match param {
                 syn::FnArg::Typed(pat_type) => {
                     if let syn::Pat::Ident(pat_ident) = &*pat_type.pat {
                         let name = pat_ident.ident.to_string();
                         let shape = self.extract_shape(&pat_type.ty);
-                        self.param_shapes.insert(name, shape);
+                        self.param_shapes.insert(name.clone(), shape);
+                        if let Some(ty) = type_last_segment(&pat_type.ty) {
+                            self.param_types.insert(name, ty);
+                        }
                     }
                 }
                 syn::FnArg::Receiver(rec) => {
@@ -572,8 +622,14 @@ impl<'src> Extractor<'src> {
             syn::Expr::Block(_) => None,
             // Struct literal Foo { ... } — opaque.
             syn::Expr::Struct(_) => None,
-            // Field access foo.bar — try the base expression.
-            syn::Expr::Field(field) => self.extract_expr_shape(&field.base),
+            // Field access foo.bar — resolve through the struct-field
+            // registry (vampiro-224.14): find the base expression's declared
+            // type (parameter or annotated local, or a chained field), then
+            // the field's declared shape. Unknown base type or unknown field
+            // degrade to opaque — never guess the base expression's shape,
+            // which fabricated `Ref(Opaque)` vs `Scalar(String)` mismatches
+            // (the espectacular check.rs FP class).
+            syn::Expr::Field(field) => self.field_access_shape(field),
             // Path expression (variable/constant reference).
             syn::Expr::Path(expr_path) => {
                 let name = Self::path_name(expr_path);
@@ -588,6 +644,94 @@ impl<'src> Extractor<'src> {
             // the receiver's shape (vampiro-224.6).
             syn::Expr::MethodCall(mc) => self.method_call_shape(mc),
             // Everything else: opaque.
+            _ => None,
+        }
+    }
+
+    /// Populate the struct-field registry from a file's items
+    /// (vampiro-224.14).
+    ///
+    /// Records every `Item::Struct`'s named fields: declared shape (via
+    /// [`Extractor::extract_shape`]) and, for named path types, the type's
+    /// last segment so chained accesses (`outer.inner.name`) resolve hop by
+    /// hop. Recurses into inline `mod` blocks. Structs are keyed by bare
+    /// name — cross-module same-named struct shadowing is not modeled (an
+    /// accepted approximation; the fallback for an ambiguous hit is the
+    /// same shape degradation rules as any other lookup).
+    fn collect_struct_fields<'a>(&mut self, items: impl IntoIterator<Item = &'a syn::Item>) {
+        for item in items {
+            match item {
+                syn::Item::Struct(item_struct) => {
+                    let mut fields: HashMap<String, FieldInfo> = HashMap::new();
+                    for field in &item_struct.fields {
+                        if let Some(ident) = &field.ident {
+                            fields.insert(
+                                ident.to_string(),
+                                FieldInfo {
+                                    shape: self.extract_shape(&field.ty),
+                                    type_name: type_last_segment(&field.ty),
+                                },
+                            );
+                        }
+                    }
+                    self.struct_fields
+                        .insert(item_struct.ident.to_string(), fields);
+                }
+                syn::Item::Mod(item_mod) => {
+                    if let Some((_, mod_items)) = &item_mod.content {
+                        self.collect_struct_fields(mod_items);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Shape of a named field access, resolved through the struct-field
+    /// registry (vampiro-224.14).
+    ///
+    /// The base expression's declared type is looked up in the parameter /
+    /// annotated-local type maps (or, for chained access, in the registry
+    /// itself), then the field's declared shape is returned. Tuple-index
+    /// access (`pair.0`) and any unresolvable hop return `None` (opaque).
+    fn field_access_shape(&self, field: &syn::ExprField) -> Option<Shape> {
+        let member = match &field.member {
+            syn::Member::Named(ident) => ident.to_string(),
+            syn::Member::Unnamed(_) => return None,
+        };
+        let base_type = self.expr_type_name(&field.base)?;
+        self.struct_fields
+            .get(&base_type)
+            .and_then(|fields| fields.get(&member))
+            .map(|info| info.shape.clone())
+    }
+
+    /// Declared type name (last path segment) of an expression, for
+    /// field-registry lookups (vampiro-224.14).
+    ///
+    /// Resolves path expressions via parameter and annotated-local type
+    /// maps; chained field accesses recurse through the registry's stored
+    /// field type names. Anything else is unresolvable (`None`).
+    fn expr_type_name(&self, expr: &syn::Expr) -> Option<String> {
+        match expr {
+            syn::Expr::Path(expr_path) => {
+                let name = Self::path_name(expr_path);
+                self.param_types
+                    .get(&name)
+                    .cloned()
+                    .or_else(|| self.local_types.get(&name).cloned())
+            }
+            syn::Expr::Field(field) => {
+                let member = match &field.member {
+                    syn::Member::Named(ident) => ident.to_string(),
+                    syn::Member::Unnamed(_) => return None,
+                };
+                let base_type = self.expr_type_name(&field.base)?;
+                self.struct_fields
+                    .get(&base_type)
+                    .and_then(|fields| fields.get(&member))
+                    .and_then(|info| info.type_name.clone())
+            }
             _ => None,
         }
     }
@@ -1264,13 +1408,34 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 // Track `let x = expr;` for local variable shape resolution.
                 // This enables data-flow tracking through variable bindings:
                 // `let x = parse_amount(input);` → `x` has `parse_amount`'s codomain.
+                //
+                // `let x: &Ctx = ...` parses as Pat::Type wrapping the ident —
+                // unwrap it and record the annotated type's last segment for
+                // the struct-field registry (vampiro-224.14). Only annotated
+                // bindings carry a statically known type name.
+                let binding = match &local.pat {
+                    syn::Pat::Ident(pat_ident) => Some((pat_ident.ident.to_string(), None)),
+                    syn::Pat::Type(pat_type) => match &*pat_type.pat {
+                        syn::Pat::Ident(pat_ident) => {
+                            Some((pat_ident.ident.to_string(), type_last_segment(&pat_type.ty)))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
                 if let Some(init) = &local.init {
-                    if let syn::Pat::Ident(pat_ident) = &local.pat {
+                    if let Some((name, ty_name)) = binding {
                         if let Some(shape) = self.extract_expr_shape(&init.expr) {
-                            let name = pat_ident.ident.to_string();
-                            self.local_shapes.insert(name, shape);
+                            self.local_shapes.insert(name.clone(), shape);
+                        }
+                        if let Some(ty) = ty_name {
+                            self.local_types.insert(name, ty);
                         }
                     }
+                } else if let Some((name, Some(ty))) = binding {
+                    // `let x: &Ctx;` without initializer still declares a
+                    // statically known type.
+                    self.local_types.insert(name, ty);
                 }
 
                 // `let _ = expr;` — wildcard pattern discards the result.
