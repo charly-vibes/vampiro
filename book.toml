@@ -9,9 +9,10 @@ description = "Specification and implementation roadmap for the Vampiro composit
 build-dir = "docs/book"
 
 [output.html]
-default-theme = "navy"
+default-theme = "coal"
+preferred-dark-theme = "coal"
 git-repository-url = "https://github.com/charly-vibes/vampiro"
 edit-url-template = "https://github.com/charly-vibes/vampiro/edit/main/{path}"
 site-url = "/vampiro/"
 no-section-label = true
-additional-css = []
+additional-css = ["theme/charly.css"]

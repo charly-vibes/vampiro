@@ -6,6 +6,12 @@
 
 # Vampiro
 
+> **Why:** cross-language codebases break at the seams — call, module, effect,
+> law, retry, resource, and trust boundaries where two pieces *look* compatible
+> but don't compose. Vampiro proves composition across those boundaries
+> mechanically instead of hoping integration tests catch it.
+> **Status:** [beta](docs/src/status.md) · prove/check shipped · [Motivation & design](docs/src/index.md)
+
 Vampiro is a cross-language Rust CLI that checks whether code composes
 correctly across call, module, effect, law, retry, resource, and trust
 boundaries.
