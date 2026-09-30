@@ -490,6 +490,48 @@ fn process_assignment(
     }
 }
 
+/// Determine whether a call expression is in return position: its value
+/// flows directly to the enclosing function's `return` statement
+/// (vampiro-224.9 mirrored to the Python frontend). Python has no
+/// tail-expression return — a trailing unreturned expression yields None
+/// implicitly, so only `return` operands are return position.
+fn is_return_position(mut node: Node) -> bool {
+    while let Some(parent) = node.parent() {
+        match parent.kind() {
+            "return_statement" => return true,
+            // Value consumed by an enclosing construct — argument of another
+            // call, stored/accumulated, indexed, container element, loop or
+            // condition context, default value: it does not flow to return.
+            "call"
+            | "argument_list"
+            | "assignment"
+            | "augmented_assignment"
+            | "named_expression"
+            | "subscript"
+            | "list"
+            | "set"
+            | "dictionary"
+            | "list_comprehension"
+            | "set_comprehension"
+            | "dictionary_comprehension"
+            | "for_statement"
+            | "while_statement"
+            | "if_statement"
+            | "with_statement"
+            | "assert_statement"
+            | "yield"
+            | "default_parameter"
+            | "typed_default_parameter"
+            | "lambda" => return false,
+            // Value passes through (binary operators, attribute access,
+            // parenthesized forms, conditional arms): keep walking up.
+            _ => {}
+        }
+        node = parent;
+    }
+    false
+}
+
 /// Process a call expression, extracting a CIR edge with per-slot data-flow.
 #[allow(clippy::too_many_arguments, clippy::only_used_in_recursion)]
 fn process_call_expression(
@@ -528,7 +570,9 @@ fn process_call_expression(
                     };
 
                     // Emit a single declaration->declaration edge for the return-boundary
-                    // check (no slot). This preserves the existing codomain comparison.
+                    // check (no slot). vampiro-224.9 mirrored to Python: the edge carries
+                    // return_position only when the call's value flows to the enclosing
+                    // function's `return` (Python has no tail-expression return).
                     let edge = CirEdge {
                         id: StableId::new(format!("py:edge:{}", *edge_counter)),
                         source: caller_id.clone(),
@@ -541,7 +585,7 @@ fn process_call_expression(
                         trust_provenance: TrustProvenance::default(),
                         slot: None,
                         arg_shape: None,
-                        return_position: true,
+                        return_position: is_return_position(node),
                     };
 
                     graph.add_edge(edge);
@@ -582,7 +626,9 @@ fn process_call_expression(
                                         trust_provenance: TrustProvenance::default(),
                                         slot: Some(slot_index),
                                         arg_shape: None,
-                                        return_position: true,
+                                        // Data-flow edges feed the per-slot domain check,
+                                        // not the return-boundary check.
+                                        return_position: false,
                                     };
                                     graph.add_edge(expr_edge);
                                     *edge_counter += 1;
@@ -881,105 +927,127 @@ fn python_type_to_scalar(name: &str) -> Option<ScalarKind> {
 }
 
 /// Convert a Python type hint node to a CIR shape.
+///
+/// Unresolvable or unannotated types map to `Shape::Opaque` — the 224.3 rule
+/// (unresolvable named types must be Opaque, not Scalar(Unit)) — because the
+/// composition unifier excludes top-level opaque from break checking, while a
+/// Unit scalar witnesses mismatches against any concrete scalar.
 fn type_hint_to_shape(node: Node, source: &str) -> Shape {
     match node.kind() {
+        // `type` is the grammar's annotation wrapper — dispatch to its single
+        // inner node.
         "type" => {
-            let children: Vec<_> = {
-                let mut cursor = node.walk();
-                node.children(&mut cursor).collect()
-            };
-            if children.is_empty() {
-                return Shape::Scalar(ScalarKind::Unit);
-            }
-            let first = children[0];
-            match first.kind() {
-                "identifier" => {
-                    let name = node_text(first, source).unwrap_or_default();
-                    match name.as_str() {
-                        "int" | "float" | "str" | "bool" => {
-                            let name = node_text(first, source).unwrap_or_default();
-                            if let Some(kind) = python_type_to_scalar(&name) {
-                                Shape::Scalar(kind)
-                            } else {
-                                Shape::Scalar(ScalarKind::Unit)
-                            }
-                        }
-                        "bytes" | "None" | "Any" => Shape::Scalar(ScalarKind::Unit),
-                        "list" | "set" | "frozenset" => {
-                            if children.len() > 1 {
-                                let inner = &children[1];
-                                if inner.kind() == "type" {
-                                    let inner_shape = type_hint_to_shape(*inner, source);
-                                    Shape::Record(vec![inner_shape])
-                                } else {
-                                    Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
-                                }
-                            } else {
-                                Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
-                            }
-                        }
-                        "dict" => {
-                            if children.len() > 4 {
-                                // dict[K, V] — children: identifier 'dict', [, K, , V, ]
-                                let k_shape = if children[2].kind() == "type" {
-                                    type_hint_to_shape(children[2], source)
-                                } else {
-                                    Shape::Scalar(ScalarKind::Unit)
-                                };
-                                let v_shape = if children[4].kind() == "type" {
-                                    type_hint_to_shape(children[4], source)
-                                } else {
-                                    Shape::Scalar(ScalarKind::Unit)
-                                };
-                                Shape::Record(vec![k_shape, v_shape])
-                            } else {
-                                Shape::Record(vec![
-                                    Shape::Scalar(ScalarKind::Unit),
-                                    Shape::Scalar(ScalarKind::Unit),
-                                ])
-                            }
-                        }
-                        "tuple" => {
-                            if children.len() > 1 {
-                                let inner_shapes: Vec<Shape> = children[1..]
-                                    .iter()
-                                    .filter(|c| c.kind() == "type")
-                                    .map(|c| type_hint_to_shape(*c, source))
-                                    .collect();
-                                if inner_shapes.is_empty() {
-                                    Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
-                                } else {
-                                    Shape::Record(inner_shapes)
-                                }
-                            } else {
-                                Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)])
-                            }
-                        }
-                        "Optional" => {
-                            if children.len() > 1 {
-                                let inner = &children[1];
-                                if inner.kind() == "type" {
-                                    type_hint_to_shape(*inner, source)
-                                } else {
-                                    Shape::Scalar(ScalarKind::Unit)
-                                }
-                            } else {
-                                Shape::Scalar(ScalarKind::Unit)
-                            }
-                        }
-                        _ => Shape::Scalar(ScalarKind::Unit),
-                    }
-                }
-                "subscript" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
-                "union_type" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
-                _ => Shape::Scalar(ScalarKind::Unit),
+            let mut cursor = node.walk();
+            let mut children = node.children(&mut cursor);
+            match (children.next(), children.next()) {
+                (Some(inner), None) => type_hint_to_shape(inner, source),
+                _ => Shape::Opaque,
             }
         }
-        "union_type" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
-        "generic_type" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
-        "list" | "tuple" | "dictionary" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+        "identifier" => {
+            let name = node_text(node, source).unwrap_or_default();
+            if let Some(kind) = python_type_to_scalar(&name) {
+                Shape::Scalar(kind)
+            } else if name == "None" {
+                Shape::Scalar(ScalarKind::Unit)
+            } else {
+                // bytes, Any, custom classes — cannot resolve a shape.
+                Shape::Opaque
+            }
+        }
+        "generic_type" => {
+            // `<base>[<params>]`: children are the base identifier followed by
+            // a `type_parameter` holding the parameter `type` nodes.
+            let mut cursor = node.walk();
+            let children: Vec<_> = node.children(&mut cursor).collect();
+            let base = children
+                .iter()
+                .find(|c| c.kind() == "identifier")
+                .and_then(|c| node_text(*c, source));
+            let params: Vec<Shape> = children
+                .iter()
+                .find(|c| c.kind() == "type_parameter")
+                .map(|tp| {
+                    let mut pc = tp.walk();
+                    tp.children(&mut pc)
+                        .filter(|c| c.kind() == "type")
+                        .map(|c| type_hint_to_shape(c, source))
+                        .collect()
+                })
+                .unwrap_or_default();
+            match base.as_deref() {
+                // list[T] / set[T] / frozenset[T] → sequence of T
+                Some("list" | "set" | "frozenset") if params.len() == 1 => Shape::Parameterized {
+                    base: "Vec".into(),
+                    parameters: params,
+                },
+                // dict[K, V] → map (base matches the Rust frontend's HashMap)
+                Some("dict") if params.len() == 2 => Shape::Parameterized {
+                    base: "HashMap".into(),
+                    parameters: params,
+                },
+                // tuple[A, B, ...] → product type
+                Some("tuple") if !params.is_empty() => Shape::Record(params),
+                // Optional[T] → Option[T]
+                Some("Optional") if params.len() == 1 => Shape::Parameterized {
+                    base: "Option".into(),
+                    parameters: params,
+                },
+                // typing.Union[A, B, ...]
+                Some("Union") if !params.is_empty() => Shape::Union(params),
+                // Bare containers, partial subscripts (dict[K]), and unknown
+                // generic bases (Literal[...], custom generics) — unresolvable.
+                _ => Shape::Opaque,
+            }
+        }
+        "binary_operator" | "union_type" => {
+            // PEP 604 unions: `A | B`, possibly ending in `None`.
+            let arms = union_arms(node, source);
+            if arms.is_empty() {
+                return Shape::Opaque;
+            }
+            // `X | None` (either order) → Option[X]
+            let unit = Shape::Scalar(ScalarKind::Unit);
+            let non_none: Vec<Shape> = arms.iter().filter(|a| **a != unit).cloned().collect();
+            if arms.len() == 2 && non_none.len() == 1 {
+                Shape::Parameterized {
+                    base: "Option".into(),
+                    parameters: non_none,
+                }
+            } else {
+                Shape::Union(arms)
+            }
+        }
         "none" => Shape::Scalar(ScalarKind::Unit),
-        _ => Shape::Scalar(ScalarKind::Unit),
+        // Default-value literal nodes reaching the annotation path — keep the
+        // existing degraded mapping (expression shapes are a separate concern).
+        "list" | "tuple" | "dictionary" => Shape::Record(vec![Shape::Scalar(ScalarKind::Unit)]),
+        _ => Shape::Opaque,
+    }
+}
+
+/// Flatten a PEP 604 union annotation into its arms (`None` → Unit scalar).
+fn union_arms(node: Node, source: &str) -> Vec<Shape> {
+    match node.kind() {
+        "binary_operator" => {
+            let mut arms = Vec::new();
+            if let Some(left) = node.child_by_field_name("left") {
+                arms.extend(union_arms(left, source));
+            }
+            if let Some(right) = node.child_by_field_name("right") {
+                arms.extend(union_arms(right, source));
+            }
+            arms
+        }
+        "union_type" => {
+            let mut cursor = node.walk();
+            node.children(&mut cursor)
+                .filter(|c| c.kind() == "type")
+                .map(|c| type_hint_to_shape(c, source))
+                .collect()
+        }
+        "none" => vec![Shape::Scalar(ScalarKind::Unit)],
+        _ => vec![type_hint_to_shape(node, source)],
     }
 }
 
@@ -1078,6 +1146,178 @@ mod tests {
             }
         }
         "<not found>".to_string()
+    }
+
+    // --- Type-hint inference table (vampiro-224.11) ---
+    //
+    // Subscripted builtins must map to CIR parameterized/record shapes, not
+    // degrade to Unit/Record([Unit]). Table mirrors the ScalarKind inference
+    // table: one row per annotation form.
+
+    /// Parse `def f() -> <annotation>: pass` and extract the codomain shape.
+    fn codomain_of(annotation: &str) -> Shape {
+        let source = format!("def f() -> {}:\n    pass\n", annotation);
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_python::LANGUAGE.into())
+            .unwrap();
+        let tree = parser.parse(&source, None).unwrap();
+        let func = tree.root_node().child(0).unwrap();
+        extract_codomain_shape(func, &source)
+    }
+
+    /// Parse `def f(x: <annotation>): pass` and extract the domain shape.
+    fn domain_of(annotation: &str) -> Shape {
+        let source = format!("def f(x: {}):\n    pass\n", annotation);
+        let mut parser = tree_sitter::Parser::new();
+        parser
+            .set_language(&tree_sitter_python::LANGUAGE.into())
+            .unwrap();
+        let tree = parser.parse(&source, None).unwrap();
+        let func = tree.root_node().child(0).unwrap();
+        extract_domain_shape(func, &source)
+    }
+
+    fn vec_of(inner: Shape) -> Shape {
+        Shape::Parameterized {
+            base: "Vec".into(),
+            parameters: vec![inner],
+        }
+    }
+
+    fn option_of(inner: Shape) -> Shape {
+        Shape::Parameterized {
+            base: "Option".into(),
+            parameters: vec![inner],
+        }
+    }
+
+    #[test]
+    fn hint_list_str_is_parameterized_vec_of_string() {
+        assert_eq!(
+            codomain_of("list[str]").normalize(),
+            vec_of(Shape::Scalar(ScalarKind::String)).normalize()
+        );
+    }
+
+    #[test]
+    fn hint_list_int_is_parameterized_vec_of_int() {
+        assert_eq!(
+            domain_of("list[int]").normalize(),
+            vec_of(Shape::Scalar(ScalarKind::Int)).normalize()
+        );
+    }
+
+    #[test]
+    fn hint_nested_list_is_recursive() {
+        assert_eq!(
+            codomain_of("list[list[str]]").normalize(),
+            vec_of(vec_of(Shape::Scalar(ScalarKind::String))).normalize()
+        );
+    }
+
+    #[test]
+    fn hint_dict_is_parameterized_map() {
+        assert_eq!(
+            codomain_of("dict[str, int]").normalize(),
+            Shape::Parameterized {
+                base: "HashMap".into(),
+                parameters: vec![
+                    Shape::Scalar(ScalarKind::String),
+                    Shape::Scalar(ScalarKind::Int)
+                ]
+            }
+            .normalize()
+        );
+    }
+
+    #[test]
+    fn hint_tuple_is_record_of_arms() {
+        assert_eq!(
+            codomain_of("tuple[int, str]").normalize(),
+            Shape::Record(vec![
+                Shape::Scalar(ScalarKind::Int),
+                Shape::Scalar(ScalarKind::String)
+            ])
+            .normalize()
+        );
+    }
+
+    #[test]
+    fn hint_set_is_parameterized_vec() {
+        assert_eq!(
+            codomain_of("set[int]").normalize(),
+            vec_of(Shape::Scalar(ScalarKind::Int)).normalize()
+        );
+    }
+
+    #[test]
+    fn hint_optional_is_option() {
+        assert_eq!(
+            codomain_of("Optional[str]").normalize(),
+            option_of(Shape::Scalar(ScalarKind::String)).normalize()
+        );
+    }
+
+    #[test]
+    fn hint_pep604_optional_is_option() {
+        assert_eq!(
+            codomain_of("str | None").normalize(),
+            option_of(Shape::Scalar(ScalarKind::String)).normalize()
+        );
+    }
+
+    #[test]
+    fn hint_pep604_union_is_union() {
+        assert_eq!(
+            codomain_of("int | str").normalize(),
+            Shape::Union(vec![
+                Shape::Scalar(ScalarKind::Int),
+                Shape::Scalar(ScalarKind::String)
+            ])
+            .normalize()
+        );
+    }
+
+    #[test]
+    fn hint_pep604_union_with_none_keeps_unit_arm() {
+        assert_eq!(
+            codomain_of("int | str | None").normalize(),
+            Shape::Union(vec![
+                Shape::Scalar(ScalarKind::Int),
+                Shape::Scalar(ScalarKind::String),
+                Shape::Scalar(ScalarKind::Unit)
+            ])
+            .normalize()
+        );
+    }
+
+    #[test]
+    fn hint_bare_container_is_opaque_not_unit_record() {
+        // `list` without a subscript is untyped — Opaque (unresolvable), not
+        // a Record holding a Unit scalar (224.3 rule: unresolvable → Opaque).
+        assert_eq!(codomain_of("list"), Shape::Opaque);
+        assert_eq!(codomain_of("dict"), Shape::Opaque);
+        assert_eq!(codomain_of("tuple"), Shape::Opaque);
+    }
+
+    #[test]
+    fn hint_any_and_custom_class_are_opaque() {
+        assert_eq!(codomain_of("Any"), Shape::Opaque);
+        assert_eq!(codomain_of("SectionSync"), Shape::Opaque);
+    }
+
+    #[test]
+    fn hint_none_annotation_is_unit() {
+        assert_eq!(codomain_of("None"), Shape::Scalar(ScalarKind::Unit));
+    }
+
+    #[test]
+    fn hint_scalars_unchanged() {
+        assert_eq!(codomain_of("int"), Shape::Scalar(ScalarKind::Int));
+        assert_eq!(codomain_of("str"), Shape::Scalar(ScalarKind::String));
+        assert_eq!(codomain_of("float"), Shape::Scalar(ScalarKind::Float));
+        assert_eq!(codomain_of("bool"), Shape::Scalar(ScalarKind::Bool));
     }
 
     fn check_function_effect(source: &str, check: impl Fn(&EffectChannel) -> bool) {
