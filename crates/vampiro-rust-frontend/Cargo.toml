@@ -21,3 +21,4 @@ sha2 = "0.10"
 
 [dev-dependencies]
 tempfile = "3"
+vampiro-seam-analysis = { path = "../vampiro-seam-analysis", version = "0.4.0" }

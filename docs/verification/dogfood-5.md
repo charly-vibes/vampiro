@@ -304,6 +304,27 @@ testaruda 1, pretender 12, ddl 5). Seeded-fixture harness sound + precise.
 
 ---
 
+### Post-224.14: struct-field registry (2026-09-30)
+
+`Expr::Field` returned the base expression's shape: a `&Ctx` parameter's
+`ctx.spec_path` inferred `Ref(Opaque)`, which does not auto-deref against
+`Scalar(String)` — a genuine-mismatch FP waiting at any bare field access
+used as a call argument (the original espectacular check.rs:755 class,
+masked since 224.6 by the unknown-method rule on `.clone()`). Fix: a
+struct-field registry — `Item::Struct` fields recorded pre-pass (shape +
+type name), `base.field` resolved via parameter/annotated-local type maps,
+chained `outer.inner.name` resolved hop by hop. Unknown base type, unknown
+field, and tuple-index access degrade to opaque (224.3 rule). The annotated-
+local path also fixed `let x: &Ctx = …` never being tracked at all — syn
+parses it as `Pat::Type`, which the old `Pat::Ident`-only arm dropped.
+
+Measured (post-224.14, source dirs only): composition **0** and redundancy
+**0 on all 8 dogfood repos** (unchanged from the 224.12 baseline; the
+espectacular robustness count stays at the 1 pre-existing finding verified
+on main). Precision is strictly improved — 6 new E2E regression tests pin
+the registry behavior (`crates/vampiro-rust-frontend/tests/
+field_access_shapes.rs`). Seeded-fixture harness sound + precise.
+
 ## Reproduction
 
 ```bash
