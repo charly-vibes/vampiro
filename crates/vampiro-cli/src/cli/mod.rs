@@ -590,7 +590,7 @@ mod tests {
         std::fs::write(dir.join("src/lib.rs"), "pub fn a() {}\n").unwrap();
         std::fs::write(dir.join("tests/integ.rs"), "fn helper() {}\n").unwrap();
 
-        let files = collect_source_files(&[dir.clone()]).unwrap();
+        let files = collect_source_files(std::slice::from_ref(&dir)).unwrap();
         assert_eq!(files, vec![dir.join("src/lib.rs")]);
 
         let _ = std::fs::remove_dir_all(&dir);
