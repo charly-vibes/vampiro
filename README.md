@@ -24,28 +24,32 @@ in the category it claims to compose in?**
 
 ## Current status
 
-**v0.3.1** — Full genesis module adoption and cross-language frontends across vampiro-cli:
+**v0.5.0** — Production-precision composition analysis across 4 languages
+(Rust, Python, Clojure, Julia):
 
-| Language | Frontend | Data-flow edges | Tests |
+| Language | Frontend | Data-flow edges | Field-type registry |
 |---|---|---|---|
-| Python | ✅ | ✅ | 73 |
-| Clojure | ✅ | ✅ | 37 |
-| Julia | ✅ | ✅ | 31 |
-| Rust | ✅ | Partial | 96 |
+| Rust | ✅ | ✅ | ✅ |
+| Python | ✅ | ✅ | — |
+| Clojure | ✅ | ✅ | — |
+| Julia | ✅ | ✅ | — |
 
-> 811 tests across the workspace (frontend suites per language plus CLI, CIR,
-> seam-analysis, and lifecycle-analysis crates).
+> 898 tests across the workspace (frontend suites per language plus CLI, CIR,
+> seam-analysis, law, and lifecycle-analysis crates).
 
-- **Composition seam analysis**: active — detects structural shape mismatches
-  at call boundaries with ~99.8% precision on clean baselines.
-- **Cross-language verification**: seeded-fault E2E suite verifies data-flow
-  edge structure across all 3 non-Rust frontends.
+- **Composition seam analysis**: active — per-slot argument shape inference
+  with struct-field registry, variant rewraps, method-output table, deref
+  coercion, and success-channel Result unification. **0 false-positive
+  composition and redundancy findings on all 8 foreign ecosystem repos**
+  (dogfood round 5; see `docs/verification/dogfood-5.md`).
+- **Redundancy / modularity / robustness axes**: active, expression-level
+  branch grouping, test-code filtering, artifact-dir exclusion at discovery.
 - **Law verification** and **lifecycle analysis** crates are available in the
   workspace but not yet integrated into the CLI (`vampiro prove` prints a
   placeholder message).
 - **Benchmarking**: 100 lines in ~10ms, 1k in ~65ms, 10k in ~0.63s.
-- **Specification**: EARS v1.3.0 approved. Active OpenSpec changes under
-  `openspec/changes/`.
+- **Specification**: EARS v1.3.0 approved. No active OpenSpec changes —
+  backlog clear.
 
 ## Quick start
 
