@@ -258,6 +258,25 @@ Latent follow-up: bare field access (`s.spec_path` as a call argument) still
 infers the base expression's shape (no struct-field registry) — no current
 measured FP, filed as vampiro-224.14.
 
+### Post-224.4: Ok/Some/Err variant rewrap (2026-09-30)
+
+`extract_expr_shape` now wraps call expressions whose last path segment is
+`Ok`/`Some`/`Err` in the variant's enum (`Ok(e)` → Result<shape(e), Opaque>,
+`Some(e)` → Option<shape(e)>, `Err(e)` → Result<Opaque, shape(e)>; tuple
+payloads → Record; fully-qualified `std::result::Result::Ok` covered). The
+inner shape no longer leaks — the R-class FPs at fotos credentials.rs:32,
+dont skill_pack.rs:56, espectacular checks/shape.rs:101 (string inferred
+where Result<string> is expected) are impossible by construction now; the
+precision gain shows as exact Result/Option parameter shapes at slot edges.
+
+Fresh source-dir scans post-224.4 (all 8 repos): no regressions; redundancy
+noise improved as a side effect of exact branch shapes — wai 37→33,
+testaruda 3→1, dulce-de-leche 6→5. Foreign composition FPs: still 0.
+Seeded-fixture harness: `fixtures_are_sound` + `fixtures_are_precise` green
+(seeded TPs fire via the harness; repo scans show 0 composition-break
+because 224.10 excludes tests/ at scan scope). Per-repo totals in
+`dogfood-5-corpus.json` (`post-224.4`).
+
 ---
 
 ## Reproduction

@@ -215,5 +215,33 @@
   "fotos": {
    "redundancy-mismatch": 2
   }
+ },
+ "post-224.4": {
+  "note": "post vampiro-224.4 (Ok/Some/Err variant rewrap in extract_expr_shape); fresh scans 2026-09-30, source dirs only; redundancy drops from exact Option/Result branch shapes; foreign composition FPs remain 0",
+  "wai": {
+   "redundancy-mismatch": 33
+  },
+  "dont": {
+   "redundancy-mismatch": 18
+  },
+  "dulce-de-leche": {
+   "redundancy-mismatch": 5
+  },
+  "espectacular": {
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "pretender": {
+   "redundancy-mismatch": 12
+  },
+  "testaruda": {
+   "redundancy-mismatch": 1
+  },
+  "vampiro": {
+   "redundancy-mismatch": 5
+  },
+  "fotos": {
+   "redundancy-mismatch": 2
+  }
  }
 }

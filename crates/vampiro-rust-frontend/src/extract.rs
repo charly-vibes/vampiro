@@ -532,9 +532,13 @@ impl<'src> Extractor<'src> {
     /// slot-boundary check.
     fn extract_expr_shape(&self, expr: &syn::Expr) -> Option<Shape> {
         match expr {
-            // Argument is a function call: use the callee's codomain.
+            // Argument is a function call: use the callee's codomain, or
+            // the variant wrapper for Ok/Some/Err rewraps (vampiro-224.4).
             syn::Expr::Call(call) => {
                 if let syn::Expr::Path(expr_path) = &*call.func {
+                    if let Some(wrapped) = self.variant_rewrap_shape(expr_path, &call.args) {
+                        return Some(wrapped);
+                    }
                     let callee_name = Self::path_name(expr_path);
                     if let Some(node_id) = self.resolve_node(&callee_name) {
                         if let Some(node) = self.graph.node_by_id(node_id) {
@@ -584,6 +588,49 @@ impl<'src> Extractor<'src> {
             // the receiver's shape (vampiro-224.6).
             syn::Expr::MethodCall(mc) => self.method_call_shape(mc),
             // Everything else: opaque.
+            _ => None,
+        }
+    }
+
+    /// Shape of an enum-variant rewrap call (vampiro-224.4).
+    ///
+    /// `Ok(e)` → `Result<shape(e), Opaque>`, `Some(e)` → `Option<shape(e)>`,
+    /// `Err(e)` → `Result<Opaque, shape(e)>`. Matched on the last path
+    /// segment so fully-qualified `std::result::Result::Ok` rewraps too.
+    /// Uninferred slots stay Opaque rather than leaking the inner shape —
+    /// the dogfood-5 FP class (fotos credentials.rs, dont skill_pack.rs,
+    /// espectacular checks/shape.rs) was `Ok(String)` inferred as bare
+    /// `String` and flagged against a `Result<String, E>` parameter.
+    fn variant_rewrap_shape(
+        &self,
+        func: &syn::ExprPath,
+        args: &syn::punctuated::Punctuated<syn::Expr, syn::token::Comma>,
+    ) -> Option<Shape> {
+        let variant = func.path.segments.last()?.ident.to_string();
+        let inner = match args.first() {
+            // Tuple payload, e.g. `Err((code, msg))` → Record of the elems.
+            Some(syn::Expr::Tuple(tup)) => Shape::Record(
+                tup.elems
+                    .iter()
+                    .map(|e| self.extract_expr_shape(e).unwrap_or(Shape::Opaque))
+                    .collect(),
+            ),
+            Some(arg) => self.extract_expr_shape(arg).unwrap_or(Shape::Opaque),
+            None => Shape::Opaque,
+        };
+        match variant.as_str() {
+            "Ok" => Some(Shape::Parameterized {
+                base: "Result".into(),
+                parameters: vec![inner, Shape::Opaque],
+            }),
+            "Some" => Some(Shape::Parameterized {
+                base: "Option".into(),
+                parameters: vec![inner],
+            }),
+            "Err" => Some(Shape::Parameterized {
+                base: "Result".into(),
+                parameters: vec![Shape::Opaque, inner],
+            }),
             _ => None,
         }
     }
@@ -2198,6 +2245,124 @@ fn go(v: Vec<String>) -> u32 { take(v.len()) }
                 parameters: vec![Shape::Scalar(ScalarKind::String)],
             }),
             "unknown method (len) must not guess the receiver shape; codomains: {codomains:?}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod rewrap_shape_tests {
+    //! Enum-variant rewrap inference (vampiro-224.4).
+    //!
+    //! `Ok(...)`/`Some(...)`/`Err(...)` call expressions must produce the
+    //! WRAPPED shape, not the inner expression's shape — the dogfood-5 FP
+    //! class (fotos credentials.rs, dont skill_pack.rs, espectacular
+    //! checks/shape.rs): an inner `String` passed where `Result<String, E>`
+    //! is expected fired a composition break.
+
+    use super::*;
+    use std::path::Path;
+    use vampiro_cir::{NodeKind, Shape};
+
+    fn expr_codomains(source: &str) -> Vec<Shape> {
+        let syntax = syn::parse_file(source).unwrap();
+        let result = extract_graph(&syntax, Path::new("test.rs"), source);
+        result
+            .graph
+            .nodes
+            .iter()
+            .filter(|n| n.kind == NodeKind::Expression)
+            .map(|n| n.codomain.clone())
+            .collect()
+    }
+
+    fn result(params: Vec<Shape>) -> Shape {
+        Shape::Parameterized {
+            base: "Result".to_string(),
+            parameters: params,
+        }
+    }
+
+    fn option(inner: Shape) -> Shape {
+        Shape::Parameterized {
+            base: "Option".to_string(),
+            parameters: vec![inner],
+        }
+    }
+
+    /// `Ok(inner)` must wrap in Result with an Opaque error param — not leak
+    /// the inner shape (fotos credentials.rs FP).
+    #[test]
+    fn ok_rewrap_not_flagged() {
+        let source = "\
+fn inner() -> String { String::new() }
+fn take(r: Result<String, std::io::Error>) -> u32 { let _ = r; 0 }
+fn main() { take(Ok(inner())); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&result(vec![
+                Shape::Scalar(ScalarKind::String),
+                Shape::Opaque,
+            ])),
+            "Ok(inner()) must infer Result<String, Opaque>; codomains: {codomains:?}"
+        );
+        assert!(
+            !codomains.contains(&Shape::Scalar(ScalarKind::String)),
+            "Ok(inner()) must not leak the inner String shape; codomains: {codomains:?}"
+        );
+    }
+
+    /// `Some(inner)` must wrap in Option (espectacular checks/shape.rs FP).
+    #[test]
+    fn some_rewrap_not_flagged() {
+        let source = "\
+fn inner() -> String { String::new() }
+fn take(o: Option<String>) -> u32 { let _ = o; 0 }
+fn main() { take(Some(inner())); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&option(Shape::Scalar(ScalarKind::String))),
+            "Some(inner()) must infer Option<String>; codomains: {codomains:?}"
+        );
+        assert!(
+            !codomains.contains(&Shape::Scalar(ScalarKind::String)),
+            "Some(inner()) must not leak the inner String shape; codomains: {codomains:?}"
+        );
+    }
+
+    /// `Err(inner)` puts the inner shape in the error slot.
+    #[test]
+    fn err_rewrap_error_slot() {
+        let source = "\
+fn inner() -> String { String::new() }
+fn take(r: Result<u32, String>) -> u32 { let _ = r; 0 }
+fn main() { take(Err(inner())); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&result(vec![
+                Shape::Opaque,
+                Shape::Scalar(ScalarKind::String),
+            ])),
+            "Err(inner()) must infer Result<Opaque, String>; codomains: {codomains:?}"
+        );
+    }
+
+    /// Fully-qualified `Result::Ok` rewraps the same as the bare variant.
+    #[test]
+    fn qualified_ok_rewraps() {
+        let source = "\
+fn inner() -> u32 { 42 }
+fn take(r: Result<u32, String>) -> u32 { let _ = r; 0 }
+fn main() { take(std::result::Result::Ok(inner())); }
+";
+        let codomains = expr_codomains(source);
+        assert!(
+            codomains.contains(&result(
+                vec![Shape::Scalar(ScalarKind::Int), Shape::Opaque,]
+            )),
+            "qualified Result::Ok must infer Result<u32, Opaque>; codomains: {codomains:?}"
         );
     }
 }
