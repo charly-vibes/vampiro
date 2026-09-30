@@ -1,5 +1,68 @@
 # Changelog
 
+## [0.5.0] — 2026-09-30
+
+The precision release: composition analysis went from ~100% false positives
+on foreign code to **0 composition and 0 redundancy FPs on all 8 dogfood
+corpus repos** (epic vampiro-224). Evidence and per-class triage in
+`docs/verification/dogfood-5.md`.
+
+### Added
+
+- **Struct-field type registry** (224.14) — `Item::Struct` fields recorded in
+  a pre-pass; `base.field` resolves the field's declared shape (chained
+  `outer.inner.name` hop by hop); annotated `let x: &Ctx` bindings tracked
+  (were silently dropped — syn parses them as `Pat::Type`).
+- **Method-output shape table** (224.6) — `is_some*`/`is_ok*` → bool,
+  `ok`/`err`/`unwrap*`/`find`/`map`/`map_err` mapped; **unknown methods
+  return opaque instead of guessing the receiver's shape**.
+- **Variant rewrap shapes** (224.4) — `Ok(e)`/`Some(e)`/`Err(e)` wrap the
+  inner shape in `Result`/`Option` instead of leaking it.
+- **Python annotation inference** (224.11) — generic types (`list` → `Vec`,
+  `dict` → `HashMap`, `Optional` → `Option`, `typing.Union` → `Union`),
+  PEP 604 unions (`X | None`), return-position gating mirrored to Python.
+- **Deref coercion** (224.13) — `&Vec<T>` → `&[T]`, `&mut T` → `&T` in
+  `unify_shapes` (Ref-Ref recursion); deref-to-non-Ref deliberately still
+  mismatches (rustc does not auto-deref in argument position).
+
+### Changed
+
+- **Result success-channel unification** (224.5) — the `?` operator
+  auto-converts the error channel via `From`, so `Result<T, E1>` vs
+  `Result<T, E2>` differences no longer flag; success-channel differences
+  still do.
+- **Return-position gating** (224.9) — the return-boundary check fires only
+  when the callee's result actually flows to the caller's return (tail
+  expression, `return` operand, `?` propagation). This removed the largest
+  single FP class (mid-body calls compared against the caller's return type).
+- **Redundancy branch grouping** (224.8) — expression-level grouping;
+  enclosed call sites are no longer treated as alternative dataflow branches.
+- **Opaque union arms** (224.12) — unhandled union arms whose only witness
+  is unknown are excluded rather than witnessing a Mismatch.
+- **Unresolvable named types → Opaque** (224.3) — user structs, std types,
+  and non-type generics degrade to opaque with nested-opaque-aware
+  `unify_shapes` exclusion (was: fabricated `Scalar(Unit)`).
+- **Test-code filtering** (224.10) — `tests/` directories excluded at
+  scan-scope level; `#[cfg(test)]`/`#[test]` filtering via `is_test` node
+  flag; explicit `--path <file>` stays unfiltered.
+- **Artifact directories excluded at discovery** (y45) — `target/`,
+  `node_modules/`, `dist/`, dot-directories skipped during recursive scans.
+
+### Fixed
+
+- **git2 0.21 API break** — `StatusEntry::path()` returns
+  `Result<&str, Error>`; both call sites in `scan/mod.rs` updated (PR #14).
+- **CI root-cause fixes** (qm0), vendored-libgit2 + vendored-openssl for
+  cross-compilation (5dc), `SUPPORTED_EXTENSIONS` honored in scan-scope
+  filters (gqy), dont epistemic gate wired into pre-commit + CI planning job.
+- **Dependency bumps** — clap 4.6, clap_complete, trycmd 1.2, toml,
+  actions/checkout v7, setup-node v7, upload-pages-artifact v5.
+
+### Documentation
+
+- README and docs index refreshed to v0.5.0 status (898 tests, dogfood
+  evidence, current capability table).
+
 ## [0.4.0] — 2026-08-05
 
 ### Added
