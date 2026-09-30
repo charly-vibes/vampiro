@@ -106,6 +106,7 @@ fn consumer_imports_cir_and_constructs_graph() {
         trust_provenance: Default::default(),
         slot: None,
         arg_shape: None,
+        return_position: true,
     };
 
     graph.add_node(caller);
@@ -187,6 +188,7 @@ fn consumer_detects_invalid_graph() {
         trust_provenance: Default::default(),
         slot: None,
         arg_shape: None,
+        return_position: true,
     };
     graph.add_node(node);
     graph.add_edge(edge);

@@ -166,6 +166,33 @@ to remove most of the remainder. One seeded-fixture expectation updated
 themselves unit-callee FPs from the hand-built graph; the seeded REQ-11
 redundancy TP is unchanged.
 
+## Interim: vampiro-224.9 (return-position gating)
+
+Fix: the return-boundary (codomain-vs-codomain) comparison now fires only
+for **return-position** calls — calls whose result flows directly to the
+caller's return value (tail expression, `return` operand, tail-position
+`if`/`match` arms, `?`-propagated tails). The frontend tags each call-result
+edge with a new `CirEdge::return_position` flag (additive, serde-default
+`true` for legacy graphs); argument/receiver slot edges are tagged `false`
+and covered by the data-flow check instead. Nested args, let-bound calls,
+statement-position calls, `if` conditions, and match guards are excluded.
+
+Measured on the original 8 repos (composition-break, post-s3e → post-224.9):
+wai 61 → **0**, dont 29 → **13**\*, dulce-de-leche 12 → **0**, espectacular
+9 → **1**, pretender 10 → **0**, testaruda 12 → **2** (src + adapter only),
+vampiro 25 → **5**. Total 162 → **~21 (−87%)** on the surviving signal.
+Caveats: dont/testaruda gained new code the same day (drift), and fotos
+became unscannable (unreadable `.flatpak-builder` cache created after the
+last run), so per-repo numbers are directional, not exact re-runs. The
+ticket's named acceptance sites are clean: specodelic main.rs unit-vs-int =
+0, bajan store/nodes.rs `collapse()` = 0. Note: a fresh scan surfaced 888
+composition-breaks under testaruda's `target/scratch/` — build-artifact
+vendored code; the corpus re-triage checkpoint should scan source dirs only.
+Seeded-fixture TPs (composition slot-boundary, data-flow, try-operator) all
+still fire; the stress `composition.rs` fixture was updated so its seeded
+break is a genuine return-position call (the old `let _v = source_value();`
+form was itself an R7-class FP).
+
 ---
 
 ## Reproduction

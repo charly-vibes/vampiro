@@ -133,6 +133,31 @@ pub struct CirEdge {
     /// be statically determined (e.g., function call result, literal).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub arg_shape: Option<Shape>,
+    /// Whether the callee's result flows directly to the caller's return
+    /// value: the call is the tail expression of the enclosing block (or a
+    /// branch of a tail `if`/`match`/block), the operand of a `return`, or
+    /// `?`-propagated from a tail position.
+    ///
+    /// The composition analyzer's return-boundary check (REQ-7) fires only
+    /// for return-position calls: comparing codomain-vs-codomain on a call
+    /// whose result is discarded, let-bound, or consumed as an argument is
+    /// definitionally a false positive on compiling code (vampiro-224.9).
+    ///
+    /// Defaults to `true` when absent so graphs produced before this field
+    /// existed keep their historical checking behavior; the Rust frontend
+    /// sets it accurately. Omitted when `true` so the common tail-call case
+    /// does not bloat serialized graphs.
+    #[serde(default = "default_true", skip_serializing_if = "is_return_position")]
+    pub return_position: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// `skip_serializing_if` predicate: omit the field when `true`.
+fn is_return_position(value: &bool) -> bool {
+    *value
 }
 
 /// A complete Composition IR graph for a single compilation unit.
@@ -402,6 +427,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         };
 
         graph.add_node(caller);
@@ -432,6 +458,65 @@ mod tests {
                 .as_deref(),
             Some("callee_fn")
         );
+    }
+
+    // --- vampiro-224.9: return-position flag on call-result edges ---
+
+    #[test]
+    fn edge_return_position_defaults_true_and_omits_true_from_json() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        graph.add_node(make_node(
+            "a",
+            "a_fn",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
+        graph.add_node(make_node(
+            "b",
+            "b_fn",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Unit),
+        ));
+        let edge = CirEdge {
+            id: StableId::new("e1"),
+            source: StableId::new("a"),
+            target: StableId::new("b"),
+            resolution: EffectResolution::Propagated,
+            unwrap_evidence: None,
+            provenance: Provenance::Direct,
+            span: SourceSpan {
+                file: "src/lib.rs".into(),
+                start_line: 1,
+                start_column: 1,
+                end_line: 1,
+                end_column: 10,
+            },
+            discard_spans: vec![],
+            trust_provenance: Default::default(),
+            slot: None,
+            arg_shape: None,
+            return_position: true,
+        };
+        graph.add_edge(edge);
+
+        // `true` (the common tail-call case) is omitted from serialization.
+        let value: serde_json::Value = serde_json::to_value(&graph).unwrap();
+        let edge_json = &value["edges"][0];
+        assert!(
+            edge_json.get("return_position").is_none(),
+            "return_position=true must be omitted from serialized graphs"
+        );
+
+        // Absent on the wire → true on read (legacy graphs keep their
+        // historical return-boundary checking behavior).
+        let deserialized: CirGraph = serde_json::from_value(value).unwrap();
+        assert!(deserialized.edges[0].return_position);
+
+        // Explicit false survives a round trip.
+        let mut value2: serde_json::Value = serde_json::to_value(&graph).unwrap();
+        value2["edges"][0]["return_position"] = serde_json::Value::Bool(false);
+        let deserialized2: CirGraph = serde_json::from_value(value2).unwrap();
+        assert!(!deserialized2.edges[0].return_position);
     }
 
     #[test]
@@ -483,6 +568,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         };
 
         graph.add_node(node);
@@ -575,6 +661,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         };
 
         graph.add_node(node);
@@ -620,6 +707,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         };
         graph.add_node(node);
         graph.add_edge(edge);
@@ -811,6 +899,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: Some(0),
             arg_shape: None,
+            return_position: true,
         });
 
         // Edge with slot=None
@@ -832,6 +921,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         });
 
         let json = serde_json::to_string_pretty(&graph).unwrap();
@@ -898,6 +988,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: Some(0),
             arg_shape: None,
+            return_position: true,
         });
 
         let json = serde_json::to_string_pretty(&graph).unwrap();

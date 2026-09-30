@@ -1,6 +1,6 @@
 {
  "date": "2026-09-30",
- "note": "pre = pre-R1 binary, post = post-R1 binary, post-s3e = post vampiro-s3e (unit-callee-codomain gate, same-language Rust only); original 8 repos; extension adds specodelic+bajan (post only)",
+ "note": "pre = pre-R1 binary, post = post-R1 binary, post-s3e = post vampiro-s3e (unit-callee-codomain gate, same-language Rust only); original 8 repos; extension adds specodelic+bajan (post only); post-224.9 = return-position gating (composition-break counts exclude target/ build artifacts; dont/testaruda drifted same-day; fotos unscannable due to .flatpak-builder permission)",
  "post": {
   "bajan": {
    "composition-break": 3,
@@ -120,6 +120,35 @@
   "fotos": {
    "composition-break": 4,
    "redundancy-mismatch": 2
+  }
+ },
+ "post-224.9": {
+  "wai": {
+   "redundancy-mismatch": 37
+  },
+  "dont": {
+   "composition-break": 13,
+   "redundancy-mismatch": 234
+  },
+  "dulce-de-leche": {
+   "redundancy-mismatch": 6
+  },
+  "espectacular": {
+   "composition-break": 1,
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "pretender": {
+   "redundancy-mismatch": 14
+  },
+  "testaruda": {
+   "composition-break": 2
+  },
+  "vampiro": {
+   "composition-break": 5,
+   "facade-leak": 1,
+   "redundancy-mismatch": 11,
+   "swallowed-effect": 4
   }
  }
 }

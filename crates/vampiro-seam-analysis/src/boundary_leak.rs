@@ -177,6 +177,7 @@ mod tests {
             trust_provenance: trust,
             slot: None,
             arg_shape: None,
+            return_position: true,
         }
     }
 

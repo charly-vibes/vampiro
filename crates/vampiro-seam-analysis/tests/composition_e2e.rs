@@ -48,9 +48,12 @@ fn composition_e2e_negative_fixture() {
     let findings = analyze(&graph);
 
     // The fixture is a negative case: at least one composition finding must
-    // be produced. (The coarse call-edge model approximates the spec's
-    // data-flow edge; per-slot argument binding is a tracked refinement —
-    // see docs/verification/add-core-seam-analysis-1.md.)
+    // be produced. Since vampiro-224.9 the return-boundary (codomain-vs-
+    // codomain) check fires only for return-position calls — the fixture's
+    // tuple tail means the decl-edge comparison is correctly suppressed, and
+    // the seeded TP surfaces via the data-flow check: `parse_amount`'s
+    // Option<f64> flows into `apply_discount`'s `f64` slot without being
+    // unwrapped (REQ-7).
     let composition: Vec<_> = findings
         .iter()
         .filter(|f| f.axis == Axis::Composition)
@@ -71,22 +74,21 @@ fn composition_e2e_negative_fixture() {
         "line range must be well-formed"
     );
 
-    // Side-by-side evidence (REQ-7): both caller-expected and callee-produced
-    // shapes are present.
+    // Side-by-side evidence (REQ-7): both caller-produced and callee-expected
+    // shapes are present. The seam here is the argument slot: Option<f64>
+    // produced where f64 is expected.
     #[allow(irrefutable_let_patterns)]
-    let Evidence::CompositionMismatch {
-        caller_expected,
-        callee_produced,
-        unhandled: _,
+    let Evidence::SlotMismatch {
+        slot,
+        callee_expected,
+        caller_produced,
     } = &f.evidence
     else {
-        panic!(
-            "expected composition mismatch evidence, got {:?}",
-            f.evidence
-        );
+        panic!("expected slot mismatch evidence, got {:?}", f.evidence);
     };
+    assert_eq!(*slot, 0, "the break is at apply_discount's first parameter");
     assert!(
-        caller_expected != callee_produced,
+        callee_expected != caller_produced,
         "side-by-side shapes must differ in a composition finding"
     );
 }

@@ -371,6 +371,16 @@ impl CompositionAnalyzer {
                 NodeKind::Declaration => {
                     // --- Return-boundary check ---
                     //
+                    // vampiro-224.9: fire only for return-position calls.
+                    // The check compares callee codomain vs caller codomain,
+                    // which is meaningful only when the callee's result
+                    // actually flows to the caller's return (tail
+                    // expression / return operand, tagged by the frontend
+                    // as `return_position`). Statement-position, let-bound,
+                    // and argument-slot calls are definitionally FPs on
+                    // compiling code; their data flow is covered by the
+                    // slot-boundary and data-flow checks instead.
+                    //
                     // Skip edges where the caller has a void/unit return type
                     // (Scalar as the unit type). There's no composition
                     // contract at the return boundary for void-returning
@@ -378,7 +388,7 @@ impl CompositionAnalyzer {
                     // distinguish different scalar types (u32, f64, bool are
                     // all `Scalar`), so this guard loses no precision while
                     // eliminating noise from unrelated call edges.
-                    if source.codomain != Shape::Scalar(ScalarKind::Unit) {
+                    if edge.return_position && source.codomain != Shape::Scalar(ScalarKind::Unit) {
                         // For edges with Ordinary+Total unwrap evidence
                         // (e.g., `?` operator on Result/Option), the callee's
                         // effect wrapper is removed at the call site. Compare
@@ -775,6 +785,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot,
             arg_shape: None,
+            return_position: true,
         }
     }
 
@@ -831,6 +842,64 @@ mod tests {
             findings.len(),
             1,
             "cross-language unit-callee mismatch must still fire"
+        );
+    }
+
+    // --- vampiro-224.9: return-boundary check fires only for return-position calls ---
+
+    #[test]
+    fn analyze_return_boundary_gated_for_non_return_position_call() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Caller returns String, callee produces Int — a codomain mismatch,
+        // but the call is statement-position: the callee's result never
+        // flows to the caller's return, so the return-boundary check must
+        // not fire (definitionally an FP on compiling code).
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::String),
+        ));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Int),
+        ));
+        let mut e = edge("e1", "caller", "callee", 7);
+        e.return_position = false;
+        graph.add_edge(e);
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            0,
+            "non-return-position call must not fire the return-boundary check"
+        );
+    }
+
+    #[test]
+    fn analyze_return_boundary_fires_for_return_position_call() {
+        let mut graph = CirGraph::new("src/lib.rs");
+        // Same shapes as above, but the call is in return position (tail
+        // expression / return operand) — the codomain mismatch fires.
+        graph.add_node(node(
+            "caller",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::String),
+        ));
+        graph.add_node(node(
+            "callee",
+            Shape::Scalar(ScalarKind::Unit),
+            Shape::Scalar(ScalarKind::Int),
+        ));
+        let mut e = edge("e1", "caller", "callee", 7);
+        e.return_position = true;
+        graph.add_edge(e);
+
+        let findings = CompositionAnalyzer::new().analyze(&graph);
+        assert_eq!(
+            findings.len(),
+            1,
+            "return-position codomain mismatch must fire"
         );
     }
 
@@ -1010,6 +1079,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: Some(0),
             arg_shape: Some(rec.clone()), // passes Record where Scalar expected
+            return_position: true,
         });
         let findings = CompositionAnalyzer::new().analyze(&graph);
         assert_eq!(findings.len(), 1, "expected 1 SlotMismatch finding");
@@ -1070,6 +1140,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: Some(0),
             arg_shape: Some(Shape::Scalar(ScalarKind::Unit)), // passes Scalar where Record expected
+            return_position: true,
         });
         let findings = CompositionAnalyzer::new().analyze(&graph);
         assert_eq!(findings.len(), 1);
@@ -1174,6 +1245,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -1222,6 +1294,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);
@@ -1279,6 +1352,7 @@ mod tests {
             trust_provenance: Default::default(),
             slot: None,
             arg_shape: None,
+            return_position: true,
         });
 
         let findings = CompositionAnalyzer::new().analyze(&graph);

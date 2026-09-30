@@ -50,6 +50,8 @@ pub fn extract_graph(syntax: &syn::File, path: &Path, source: &str) -> Extractio
         local_shapes: HashMap::new(),
         is_test_context: false,
         pending_discard: false,
+        tail_depth: 0,
+        pending_return_position: false,
     };
     visit::visit_file(&mut extractor, syntax);
     ExtractionResult {
@@ -97,6 +99,15 @@ struct Extractor<'src> {
     /// Whether the next visited call expression is in a discard context
     /// (e.g., `let _ = expr;` or `expr;` as a statement).
     pending_discard: bool,
+    /// Block-nesting depth at which the visited expression is in return
+    /// position (tail expression, `return` operand, or `?`-propagated
+    /// tail). Zero means ordinary statement/argument context
+    /// (vampiro-224.9).
+    tail_depth: usize,
+    /// Tail-position flag handed to the next call visitor: the call's
+    /// result flows directly to the caller's return value. Consumed by
+    /// `add_call_edge` call sites to tag `CirEdge::return_position`.
+    pending_return_position: bool,
 }
 
 impl<'src> Extractor<'src> {
@@ -455,7 +466,9 @@ impl<'src> Extractor<'src> {
 
         let prev = self.current_function.replace(fq);
 
-        visit::visit_block(self, &func.block);
+        self.tail_depth += 1;
+        self.visit_block(&func.block);
+        self.tail_depth -= 1;
 
         self.current_function = prev;
     }
@@ -775,6 +788,11 @@ impl<'src> Extractor<'src> {
         slot: Option<u32>,
         arg_shape: Option<Shape>,
         expression_source: Option<StableId>,
+        // Whether the callee's result flows to the caller's return value
+        // (vampiro-224.9). Only call-result edges carry `true`; argument/
+        // receiver slot edges carry `false` (their values flow into
+        // parameters, covered by data-flow checks instead).
+        return_position: bool,
     ) {
         if Self::is_builtin(callee_name) {
             return;
@@ -816,6 +834,7 @@ impl<'src> Extractor<'src> {
             trust_provenance: Default::default(),
             slot,
             arg_shape,
+            return_position,
         };
 
         self.graph.add_edge(edge);
@@ -851,7 +870,18 @@ impl<'src> Extractor<'src> {
             },
             _ => return,
         };
-        self.add_call_edge(&name, span, resolution, evidence, None, None, None);
+        self.add_call_edge(
+            &name,
+            span,
+            resolution,
+            evidence,
+            None,
+            None,
+            None,
+            // The receiver's result flows onward through the unwrap; it is
+            // in return position exactly when the method chain is.
+            self.pending_return_position,
+        );
     }
 
     /// Known Rust built-in functions/constructors that should not produce edges.
@@ -936,6 +966,124 @@ impl<'src> Extractor<'src> {
 
 /// Visit functions and extract CIR nodes, visibility, and facades.
 impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
+    // --- return-position tracking (vampiro-224.9) ---
+    //
+    // `tail_depth > 0` marks expressions whose value flows directly to the
+    // enclosing function's return value: the tail expression of a block in
+    // tail position, `return` operands, and `?`-propagated tails. Call
+    // visitors consume `pending_return_position` to tag call-result edges;
+    // argument/receiver contexts drop out of tail position because their
+    // values flow into callee slots (covered by data-flow checks instead).
+    fn visit_expr(&mut self, expr: &'ast syn::Expr) {
+        let in_tail = self.tail_depth > 0;
+        match expr {
+            // A call/method call grabs the current tail context for its own
+            // call-result edge; its arguments and receivers are NOT in
+            // return position.
+            syn::Expr::Call(_) | syn::Expr::MethodCall(_) => {
+                self.pending_return_position = in_tail;
+                let prev = self.tail_depth;
+                self.tail_depth = 0;
+                visit::visit_expr(self, expr);
+                self.tail_depth = prev;
+                self.pending_return_position = false;
+            }
+            // `return e;` — the operand is in return position even when the
+            // return is a mid-function statement.
+            syn::Expr::Return(ret) => {
+                self.tail_depth += 1;
+                if let Some(inner) = &ret.expr {
+                    self.visit_expr(inner);
+                }
+                self.tail_depth -= 1;
+            }
+            // `?` propagates the operand's unwrapped value onward, so it
+            // inherits the tail context; visit_expr_try consumes the pending
+            // flag to tag the operand call's edge.
+            syn::Expr::Try(_) => {
+                self.pending_return_position = in_tail;
+                visit::visit_expr(self, expr);
+                self.pending_return_position = false;
+            }
+            // Tail position flows through result-producing wrappers. If/match
+            // conditions and match guards are handled explicitly: a condition
+            // call's value drives control flow, it does not flow to return.
+            syn::Expr::If(e) if in_tail => {
+                let prev = self.tail_depth;
+                self.tail_depth = 0;
+                self.visit_expr(&e.cond);
+                self.tail_depth = 1;
+                self.visit_block(&e.then_branch);
+                self.tail_depth = prev;
+                if let Some((_, else_expr)) = &e.else_branch {
+                    self.tail_depth = 1;
+                    self.visit_expr(else_expr);
+                    self.tail_depth = prev;
+                }
+            }
+            syn::Expr::Match(e) if in_tail => {
+                let prev = self.tail_depth;
+                self.tail_depth = 0;
+                self.visit_expr(&e.expr);
+                self.tail_depth = 1;
+                for arm in &e.arms {
+                    if let Some((_, guard)) = &arm.guard {
+                        self.tail_depth = 0;
+                        self.visit_expr(guard);
+                        self.tail_depth = 1;
+                    }
+                    self.visit_expr(&arm.body);
+                }
+                self.tail_depth = prev;
+            }
+            syn::Expr::Await(_)
+            | syn::Expr::Block(_)
+            | syn::Expr::Unsafe(_)
+            | syn::Expr::Paren(_)
+            | syn::Expr::Group(_)
+                if in_tail =>
+            {
+                visit::visit_expr(self, expr);
+            }
+            // Everything else (binaries, assignments, condition calls in
+            // non-tail position, …): children are not in return position.
+            _ => {
+                let prev = self.tail_depth;
+                self.tail_depth = 0;
+                visit::visit_expr(self, expr);
+                self.tail_depth = prev;
+            }
+        }
+    }
+
+    fn visit_block(&mut self, block: &'ast syn::Block) {
+        if self.tail_depth == 0 {
+            visit::visit_block(self, block);
+            return;
+        }
+        // A block in tail position passes tail status only to its tail
+        // expression (last statement without a semicolon); every other
+        // statement — including `let` bindings and discarded calls — is
+        // ordinary statement context.
+        let tail_idx = match block.stmts.last() {
+            Some(syn::Stmt::Expr(_, None)) => Some(block.stmts.len() - 1),
+            _ => None,
+        };
+        let prev = self.tail_depth;
+        self.tail_depth = 0;
+        for (i, stmt) in block.stmts.iter().enumerate() {
+            if Some(i) != tail_idx {
+                self.visit_stmt(stmt);
+            }
+        }
+        self.tail_depth = prev;
+        if let Some(i) = tail_idx {
+            if let syn::Stmt::Expr(expr, None) = &block.stmts[i] {
+                self.visit_expr(expr);
+            }
+        }
+    }
+
     #[allow(clippy::borrow_deref_ref)]
     fn visit_stmt(&mut self, stmt: &'ast syn::Stmt) {
         // Detect true discards: expression statements and wildcard locals.
@@ -1030,7 +1178,16 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 // Skip builtins entirely — no edges, no expression nodes.
             } else if call.args.is_empty() {
                 // Zero-arg call: declaration→declaration edge for return-boundary check.
-                self.add_call_edge(&callee_name, span, resolution, None, None, None, None);
+                self.add_call_edge(
+                    &callee_name,
+                    span,
+                    resolution,
+                    None,
+                    None,
+                    None,
+                    None,
+                    self.pending_return_position,
+                );
             } else {
                 // Get the current function's ID for expression node linking.
                 let current_fn_id = self
@@ -1049,6 +1206,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     None,
                     None,
                     None,
+                    self.pending_return_position,
                 );
 
                 // Emit expression→declaration edges for each argument with a known
@@ -1068,6 +1226,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                                 Some(i as u32),
                                 None,
                                 Some(expr_id),
+                                false,
                             );
                         }
                     }
@@ -1096,6 +1255,8 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
         // edge with slot=None for the receiver.
         let total_args = 1 + call.args.len(); // receiver + explicit args
         if total_args == 1 {
+            // Zero-arg method: the slot-less edge IS the call-result edge —
+            // tag it with the enclosing return-position context.
             self.add_call_edge(
                 &callee_name,
                 span,
@@ -1104,9 +1265,11 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 None,
                 None,
                 None,
+                self.pending_return_position,
             );
         } else {
-            // Receiver at slot 0
+            // Receiver at slot 0 — the receiver's value flows into the
+            // method, not to the caller's return, so never return position.
             self.add_call_edge(
                 &callee_name,
                 span,
@@ -1115,6 +1278,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                 Some(0),
                 None,
                 None,
+                false,
             );
             for (i, _arg) in call.args.iter().enumerate() {
                 self.add_call_edge(
@@ -1125,6 +1289,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     Some((i + 1) as u32),
                     None,
                     None,
+                    false,
                 );
             }
         }
@@ -1160,6 +1325,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                     None,
                     None,
                     None,
+                    self.pending_return_position,
                 );
             }
             syn::Expr::Call(inner) => {
@@ -1180,6 +1346,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                             None,
                             None,
                             None,
+                            self.pending_return_position,
                         );
                     } else {
                         for i in 0..inner.args.len() {
@@ -1191,6 +1358,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                                 Some(i as u32),
                                 None,
                                 None,
+                                false,
                             );
                         }
                     }
@@ -1212,6 +1380,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         None,
                         None,
                         None,
+                        self.pending_return_position,
                     );
                 } else {
                     self.add_call_edge(
@@ -1222,6 +1391,7 @@ impl<'src, 'ast> Visit<'ast> for Extractor<'src> {
                         Some(0),
                         None,
                         None,
+                        false,
                     );
                 }
             }
