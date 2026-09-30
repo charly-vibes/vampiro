@@ -286,6 +286,22 @@ walk + status collection) — same layer as the 224.10 tests/ filter; explicit
 the ticket: testaruda full-repo scan **888 composition-breaks → 2** (both in
 `adapter-typescript/src/`, real code); zero findings under artifact dirs.
 
+### Post-224.8: enclosed call sites are not branches (2026-09-30)
+
+The redundancy tracer grouped edges by target, so two independent CALLERS of
+one callee were treated as alternative dataflow branches and their codomains
+compared (dont events.rs:91: `days_in_month` int vs `epoch_to_parts` 6-tuple
+against `is_leap`'s domain). Fix: a frontend call edge's source is the
+enclosing function of the call site — when the source node's span contains
+the edge span, the edge is a call site, not a branch, and is excluded from
+branch grouping. Hand-built consumer/feeder graphs (the legit REQ-11 shape;
+the frontend cannot naturally produce a ≥2-inbound consumer, see the stress
+redundancy.rs fixture docs) have disjoint spans and still group.
+
+Measured (post-224.8, source dirs only): redundancy-mismatch **0 on all 8
+dogfood repos** (post-224.4: wai 33, dont 18, vampiro 5, fotos 2,
+testaruda 1, pretender 12, ddl 5). Seeded-fixture harness sound + precise.
+
 ---
 
 ## Reproduction
