@@ -150,5 +150,39 @@
    "redundancy-mismatch": 11,
    "swallowed-effect": 4
   }
+ },
+ "post-224.9-checkpoint": {
+  "note": "post-224.9 binary, source dirs only (src, tests, crates, examples, extensions, adapters); fresh scans 2026-09-30; replaces the directional post-224.9 block whose repo-root scans were polluted by target/ artifact code (dont 234 redundancy) and same-day drift",
+  "wai": {
+   "redundancy-mismatch": 37
+  },
+  "dont": {
+   "composition-break": 1,
+   "redundancy-mismatch": 18
+  },
+  "dulce-de-leche": {
+   "redundancy-mismatch": 6
+  },
+  "espectacular": {
+   "composition-break": 1,
+   "redundancy-mismatch": 16,
+   "swallowed-effect": 1
+  },
+  "pretender": {
+   "redundancy-mismatch": 14
+  },
+  "testaruda": {
+   "composition-break": 2,
+   "redundancy-mismatch": 3
+  },
+  "vampiro": {
+   "composition-break": 5,
+   "facade-leak": 1,
+   "redundancy-mismatch": 11,
+   "swallowed-effect": 4
+  },
+  "fotos": {
+   "redundancy-mismatch": 2
+  }
  }
 }

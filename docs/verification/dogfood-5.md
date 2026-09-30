@@ -193,6 +193,38 @@ still fire; the stress `composition.rs` fixture was updated so its seeded
 break is a genuine return-position call (the old `let _v = source_value();`
 form was itself an R7-class FP).
 
+## Checkpoint: post-224.9 re-triage (epic vampiro-224 intermediate milestone)
+
+Fresh scans (2026-09-30, post-224.9 binary) of all 8 repos, **source dirs only**
+(`src`, `tests`, `crates`, `examples`, `extensions`, adapters) — supersedes the
+directional post-224.9 numbers above, whose repo-root scans were polluted by
+`target/` artifact code (dont redundancy 234 → 18 once scoped) and same-day
+drift. Per-repo counts in `dogfood-5-corpus.json` (`post-224.9-checkpoint`).
+
+Composition-break: **162 → 9 (−94%)**. Triage of all 9:
+
+| Site | Verdict | Root cause |
+|---|---|---|
+| vampiro `tests/fixtures/add-core-seam-analysis/1/composition_break.rs:27` | TP (seeded) | expected.json confirms |
+| vampiro `tests/fixtures/add-core-seam-analysis/3/swallowed_effect.rs:34` | TP (seeded) | force_unwrap(parse_raw) intended break |
+| vampiro `tests/fixtures/add-core-seam-analysis/4/redundancy_mismatch.rs:34` | TP (seeded) | use_data(primary) intended break |
+| vampiro `tests/fixtures/stress/composition.rs:20` | TP (seeded) | re-seeded genuine return-position break |
+| vampiro `tests/fixtures/stress/data_flow_seam.rs:22` | TP (seeded) | slot-boundary check, expected.json confirms |
+| dont `src/main.rs:4839` `mocks.as_ref()` | FP | `.as_ref()` not modeled (ref inside Option) — 224.4/.6 |
+| espectacular `src/check.rs:755` `spec_path.clone()` | FP | `.clone()` mis-modeled as ref(opaque); actual String→String matches callee — 224.4/.6 |
+| testaruda `src/engine.rs:244` `&mut Vec<(u32,)>` → `&[(u32,)]` | FP | Deref coercion (`Vec<T>`→slice) not modeled — filed vampiro-224.13 |
+| testaruda `adapter-clojure/tests/queries_test.rs:239` `src.as_bytes()` | FP | in `tests/` (224.10) + `.as_bytes()` modeled as string |
+
+Milestone read: foreign-code composition FP rate is still 5/5 = 100% (no
+genuine breaks exist in compiling foreign code), but every residual FP maps
+to an open ticket and the classes are shallow (method/combinator modeling,
+deref coercion, tests/ filtering). Checkpoint re-prioritization: 224.5
+(Result error param) and 224.7 (if/match conditions) have **zero residual
+findings** — deprioritize; the remaining FPs are covered by 224.4/224.6
+(method modeling), 224.13 (deref coercion, new), and 224.10 (tests/ filter).
+Seeded-fixture TPs all still fire (composition slot-boundary, data-flow,
+try-operator, stress return-position).
+
 ---
 
 ## Reproduction
