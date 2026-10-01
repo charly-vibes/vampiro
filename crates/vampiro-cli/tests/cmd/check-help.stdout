@@ -5,19 +5,34 @@ Usage: vampiro check [OPTIONS]
 Options:
   -p, --path <PATH>
           Path(s) to Rust source file(s) or directories to scan
+
       --target <TARGET>
           Explicit target revision (commit SHA or ref) for diff scope
+
       --base <BASE>
           Base revision (commit SHA or ref) for diff scope
+
       --full
           Scan all files (full scope) instead of diff
+
       --mode <MODE>
-          Scan mode: guidance, tiered, or gate [default: guidance]
+          Scan mode: guidance, tiered, or gate
+
+          Defaults to gate (fail-closed). Advisory modes are dated downgrades: they require --advisory-until with a future ISO date, else the scan fails (vampiro-b7g advisory-lease TTL).
+
+          [default: gate]
+
+      --advisory-until <DATE>
+          Advisory lease expiry (ISO YYYY-MM-DD) for tiered/guidance modes. Required for advisory modes; an expired/missing lease fails closed — renew by pushing the date forward (a visible, reviewable diff)
+
       --severity-threshold <SEVERITY_THRESHOLD>
           Severity threshold for gate mode (low, medium, high)
+
   -j, --json
           Output findings as JSON
+
       --sarif
           Output findings as SARIF 2.1.0
+
   -h, --help
-          Print help
+          Print help (see a summary with '-h')

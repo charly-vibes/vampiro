@@ -91,8 +91,18 @@ pub struct CheckArgs {
     pub full: bool,
 
     /// Scan mode: guidance, tiered, or gate
-    #[arg(long, default_value = "guidance")]
+    ///
+    /// Defaults to gate (fail-closed). Advisory modes are dated downgrades:
+    /// they require --advisory-until with a future ISO date, else the scan
+    /// fails (vampiro-b7g advisory-lease TTL).
+    #[arg(long, default_value = "gate")]
     pub mode: String,
+
+    /// Advisory lease expiry (ISO YYYY-MM-DD) for tiered/guidance modes.
+    /// Required for advisory modes; an expired/missing lease fails closed —
+    /// renew by pushing the date forward (a visible, reviewable diff).
+    #[arg(long, value_name = "DATE")]
+    pub advisory_until: Option<String>,
 
     /// Severity threshold for gate mode (low, medium, high)
     #[arg(long)]
@@ -514,9 +524,10 @@ fn run_check(args: &CheckArgs) -> ExitCode {
     }
 
     // Apply policy
-    let mode: ScanMode = args.mode.parse().unwrap_or(ScanMode::Guidance);
+    let mode: ScanMode = args.mode.parse().unwrap_or(ScanMode::Gate);
     let policy = ScanPolicy {
         mode,
+        advisory_until: args.advisory_until.clone(),
         severity_threshold: args
             .severity_threshold
             .as_ref()

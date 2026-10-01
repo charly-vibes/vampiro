@@ -95,6 +95,10 @@ fn bench_vampiro(path: &Path) -> (std::time::Duration, bool) {
         .arg("--full")
         .arg("--mode")
         .arg("guidance")
+        // advisory modes are dated downgrades (vampiro-b7g); benchmarks
+        // measure throughput, not policy — carry a current lease.
+        .arg("--advisory-until")
+        .arg("2099-12-31")
         .output()
         .expect("vampiro check subprocess failed");
     let elapsed = start.elapsed();

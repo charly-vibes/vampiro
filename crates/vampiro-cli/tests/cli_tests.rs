@@ -30,6 +30,8 @@ fn quickstart_smoke_test() {
             &file.to_string_lossy(),
             "--mode",
             "guidance",
+            "--advisory-until",
+            "2099-12-31",
         ])
         .output()
         .expect("quickstart command failed to start");
@@ -69,6 +71,8 @@ fn python_cli_accepts_py_file() {
             &fixture.to_string_lossy(),
             "--mode",
             "guidance",
+            "--advisory-until",
+            "2099-12-31",
         ])
         .output()
         .expect("python check command failed to start");
@@ -102,6 +106,8 @@ fn python_cli_accepts_py_directory() {
             &fixture_dir.to_string_lossy(),
             "--mode",
             "guidance",
+            "--advisory-until",
+            "2099-12-31",
         ])
         .output()
         .expect("python directory check command failed to start");
@@ -130,6 +136,8 @@ fn assert_check_succeeds(label: &str, path: &Path) {
             &path.to_string_lossy(),
             "--mode",
             "guidance",
+            "--advisory-until",
+            "2099-12-31",
         ])
         .output()
         .unwrap_or_else(|_| panic!("{label} check command failed to start"));

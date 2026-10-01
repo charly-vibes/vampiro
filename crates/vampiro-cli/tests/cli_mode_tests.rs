@@ -56,6 +56,8 @@ fn cli_mode_guidance_reports_findings_with_exit_0() {
         "--full",
         "--mode",
         "guidance",
+        "--advisory-until",
+        "2099-12-31",
     ]);
     assert_eq!(
         output.status.code(),
@@ -82,6 +84,8 @@ fn cli_mode_guidance_clean_baseline_exits_0_no_findings() {
         "--full",
         "--mode",
         "guidance",
+        "--advisory-until",
+        "2099-12-31",
     ]);
     assert_eq!(output.status.code(), Some(0));
     assert!(
@@ -103,6 +107,8 @@ fn cli_mode_tiered_reports_findings_grouped_with_exit_0() {
         "--full",
         "--mode",
         "tiered",
+        "--advisory-until",
+        "2099-12-31",
     ]);
     assert_eq!(
         output.status.code(),
@@ -213,6 +219,8 @@ fn check_property(a: i32, b: i32) -> bool {
         "--full",
         "--mode",
         "guidance",
+        "--advisory-until",
+        "2099-12-31",
     ]);
     assert_eq!(
         output.status.code(),

@@ -43,6 +43,9 @@ fn assert_no_panic(path: &Path, label: &str) {
         .arg("--full")
         .arg("--mode")
         .arg("guidance")
+        // advisory modes carry a current lease (vampiro-b7g)
+        .arg("--advisory-until")
+        .arg("2099-12-31")
         .output()
         .unwrap_or_else(|e| panic!("{label}: failed to spawn vampiro: {e}"));
 

@@ -37,8 +37,10 @@ fn finding(severity: &str, fd: Option<u32>) -> FlatFinding {
 
 #[test]
 fn test_3_1_guidance_passes_with_findings() {
+    // Advisory requires a current lease (vampiro-b7g)
     let policy = ScanPolicy {
         mode: ScanMode::Guidance,
+        advisory_until: Some("2099-12-31".to_string()),
         ..Default::default()
     };
     let findings = vec![finding("high", None)];
@@ -47,8 +49,10 @@ fn test_3_1_guidance_passes_with_findings() {
 
 #[test]
 fn test_3_1_tiered_passes_with_findings() {
+    // Advisory requires a current lease (vampiro-b7g)
     let policy = ScanPolicy {
         mode: ScanMode::Tiered,
+        advisory_until: Some("2099-12-31".to_string()),
         ..Default::default()
     };
     let findings = vec![finding("high", None)];
