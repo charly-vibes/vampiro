@@ -25,7 +25,7 @@ pre-commit:
       exclude:
         - 'Cargo.lock'
         - '*.patch'
-        - '.beads/hooks/**'
+        - '.beads/hooks/*'
     end-of-file-fixer:
       run: |
         git diff --cached --name-only -z | xargs -0 -I{} sh -c 'test "$(tail -c1 "{}")" = "" || (echo "{}: missing trailing newline"; exit 1)'
@@ -37,7 +37,7 @@ pre-commit:
         - '*.gif'
         - '*.pdf'
         - '*.woff2'
-        - '.beads/hooks/**'
+        - '.beads/hooks/*'
     check-added-large-files:
       run: |
         git diff --cached --name-only -z | xargs -0 -I{} sh -c '
