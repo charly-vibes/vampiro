@@ -17,9 +17,9 @@ Options:
 
       --mode <MODE>
           Scan mode: guidance, tiered, or gate
-
+          
           Defaults to gate (fail-closed). Advisory modes are dated downgrades: they require --advisory-until with a future ISO date, else the scan fails (vampiro-b7g advisory-lease TTL).
-
+          
           [default: gate]
 
       --advisory-until <DATE>
