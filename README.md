@@ -10,8 +10,7 @@
 > law, retry, resource, and trust boundaries where two pieces *look* compatible
 > but don't compose. Vampiro proves composition across those boundaries
 > mechanically instead of hoping integration tests catch it.
-> **Status:** [beta](docs/src/status.md) · prove/check shipped · [Motivation & design](docs/src/index.md)
-
+> **Status:** [beta](docs/src/status.md) · prove/check shipped · [Motivation & design](docs/src/index.md) · [charly-vibes Tool Ecosystem](https://charly-vibes.github.io/dulce-de-leche/ecosystem-map.html)
 Vampiro is a cross-language Rust CLI that checks whether code composes
 correctly across call, module, effect, law, retry, resource, and trust
 boundaries.
