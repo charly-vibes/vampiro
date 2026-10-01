@@ -11,6 +11,9 @@ on:
       - "scripts/build_docs.py"
       - "book.toml"
       - "vampiro-ears-spec.md"
+      - 'Cargo.toml'
+    tags:
+      - 'v*'
   pull_request:
     paths:
       - ".github/workflows/docs.yml"
@@ -41,6 +44,24 @@ jobs:
 
       - name: Assemble authoritative documentation
         run: python scripts/build_docs.py
+
+      - name: Generate release-status page from Cargo.toml
+        # §6 (DDL-j0u): the book's version claims must come from Cargo.toml,
+        # never from hand-typed text — hand-typed versions drift (ddl's
+        # deployed book said v0.5.0 while the repo was v0.7.0).
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | sed 's/version = "\(.*\)"/\1/')
+          TAG="${GITHUB_REF_NAME:-main}"
+          mkdir -p docs/src
+          cat > docs/src/release.md <<EOF
+          # Release Status
+
+          > **Generated artifact** (docs.yml, from Cargo.toml + git ref).
+          > Do not hand-edit — the repo source files remain authoritative.
+
+          - **Version:** v${VERSION}
+          - **Built from:** ${TAG} @ ${GITHUB_SHA::7}
+          EOF
 
       - name: Build documentation
         run: mdbook build
