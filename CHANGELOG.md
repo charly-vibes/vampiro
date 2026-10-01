@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.6.0] — 2026-10-01
+
+### Changed
+
+- **Gate-by-default + advisory lease TTL (vampiro-b7g)** — `vampiro check`
+  now defaults to `--mode gate` (fail-closed). `tiered` and `guidance` are
+  dated downgrades: they require `--advisory-until DATE` (ISO YYYY-MM-DD).
+  An expired, missing, or unparseable lease fails closed — the
+  quality-drift detector forcing a renewed, dated, reviewable decision
+  instead of a permanent silent advisory. Renewal = push the date forward
+  (a visible diff). Gate mode never consults the lease. Date math is
+  zero-dependency (lexicographic ISO compare + Hinnant civil-from-days).
+
+### Added
+
+- `ScanPolicy.advisory_until` (TOML + CLI `--advisory-until`), and
+  `ScanPolicy::advisory_lease_expired()`.
+
+### Fixed
+
+- The pre-push dogfood hook ran `vampiro check` in advisory guidance mode
+  with stderr piped to `/dev/null` — pure noise in its own repo. It now
+  runs `--mode gate` and blocks.
+
+
 ## [0.5.0] — 2026-09-30
 
 The precision release: composition analysis went from ~100% false positives

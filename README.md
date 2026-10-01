@@ -60,7 +60,8 @@ in the category it claims to compose in?**
 
 ```bash
 cargo build --release
-./target/release/vampiro check --path <file> --mode guidance
+./target/release/vampiro check --path <file>              # gate mode (default — blocks)
+# advisory needs a dated lease: --mode guidance --advisory-until 2027-03-31
 ```
 
 ## Documentation

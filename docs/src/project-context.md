@@ -114,8 +114,11 @@ Their `filtration_distance` is separate evidence, not configured severity.
   remain eligible for modularity and robustness analysis.
 - Duplicate findings are identified stably from rule, location, and shape
   hash.
-- `guidance` mode never fails solely because of findings; `gate` mode fails
-  only when seam-scoped findings meet the configured threshold.
+- `gate` is the default mode and fails when seam-scoped findings meet the
+  configured threshold; `guidance`/`tiered` are advisory but are DATED
+  downgrades: they require `--advisory-until DATE` (or a config lease), and
+  an expired/missing lease fails closed — the quality-drift detector forcing
+  a renewed, dated, reviewable decision (vampiro-b7g).
 - Prover unavailability is `ProverUnavailable`, not `Disproved` or success.
 - N+1 detection, documentation truth maintenance, and lock-order analysis are
   explicitly out of scope because they require other extraction models or
