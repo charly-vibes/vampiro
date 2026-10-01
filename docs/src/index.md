@@ -6,7 +6,7 @@
 
 # Vampiro
 
-Vampiro is a cross-language Rust CLI (v0.5.0) that asks one question at every
+Vampiro is a cross-language Rust CLI (current release: [release status](./release.md)) that asks one question at every
 call boundary: **does this edge compose validly in the category it claims to
 compose in?**
 
@@ -21,7 +21,7 @@ It detects four classes of seam defect:
 
 ## Current status
 
-**v0.5.0** — Production-precision CLI with frontends for 4 languages (Rust,
+**[Current release](./release.md)** — Production-precision CLI with frontends for 4 languages (Rust,
 Python, Clojure, Julia): per-slot composition seam analysis with data-flow
 edges, struct-field registry, and success-channel Result unification — **0
 foreign composition/redundancy false positives** on the 8-repo dogfood
