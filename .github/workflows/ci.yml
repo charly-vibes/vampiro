@@ -71,7 +71,7 @@ jobs:
           ddl status >/dev/null
           wai status >/dev/null
           openspec validate --all >/dev/null
-          pretender check >/dev/null
+          pretender check --mode guidance >/dev/null
       # Run the exact same command as local development
       - name: Run CI pipeline
         env:
