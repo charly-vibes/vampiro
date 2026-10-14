@@ -1,13 +1,57 @@
+<!-- ah:managed:start -->
+## espectacular
+
+Run `ah check` to verify spec-test correspondence before committing.
+
+- `ah check` — validate all deployed specs
+- `ah check --changes <name>` — validate with a change overlay
+- `ah init` — set up or refresh espectacular project files
+- `ah doctor` — diagnose setup issues
+- `ah explain <topic>` — playbook guidance for finding kinds and suggested actions
+- `ah doctor --enable <adapter>` — write adapter config into .espectacular/config.toml
+- `ah signals` — emit dont drift signals
+<!-- ah:managed:end -->
+
+<!-- BEADS:START -->
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
+## Beads Issue Tracker
+
+This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
+
+### Quick Reference
+
+```bash
+bd ready              # Find available work
+bd show <id>          # View issue details
+bd update <id> --claim  # Claim work
+bd close <id>         # Complete work
+```
+
+### Rules
+
+- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
+- Run `bd prime` for detailed command reference and session close protocol
+- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+
+## Session Completion
+
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+
+**MANDATORY WORKFLOW:**
+
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY.
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
+<!-- END BEADS INTEGRATION -->
+<!-- BEADS:END -->
+
 <!-- DONT:START -->
-# DONT MANAGED BLOCK — DO NOT EDIT
-
-This project uses `dont` for grounded-claim workflow.
-
-At session start run `dont prime --json`.
-
-Canonical agent instructions: `.dont/AGENTS.md`.
-
-Edits inside this managed block will be overwritten by `dont doctor --fix`.
+<!-- dont: managed block -->
+See .dont/ for grounded-claim workflow.
 <!-- DONT:END -->
 
 <!-- OPENSPEC:START -->
@@ -29,16 +73,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 <!-- OPENSPEC:END -->
 
-<!-- WAI:START -->
-## PRIMARY OBJECTIVE
-
-Build and maintain **vampiro** — the cross-language static-analysis CLI that
-checks whether code composes correctly at call, module, and trust boundaries.
-Every action should trace back to: does this make vampiro more accurate at
-detecting composition mismatches, broader in language coverage, or easier to
-integrate into existing build pipelines?
-
-# Workflow Tools
+<!-- WAI:START --># Workflow Tools
 
 This project uses **wai** to track the *why* behind decisions — research,
 reasoning, and design choices that shaped the code. Run `wai status` first
@@ -46,6 +81,7 @@ to orient yourself.
 
 Detected workflow tools:
 - **wai** — research, reasoning, and design decisions
+- **beads** — issue tracking (tasks, bugs, dependencies). CLI command: **`bd`** (not `beads`)
 - **openspec** — specifications and change proposals (see `openspec/AGENTS.md`)
 
 > **CRITICAL**: Apply TDD and Tidy First throughout — not just when writing code:
@@ -59,12 +95,24 @@ Detected workflow tools:
 
 1. `wai sync` — ensure agent tools are projected
 2. `wai status` — see active projects, phase, and suggestions
+3. `bd ready` — find available work items
 
 When context reaches ~40%: stop and tell the user — responses degrade past
 this point. Recommend `wai close` then `/clear` to resume cleanly.
 Do NOT skip `wai close` — it enables resume detection.
 
+## Autonomous Work Policy
 
+Proceed without routine confirmation when the next step is clear.
+Do not ask to continue, fix, or commit — just do it.
+
+**Stop and ask** only when:
+- Conflicting requirements or ambiguous intent
+- Destructive actions (data loss, force-push, drop table)
+- Credentials, secrets, or external services not yet authorized
+- Unresolved test failures after two attempts
+- Push, deploy, or release — always get explicit authorization
+- Context approaching 40% — recommend `wai close` then `/clear`
 
 ## Detailed Instructions
 
@@ -72,16 +120,10 @@ Full workflow reference — session lifecycle, capturing work, command cheat
 sheets, cross-tool sync, and PARA structure — lives in **`.wai/AGENTS.md`**.
 Read it at the start of your first session or when you need detailed guidance.
 
-## PRIMARY OBJECTIVE (echo)
-
-Build and maintain **vampiro** — the cross-language CLI that checks whether
-code composes correctly at every call boundary. Every action should trace
-back to: does this make vampiro more accurate at detecting composition
-mismatches, broader in language coverage, or easier to integrate into
-existing build pipelines?
-
 Keep this managed block so `wai init` can refresh the instructions.
 
+
+<!-- provenance: generator=wai version=0.12.3 source=WAI sha=3e02f7c4 -->
 <!-- WAI:END -->
 
 ## Behavioral Constraints
@@ -141,6 +183,9 @@ context before starting research or creating tickets.
 
 > **Before research or ticket creation**: always run `wai search "<topic>"` to
 > check for known patterns. Do not rediscover what is already documented.
+
+
+<!-- provenance: generator=wai version=0.12.3 source=WAI:REFLECT:REF sha=73879972 -->
 <!-- WAI:REFLECT:REF:END -->
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
@@ -190,3 +235,21 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+<!-- DDL:START -->
+
+## dulce-de-leche (ddl v0.8.0)
+
+Orchestrator for the charly-vibes tool ecosystem. Run `ddl init` to
+install and configure all tools. Run `ddl status` for a health overview.
+
+Commands:
+- init     Bootstrap the toolset
+- install  Install a single tool
+- status   Show health overview
+- doctor   Run diagnostics
+- version  Show versions
+- upgrade  Update tools
+- migrate  Migrate configs
+- scope    Show active .ddl/
+
+<!-- DDL:END -->
