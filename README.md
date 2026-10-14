@@ -95,3 +95,8 @@ crates/
   vampiro-lifecycle-analysis/ # Lifecycle/safety analysis
   vampiro-frontend-harness/ # Frontend plugin harness
 ```
+
+## Documentation provenance
+
+Rendered docs are generated artifacts; the repository sources are
+authoritative — edit the repo sources, not the rendered output.
