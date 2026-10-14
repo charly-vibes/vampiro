@@ -1,0 +1,6 @@
+id = "local-worktree-and-detached-target-resolve-normally"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.11.0"

@@ -1,0 +1,6 @@
+id = "persistent-facade-item-changes-incompatibly"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.11.0"

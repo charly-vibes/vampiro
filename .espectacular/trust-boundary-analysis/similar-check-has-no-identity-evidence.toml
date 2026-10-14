@@ -1,0 +1,6 @@
+id = "similar-check-has-no-identity-evidence"
+description = ""
+archetype = "PF"
+status = "active"
+superseded_by = ""
+authored_with = "0.11.0"

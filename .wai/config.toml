@@ -2,8 +2,8 @@ plugins = []
 
 [project]
 name = "vampiro"
-version = "2026.7.16"
+version = "2026.10.10"
 description = ""
-tool_commit = "0e16817"
+tool_commit = "4f812dd"
 
 [llm]
