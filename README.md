@@ -56,6 +56,18 @@ in the category it claims to compose in?**
 - **Specification**: EARS v1.3.0 approved. No active OpenSpec changes —
   backlog clear.
 
+## Install
+
+```bash
+V=$(basename "$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
+  https://github.com/charly-vibes/vampiro/releases/latest)" | sed 's/^v//')
+TGT="$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/^x86_64$/amd64/; s/^aarch64$/arm64/')"
+curl -fsSL "https://github.com/charly-vibes/vampiro/releases/download/v${V}/vampiro_${V}_${TGT}.tar.gz" | tar xz
+chmod +x vampiro && sudo mv vampiro /usr/local/bin/
+```
+
+Or via Cargo: `cargo install vampiro`.
+
 ## Quick start
 
 ```bash
