@@ -3,8 +3,15 @@
 ## Purpose
 Define facade-history analysis — persistent snapshot storage, schema versioning, baseline/ancestor comparison, migration declarations, and breaking-change detection across revisions.
 ## Requirements
-### Requirement: Facade history detects authorized and breaking evolution
-Before persistence implementation, the system SHALL select and document snapshot storage, schema/version, retention, baseline override, and migration declaration syntax. It SHALL persist each analyzed revision's L4 facade by qualified identity and compare by default with the nearest persisted first-parent ancestor. An explicit baseline SHALL exist and be an ancestor or produce an operational error. A first snapshot SHALL establish history without a breaking finding; multiple eligible snapshots SHALL resolve deterministically. A persistent incompatible shape without a declared migration SHALL raise a composition `breaking-change` finding. Source requirements: REQ-T1, REQ-T4.
+### Requirement: Facade snapshots are persisted and compared by ancestry
+Before persistence implementation, the system SHALL select and document snapshot storage, schema/version, retention, baseline override, and migration declaration syntax. It SHALL persist each analyzed revision's L4 facade by qualified identity and compare by default with the nearest persisted first-parent ancestor. A first snapshot SHALL establish history without a breaking finding; multiple eligible snapshots SHALL resolve deterministically. **Source**: REQ-T1, REQ-T4.
+
+#### Scenario: First snapshot establishes deterministic history
+- **WHEN** the first snapshot for a facade identity is persisted, or multiple persisted snapshots are equally eligible for comparison
+- **THEN** history is established without a breaking finding and snapshot selection resolves deterministically
+
+### Requirement: Baselines and declared migrations gate breaking facade changes
+An explicit baseline SHALL exist and be an ancestor or produce an operational error. A persistent incompatible shape without a declared migration SHALL raise a composition `breaking-change` finding. **Source**: REQ-T1, REQ-T4.
 
 #### Scenario: Persistent facade item changes incompatibly
 - **WHEN** two snapshots match an item deterministically, its shape has a breaking edge, and no migration authorizes it
@@ -40,11 +47,14 @@ The system SHALL check a declared retry idempotency equation `f;f = f` through p
 - **THEN** an optionality finding links to, but remains distinct from, the edge's robustness finding
 
 ### Requirement: Every acquisition has total release coverage
-The system SHALL assign every acquisition a unique obligation/resource identity and match it one-to-one with a release on every reachable normal, early-return, error, or panic/abort path. Explicit transfer SHALL move the same obligation identity to the recipient. A duplicate release SHALL NOT discharge another obligation; any identity mismatch or insufficient release multiplicity that leaves an obligation pending SHALL raise the REQ-T7 `resource-leak` finding. An unresolved alias or identity SHALL emit the exact `identity:unknown` coverage diagnostic and SHALL NOT assert safety. Source requirements: REQ-T3, REQ-T7.
+The system SHALL assign every acquisition a unique obligation/resource identity and match it one-to-one with a release on every reachable normal, early-return, error, or panic/abort path. Explicit transfer SHALL move the same obligation identity to the recipient. **Source**: REQ-T3, REQ-T7.
 
 #### Scenario: Early return bypasses cleanup
 - **WHEN** an acquire scope has an early-return path with no matching release
 - **THEN** a resource-leak finding names the acquisition and that unreleased path
+
+### Requirement: Release mismatches raise leaks and unresolved identities stay unsafe
+A duplicate release SHALL NOT discharge another obligation; any identity mismatch or insufficient release multiplicity that leaves an obligation pending SHALL raise the REQ-T7 `resource-leak` finding. An unresolved alias or identity SHALL emit the exact `identity:unknown` coverage diagnostic and SHALL NOT assert safety. **Source**: REQ-T3, REQ-T7.
 
 #### Scenario: Alias cannot be resolved
 - **WHEN** release may target an acquisition through an unknown alias

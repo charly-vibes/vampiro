@@ -4,7 +4,8 @@
 Define the Composition IR (CIR) platform contract — nodes, edges, shapes, recursive effect channels, resolutions, and argument provenance — that all frontends must conform to.
 ## Requirements
 ### Requirement: Composition IR preserves compositional structure
-The platform SHALL contract frontends to extract, without execution, CIR nodes with domain/codomain shapes and recursive effect channels, and edges with source, target, resolution, totality, wrapper-removal evidence, exact discard span, and callee-to-caller argument provenance through a configured finite number `H` of local-binding hops. Built-in effect and resolution IDs SHALL use the REQ-2/REQ-3 vocabularies. Projects MAY add validated effect/functor and resolution/natural-transformation IDs under REQ-C1; all built-in and declared effect IDs compose as recursive coproduct terms. `unknown` SHALL be a sentinel used only for undeclared or unrecognized wrappers or resolution patterns. Source requirements: REQ-1, REQ-2, REQ-3.
+The platform SHALL contract frontends to extract, without execution, CIR nodes with domain/codomain shapes and recursive effect channels, and edges with source, target, resolution, totality, wrapper-removal evidence, exact discard span, and callee-to-caller argument provenance through a configured finite number `H` of local-binding hops. Built-in effect and resolution IDs SHALL use the REQ-2/REQ-3 vocabularies.
+**Source**: REQ-1, REQ-2, REQ-3.
 
 #### Scenario: Nested effects are extracted
 - **WHEN** a frontend maps a callable returning `async<result<option<T>>>`
@@ -13,10 +14,6 @@ The platform SHALL contract frontends to extract, without execution, CIR nodes w
 #### Scenario: Unwrap does not imply totality
 - **WHEN** one edge removes a wrapper with an explicit branch for every summand and another removes it by panic/force unwrap
 - **THEN** the first records `resolution=unwrapped, totality=total`, while the second records wrapper-removal evidence plus `resolution=swallowed, totality=partial`
-
-#### Scenario: Declared custom effect is recursive
-- **WHEN** a project declares `validated` and a frontend emits `async<validated<option<T>>>`
-- **THEN** totality checks can eliminate every layer from declaration data without a core-engine branch
 
 #### Scenario: Argument provenance is direct or bounded
 - **WHEN** a callee result reaches a caller argument directly or through at most `H` local bindings
@@ -45,27 +42,41 @@ The platform SHALL require every frontend to classify each declaration's visibil
 - **WHEN** a plugin updates only its visibility idioms
 - **THEN** visibility conformance is versioned and rerun without changing the effect-table version
 
-### Requirement: Declarative categories and filtrations are extensible and valid
-The system SHALL accept each category as a finite declaration of objects, explicitly declared identity morphisms, finite non-identity morphism generators, and a decidable composition table. Validation SHALL reject any missing identity before constructing finite closure, SHALL NOT synthesize a missing identity, SHALL reject undefined/non-closed composites, and SHALL exhaustively check identities and associativity over the resulting table. It SHALL accept finite filtrations (default L0–L4), exhaustively verify every level is a wide subcategory nested in its successor, and compute the least containing level `filtration_level(e)` for a finding edge (distinct from `Severity::sev()`, which maps severity to a numeric value). Source requirements: REQ-C1, REQ-C2, REQ-C3, REQ-C8, REQ-C9.
+### Requirement: Effect and resolution ID vocabularies are extensible
+Projects MAY add validated effect/functor and resolution/natural-transformation IDs under REQ-C1; all built-in and declared effect IDs SHALL compose as recursive coproduct terms. `unknown` SHALL be a sentinel used only for undeclared or unrecognized wrappers or resolution patterns.
+**Source**: REQ-C1, REQ-21.
 
-#### Scenario: Invalid filtration is rejected
-- **WHEN** a project declares a level that is not a subcategory of its successor
-- **THEN** configuration is rejected without computing severity
+#### Scenario: Declared custom effect is recursive
+- **WHEN** a project declares `validated` and a frontend emits `async<validated<option<T>>>`
+- **THEN** totality checks can eliminate every layer from declaration data without a core-engine branch
+
+### Requirement: Categories are finite declarations with exhaustive validation
+The system SHALL accept each category as a finite declaration of objects, explicitly declared identity morphisms, finite non-identity morphism generators, and a decidable composition table. Validation SHALL reject any missing identity before constructing finite closure, SHALL NOT synthesize a missing identity, SHALL reject undefined/non-closed composites, and SHALL exhaustively check identities and associativity over the resulting table.
+**Source**: REQ-C1, REQ-C3, REQ-C8.
 
 #### Scenario: Missing identity or non-closure is rejected
 - **WHEN** an object has no explicitly declared identity or the composition table omits a composite generated by composable morphisms
 - **THEN** declaration validation rejects it with the missing identity or composite without repairing the declaration
 
-#### Scenario: Valid filtration computes distance evidence
-- **WHEN** a finding edge first belongs to filtration level `G3`
-- **THEN** finding evidence contains user-facing `filtration_distance = 3`, equal to `filtration_level(e)`, separately from configured severity
-
 #### Scenario: Declaration exceeds resource limit
 - **WHEN** a category declaration's closure exceeds the configured resource limit (node count, edge count, or depth)
 - **THEN** the declaration is rejected as a configuration error, not validated partially
 
+### Requirement: Filtrations are finite levels with least-containing-level evidence
+The system SHALL accept finite filtrations (default L0–L4), exhaustively verify every level is a wide subcategory nested in its successor, and compute the least containing level `filtration_level(e)` for a finding edge (distinct from `Severity::sev()`, which maps severity to a numeric value).
+**Source**: REQ-C2, REQ-C9.
+
+#### Scenario: Invalid filtration is rejected
+- **WHEN** a project declares a level that is not a subcategory of its successor
+- **THEN** configuration is rejected without computing severity
+
+#### Scenario: Valid filtration computes distance evidence
+- **WHEN** a finding edge first belongs to filtration level `G3`
+- **THEN** finding evidence contains user-facing `filtration_distance = 3`, equal to `filtration_level(e)`, separately from configured severity
+
 ### Requirement: Plugins pass reproducible structural conformance
-Before implementation, the system SHALL select and document plugin packaging/ABI and serialization/schema-version policy. It SHALL load a frontend or resolver only after compatibility fixtures and a versioned suite produce byte-for-byte identical canonical UTF-8 serialized results and load manifests under unchanged tool, plugin, configuration, and platform versions, and verify frontend identity/composition preservation and naturality on shared abstract diagrams. Source requirements: REQ-6, REQ-29, REQ-C10.
+Before implementation, the system SHALL select and document plugin packaging/ABI and serialization/schema-version policy. It SHALL load a frontend or resolver only after compatibility fixtures and a versioned suite produce byte-for-byte identical canonical UTF-8 serialized results and load manifests under unchanged tool, plugin, configuration, and platform versions, and verify frontend identity/composition preservation and naturality on shared abstract diagrams.
+**Source**: REQ-6, REQ-29, REQ-C10.
 
 #### Scenario: Conformant plugin is repeated
 - **WHEN** unchanged fixtures are evaluated repeatedly

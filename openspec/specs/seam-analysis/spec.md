@@ -30,7 +30,8 @@ The system SHALL check visibility legitimacy at arbitrary filtration depth, repo
 - **THEN** a distinct facade-leak finding identifies both facade and origin
 
 ### Requirement: Effect resolution is recursively total
-The system SHALL inspect every nested built-in or project-declared coproduct layer from declarations, report swallowed `result`, `option`, or `throws` effects at the exact discard line, and in diff scope report unchecked `throws` only when no matching ancestor handler exists before a declared boundary. `unwrapped` SHALL record wrapper removal but SHALL NOT imply totality: totality requires explicit handling of every summand, and panic/force unwrap is partial/swallowed. Source requirements: REQ-9, REQ-25, REQ-C4.
+The system SHALL inspect every nested built-in or project-declared coproduct layer from declarations, report swallowed `result`, `option`, or `throws` effects at the exact discard line, and in diff scope report unchecked `throws` only when no matching ancestor handler exists before a declared boundary. `unwrapped` SHALL record wrapper removal but SHALL NOT imply totality: totality requires explicit handling of every summand, and panic/force unwrap is partial/swallowed.
+**Source**: REQ-9, REQ-25, REQ-C4.
 
 #### Scenario: Direct result option and throws are discarded
 - **WHEN** direct edges discard `result`, `option`, and `throws` values

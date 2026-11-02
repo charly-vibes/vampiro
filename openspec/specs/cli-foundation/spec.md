@@ -17,8 +17,8 @@ exact line range, configured severity, optional `filtration_distance` equal to
 mathematical `sev(e)`, and exactly one axis from `composition`, `modularity`,
 `optionality`, or `robustness`. Redundancy belongs to robustness; plugin
 diagnostics are outside findings. JSON serialization SHALL wrap this contract
-in `genesis::envelope::Envelope`, with findings nested under `data`. Source
-requirement: REQ-4; filtration evidence supports platform-owned REQ-C2.
+in `genesis::envelope::Envelope`, with findings nested under `data`.
+**Source**: REQ-4; filtration evidence supports platform-owned REQ-C2.
 
 #### Scenario: A capability constructs a finding
 
