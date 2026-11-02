@@ -12,7 +12,8 @@ Each Python, Clojure, and Julia frontend SHALL conform to platform-owned full no
 - **THEN** each frontend records direct, bounded-chain, and explicit over-bound provenance respectively
 
 ### Requirement: Additional frontends supply law and lifecycle facts
-Each frontend SHALL extract implementation-cluster membership, proof tags, and serializable values or generator references and SHALL register a compatible per-language runner that consumes the backend-neutral obligation IR. Every supported value or construct SHALL execute through that runner; an explicit unsupported result is permitted only for the particular value or construct the runner cannot represent, not for the language as a whole. Each frontend SHALL also extract language lifecycle facts and idioms for writes, retry idempotency, acquire/release, and exit paths, or emit an explicit `unknown` classification, and SHALL integrate persistence of each language's L4 facade snapshot. Conformance references: REQ-10, REQ-17, REQ-T1, REQ-T2, REQ-T3.
+Each frontend SHALL extract implementation-cluster membership, proof tags, and serializable values or generator references and SHALL register a compatible per-language runner that consumes the backend-neutral obligation IR. Every supported value or construct SHALL execute through that runner; an explicit unsupported result is permitted only for the particular value or construct the runner cannot represent, not for the language as a whole.
+**Conformance**: REQ-10, REQ-17.
 
 #### Scenario: Dynamic idiom is unsupported
 - **WHEN** a Python, Clojure, or Julia construct prevents lifecycle or runner extraction
@@ -21,6 +22,9 @@ Each frontend SHALL extract implementation-cluster membership, proof tags, and s
 #### Scenario: Each supported language executes a law
 - **WHEN** a supported Python, Clojure, or Julia cluster member and law are representable by that language's registered runner
 - **THEN** the runner consumes the obligation IR and returns property evidence rather than a language-wide unsupported result
+
+### Requirement: Frontends supply lifecycle facts and facade persistence
+Each frontend SHALL also extract language lifecycle facts and idioms for writes, retry idempotency, acquire/release, and exit paths, or emit an explicit `unknown` classification, and SHALL integrate persistence of each language's L4 facade snapshot. **Conformance**: REQ-T1, REQ-T2, REQ-T3.
 
 #### Scenario: Language facade snapshot is integrated
 - **WHEN** an L4 facade is extracted for Python, Clojure, or Julia

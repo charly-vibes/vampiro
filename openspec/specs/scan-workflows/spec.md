@@ -3,12 +3,8 @@
 ## Purpose
 Define diff-scoped and full-repository scan workflows: default seam-only scope, explicit targets, merge-base resolution, CI revision handling, incremental extraction, and cache invalidation.
 ## Requirements
-### Requirement: Scans are diff-default and incrementally complete
-The system SHALL default interactive and agent `check` invocations to seam-only diff scope and support explicit full-repository scope. Local default SHALL compare `HEAD` to a synthetic worktree target containing staged, unstaged, and untracked non-ignored files. An explicit target SHALL default to its first parent; `--base` SHALL resolve the merge base with the target; detached `HEAD` SHALL use the same rules. A target without a parent SHALL use Git's empty tree. Explicit revision inputs SHALL resolve to immutable commit IDs before analysis, and their selected parent or merge base SHALL be locally available. A missing shallow parent/merge base, non-Git context, unresolved CI revision, or failed/unavailable fetch required to obtain a CI commit or merge base SHALL return an operational error naming scope, base/target inputs, reason, and explicit-full guidance, with no silent full fallback. Every result SHALL identify resolved scope and base/target commit IDs. In full scope, zero unchanged compatible files SHALL be re-extracted; compatibility SHALL be keyed by source content plus analyzer, schema, plugin, and configuration versions, with observable cache hit/miss/invalidation telemetry. Source requirements: REQ-5, REQ-28.
-
-#### Scenario: Unchanged repository is rescanned fully
-- **WHEN** a compatible full-scan cache exists and only one file changed
-- **THEN** only that file's CIR is re-extracted while the complete repository is checked
+### Requirement: Diff scope is the default and full scope is explicit
+The system SHALL default interactive and agent `check` invocations to seam-only diff scope and support explicit full-repository scope. Every result SHALL identify resolved scope and base/target commit IDs. **Source**: REQ-5, REQ-28.
 
 #### Scenario: Interactive and agent checks default to diff
 - **WHEN** an interactive user or agent invokes `check` without a scope option
@@ -18,13 +14,26 @@ The system SHALL default interactive and agent `check` invocations to seam-only 
 - **WHEN** the caller explicitly requests full-repository scope
 - **THEN** every supported repository file participates via fresh or compatible cached CIR
 
-#### Scenario: Diff context is unavailable
-- **WHEN** the merge base is absent from a shallow clone, a required CI revision cannot resolve or be fetched, or the context is not a Git repository
-- **THEN** check returns an operational error with scope, base/target inputs, reason, and explicit-full guidance and performs no full scan
+### Requirement: Local worktree and revision targets resolve deterministically
+Local default SHALL compare `HEAD` to a synthetic worktree target containing staged, unstaged, and untracked non-ignored files. An explicit target SHALL default to its first parent; `--base` SHALL resolve the merge base with the target; detached `HEAD` SHALL use the same rules. A target without a parent SHALL use Git's empty tree. **Source**: REQ-5, REQ-28.
 
 #### Scenario: Local worktree and detached target resolve normally
 - **WHEN** a local worktree has staged, unstaged, or untracked non-ignored changes, or `HEAD` is detached with an available parent
 - **THEN** diff scope resolves the specified base and target deterministically and reports both in result metadata
+
+### Requirement: Unresolvable scan contexts return operational errors
+Explicit revision inputs SHALL resolve to immutable commit IDs before analysis, and their selected parent or merge base SHALL be locally available. A missing shallow parent/merge base, non-Git context, unresolved CI revision, or failed/unavailable fetch required to obtain a CI commit or merge base SHALL return an operational error naming scope, base/target inputs, reason, and explicit-full guidance, with no silent full fallback. **Source**: REQ-5, REQ-28.
+
+#### Scenario: Diff context is unavailable
+- **WHEN** the merge base is absent from a shallow clone, a required CI revision cannot resolve or be fetched, or the context is not a Git repository
+- **THEN** check returns an operational error with scope, base/target inputs, reason, and explicit-full guidance and performs no full scan
+
+### Requirement: Full-scope caching is content-keyed and observable
+In full scope, zero unchanged compatible files SHALL be re-extracted; compatibility SHALL be keyed by source content plus analyzer, schema, plugin, and configuration versions, with observable cache hit/miss/invalidation telemetry. **Source**: REQ-5, REQ-28.
+
+#### Scenario: Unchanged repository is rescanned fully
+- **WHEN** a compatible full-scan cache exists and only one file changed
+- **THEN** only that file's CIR is re-extracted while the complete repository is checked
 
 ### Requirement: Analysis coverage is explicit
 The system SHALL include every file lacking a frontend as `unanalyzed` rather than silently omit it. Source requirements: REQ-15.
@@ -64,7 +73,8 @@ The system SHALL render identical normalized finding data as human, JSON, or SAR
 - **THEN** the normalized result has one stable finding represented equivalently by all formats
 
 ### Requirement: CI generation encodes pull-request gating
-The system SHALL generate pipeline configuration that runs diff-scoped `check` in `gate` mode for pull requests, passes the pull request's head commit as the explicit target, and passes its base ref or commit through `--base`. The generated workflow SHALL make both revisions and their merge base locally available, resolve them to immutable commit IDs, and return the diff-context operational error without broadening scope if resolution or a required fetch fails. Source requirements: REQ-5, REQ-20.
+The system SHALL generate pipeline configuration that runs diff-scoped `check` in `gate` mode for pull requests, passes the pull request's head commit as the explicit target, and passes its base ref or commit through `--base`. The generated workflow SHALL make both revisions and their merge base locally available, resolve them to immutable commit IDs, and return the diff-context operational error without broadening scope if resolution or a required fetch fails.
+**Source**: REQ-5, REQ-20.
 
 #### Scenario: CI configuration is requested
 - **WHEN** a user selects a supported CI target
