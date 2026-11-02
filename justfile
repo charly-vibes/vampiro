@@ -40,9 +40,10 @@ install:
 test:
     #!/usr/bin/env bash
     set -uo pipefail
-    if [ ! -d .testaruda ]; then
-      testaruda init || { echo "❌ testaruda init failed" >&2; exit 1; }
-    fi
+    # init unconditionally: idempotent, and heals stub stores (e.g. the
+    # empty .testaruda/ that `wai status` creates as a side effect —
+    # dir-existence guards would then skip init and exec fails cold)
+    testaruda init || { echo "❌ testaruda init failed" >&2; exit 1; }
     code=0
     testaruda exec || code=$?
     case "$code" in
