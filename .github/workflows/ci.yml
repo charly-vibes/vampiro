@@ -53,7 +53,7 @@ jobs:
 
       - name: Install ecosystem tools (§4 dogfood matrix, pinned)
         run: |
-          cargo install --locked pretender@0.7.0 wai-cli@2026.9.28 dulce-de-leche@0.7.0
+          cargo install --locked pretender@0.7.0 wai-cli@2026.9.28 dulce-de-leche@0.7.0 testaruda@0.5.9
       - name: Install bd (beads, pinned §4)
         run: |
           tmp=$(mktemp -d)
@@ -70,6 +70,7 @@ jobs:
           bd --version >/dev/null
           ddl status >/dev/null
           wai status >/dev/null
+          testaruda --version >/dev/null
           openspec validate --all >/dev/null
           # guidance mode fails closed without an advisory lease (0.7.0) —
           # renew by pushing the date forward (visible, reviewable diff)
