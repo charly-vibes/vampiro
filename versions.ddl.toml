@@ -12,5 +12,5 @@ wai = "2026.9.28"          # crates.io: wai-cli
 pretender = "0.10.0"       # crates.io — aligned with the fleet floor (ddl versions.ddl.toml pins 0.10.0); ci.yml installs this pin
 dont = "0.2.2"             # crates.io: dont-cli — matches current ci.yml pin
 dulce-de-leche = "0.7.0"   # crates.io (bin: ddl)
-openspec = "1.15.0"        # npm: @fission-ai/openspec — 1.x since vampiro-qx8 (specs restructured for the 1.x format); matches ci.yml
+openspec = "2.1.0"         # npm: @fission-ai/openspec — artifacts in openspec/config.yaml; agent workflows are project skills in .agents/skills
 bd = "1.3.0"               # beads — pinned GitHub release download (no versioned homebrew-core formula)

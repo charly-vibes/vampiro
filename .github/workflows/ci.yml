@@ -49,7 +49,7 @@ jobs:
           node-version: "22"
 
       - name: Install OpenSpec
-        run: npm install --global @fission-ai/openspec@1.15.0
+        run: npm install --global @fission-ai/openspec@2.1.0
 
       - name: Install ecosystem tools (§4 dogfood matrix, pinned)
         run: |
