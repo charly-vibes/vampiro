@@ -1,8 +1,6 @@
 # Summary
 
 [Home](./index.md)
-[charly-vibes Tool Ecosystem](https://charly-vibes.github.io/dulce-de-leche/ecosystem-map.html)
-[Release Status](./release.md)
 [Project Context](./project-context.md)
 [EARS Specification](./specification/ears.md)
 
