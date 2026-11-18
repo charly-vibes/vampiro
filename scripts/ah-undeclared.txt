@@ -1,0 +1,127 @@
+# ah check declared backlog (ratchet input for scripts/ah_check_ratchet.py)
+#
+# Format: <spec>/<scenario-id>   # <owning ticket(s)>
+#
+# Every scenario listed here is declared in openspec/specs but not yet
+# verifiable: its contract stub carries no [tests] table (no-tests-declared) or
+# no contract exists at all (no-toml). The corpus was authored under
+# espectacular 0.11.0 (`authored_with = "0.11.0"` stubs) and ah 0.12.3 requires
+# declared tests, so these surfaced when the gate was first wired: 84
+# structural findings (82 no-tests-declared, 2 no-toml). They are real gaps,
+# not formatting drift: no test verifies these scenarios. Pay them down
+# scenario by scenario.
+#
+# The ratchet:
+#   - allows exactly these no-toml / no-tests-declared findings
+#   - fails on any other finding (orphan-toml, slug-collision, execution)
+#   - fails when a scenario is NOT listed but lacks contract/tests (new
+#     backlog must be declared with its ticket in the same change)
+#   - fails when a listed scenario is now declared (stale line: prune it)
+#
+# The list only shrinks, except when a spec-first ticket adds a scenario and
+# records it in the same change.
+#
+# No owning tickets have been filed for this backlog yet; every line carries
+# the same placeholder until the paydown is ticketed.
+
+# cir-plugin-platform
+cir-plugin-platform/argument-provenance-exceeds-the-bound  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/argument-provenance-is-direct-or-bounded  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/conformant-plugin-is-repeated  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/declaration-exceeds-resource-limit  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/declared-custom-effect-is-recursive  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/effect-channel-overflow-is-rejected  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/failed-conformance-does-not-load  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/invalid-filtration-is-rejected  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/missing-identity-or-non-closure-is-rejected  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/nested-effects-are-extracted  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/resolvers-disagree  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/shape-extraction-fails  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/shape-overflow-is-rejected  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/unwrap-does-not-imply-totality  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/valid-filtration-computes-distance-evidence  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/version-mismatch-is-detected  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/visibility-and-effect-tables-evolve-independently  # vampiro backlog (owning ticket: <none yet>)
+cir-plugin-platform/wrapper-or-unwrap-is-unmatched  # vampiro backlog (owning ticket: <none yet>)
+
+# cli-core
+cli-core/errorsink-for-self-healing-errors  # vampiro backlog (owning ticket: <none yet>)
+cli-core/guide-builder-replaces-ad-hoc-setup  # vampiro backlog (owning ticket: <none yet>)
+
+# cli-foundation
+cli-foundation/a-capability-constructs-a-finding  # vampiro backlog (owning ticket: <none yet>)
+cli-foundation/aix-artifacts-are-regenerated  # vampiro backlog (owning ticket: <none yet>)
+cli-foundation/check-emits-shared-envelope  # vampiro backlog (owning ticket: <none yet>)
+cli-foundation/commands-are-discoverable-before-integrations-exist  # vampiro backlog (owning ticket: <none yet>)
+cli-foundation/filtration-evidence-is-attached  # vampiro backlog (owning ticket: <none yet>)
+cli-foundation/managed-blocks-are-applied-twice  # vampiro backlog (owning ticket: <none yet>)
+cli-foundation/project-is-detected-by-wai  # vampiro backlog (owning ticket: <none yet>)
+cli-foundation/typo-suggestion-from-genesis  # vampiro backlog (owning ticket: <none yet>)
+
+# config
+config/config-registered-at-startup  # vampiro backlog (owning ticket: <none yet>)
+config/config-struct-implements-configfile  # vampiro backlog (owning ticket: <none yet>)
+config/dead-config-code-removed  # vampiro backlog (owning ticket: <none yet>)
+
+# lifecycle-safety
+lifecycle-safety/alias-cannot-be-resolved  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/duplicate-release-cannot-discharge-another-resource  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/early-return-bypasses-cleanup  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/first-snapshot-establishes-deterministic-history  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/item-moves-without-alias  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/no-usable-explicit-baseline  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/non-idempotent-append-is-retried  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/persistent-facade-item-changes-incompatibly  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/retried-operation-fails-its-declared-law  # vampiro backlog (owning ticket: <none yet>)
+lifecycle-safety/write-idiom-is-unknown  # vampiro backlog (owning ticket: <none yet>)
+
+# rust-analysis
+rust-analysis/crate-facade-re-exports-an-item  # vampiro backlog (owning ticket: <none yet>)
+rust-analysis/rust-callable-contains-nested-effects  # vampiro backlog (owning ticket: <none yet>)
+rust-analysis/rust-provenance-covers-all-bound-cases  # vampiro backlog (owning ticket: <none yet>)
+rust-analysis/write-and-cleanup-syntax-is-recognized  # vampiro backlog (owning ticket: <none yet>)
+
+# scan-workflows
+scan-workflows/below-threshold-finding-in-gate-mode  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/ci-configuration-is-requested  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/diff-context-is-unavailable  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/equal-threshold-finding-fails-gate  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/fifty-edge-benchmark-runs  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/filtration-mapping-is-validated-before-gating  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/full-scope-is-explicit  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/guidance-reports-all-and-succeeds  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/interactive-and-agent-checks-default-to-diff  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/local-worktree-and-detached-target-resolve-normally  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/one-issue-appears-in-two-scopes  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/required-pull-request-history-is-unavailable  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/unchanged-repository-is-rescanned-fully  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/unsupported-extension-is-present  # vampiro backlog (owning ticket: <none yet>)
+scan-workflows/valid-filtration-mapping-controls-configured-severity  # vampiro backlog (owning ticket: <none yet>)
+
+# seam-analysis
+seam-analysis/advisory-internal-target-is-reached  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/ancestor-handles-an-unchecked-exception  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/direct-result-option-and-throws-are-discarded  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/enforced-crossing-appears-in-cir  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/facade-leaks-an-internal-origin  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/fallback-differs-without-adapter  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/multiple-nested-layers-are-discarded  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/nested-layers-are-handled-independently  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/rust-declaration-is-over-exposed  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/union-arm-is-not-accepted  # vampiro backlog (owning ticket: <none yet>)
+seam-analysis/unwrapped-edge-is-still-partial  # vampiro backlog (owning ticket: <none yet>)
+
+# trust-boundary-analysis
+trust-boundary-analysis/contributors-have-mixed-trust  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/declared-validation-is-repeated  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/every-declared-boundary-class-passes  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/evidence-cannot-confirm-the-refinement  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/provenance-exceeds-its-bound-or-declarations-conflict  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/raw-external-value-enters-its-smart-constructor  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/raw-external-value-enters-the-interior  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/raw-input-reaches-a-recognized-constructor  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/similar-check-has-no-identity-evidence  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/similar-function-is-not-a-smart-constructor  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/smart-constructor-refinement-is-independent-of-confirmation  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/trust-classification-is-unknown  # vampiro backlog (owning ticket: <none yet>)
+trust-boundary-analysis/trust-provenance-is-unknown  # vampiro backlog (owning ticket: <none yet>)
