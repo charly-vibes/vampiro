@@ -4,3 +4,4 @@ gitignore_strategy = "prompt"
 
 [gates]
 ah_check = "python3 scripts/ah_check_ratchet.py"
+pretender_gate = "pretender check --mode gate"

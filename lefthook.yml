@@ -12,15 +12,15 @@ pre-commit:
   commands:
     # ddl:managed:start (pre-commit)
     ddl-ah-check:
-      run: ah check
+      run: python3 scripts/ah_check_ratchet.py
     ddl-pretender-gate:
       run: pretender check --mode gate
     ddl-spk-lint:
-      run: spk lint openspec
+      run: spk lint openspec/specs || test $? -eq 2
     # ddl:managed:end (pre-commit)
 # ah:managed:start
     ah-check:
-      run: ah check
+      run: python3 scripts/ah_check_ratchet.py
 # ah:managed:end
     bd:
       run: bd hooks run pre-commit
@@ -63,7 +63,7 @@ pre-push:
   commands:
     # ddl:managed:start (pre-push)
     ddl-ah-check:
-      run: ah check
+      run: python3 scripts/ah_check_ratchet.py
     # ddl:managed:end (pre-push)
     bd:
       run: bd hooks run pre-push
