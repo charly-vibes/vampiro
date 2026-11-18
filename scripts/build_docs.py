@@ -55,6 +55,25 @@ def copy_with_notice(source: Path, destination: Path, notice: str) -> None:
     destination.write_text(f"{notice}\n\n{source.read_text()}")
 
 
+def extract_context(config_text: str) -> str:
+    """Return the project context block from openspec/config.yaml.
+
+    The block is a YAML literal scalar (`context: |`) whose lines are indented
+    one level; stop at the first line that is not blank and not indented.
+    """
+    lines = config_text.splitlines()
+    try:
+        start = next(i for i, line in enumerate(lines) if line.rstrip() == "context: |")
+    except StopIteration as exc:
+        raise ValueError("openspec/config.yaml has no `context: |` block") from exc
+    body: list[str] = []
+    for line in lines[start + 1 :]:
+        if line.strip() and not line.startswith(" "):
+            break
+        body.append(line[2:] if line.startswith("  ") else line)
+    return "\n".join(body).strip("\n") + "\n"
+
+
 def build_summary() -> str:
     lines = [
         "# Summary",
@@ -121,11 +140,14 @@ def main() -> None:
         "> **Document status:** Approved 1.3.0 (2026-07-28). The source file `vampiro-ears-spec.md` is authoritative.",
     )
 
-    # Copy project context
-    copy_with_notice(
-        ROOT / "openspec" / "project.md",
-        SRC / "project-context.md",
-        "> **Source:** Generated from `openspec/project.md` during the documentation build.",
+    # Copy project context (openspec 2.1 keeps it in config.yaml's context block)
+    config = (ROOT / "openspec" / "config.yaml").read_text()
+    context = extract_context(config)
+    destination = SRC / "project-context.md"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        "> **Source:** Generated from the `context` block of `openspec/config.yaml` "
+        "during the documentation build.\n\n" + context.rstrip() + "\n"
     )
 
     # Remove old roadmap if it exists, then generate fresh

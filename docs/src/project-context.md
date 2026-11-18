@@ -1,139 +1,82 @@
-> **Source:** Generated from `openspec/project.md` during the documentation build.
+> **Source:** Generated from the `context` block of `openspec/config.yaml` during the documentation build.
 
-# Project Context
-
-## Purpose
 Vampiro is a cross-language static-analysis CLI that checks whether code
-composes correctly at call, module, and trust boundaries. It detects structural
+composes correctly at call, module, and trust boundaries: structural
 composition mismatches, module reach-through, law-level substitutability
 failures, discarded or inconsistent effect channels, and unrefined external
-data crossing into trusted interiors. It analyzes source without executing it
-and normalizes each language into a shared Composition IR (CIR).
+data crossing into trusted interiors. It never executes analyzed source; it
+normalizes each language into a shared Composition IR (CIR).
 
-The authoritative product requirements are in `vampiro-ears-spec.md`. Preserve
-its requirement IDs (`REQ-*`, `REQ-V*`, `REQ-C*`, `REQ-T*`, and `REQ-B*`) in
-proposals, tests, findings, and traceability notes.
+The authoritative product requirements live in `vampiro-ears-spec.md`.
+Preserve its requirement IDs (`REQ-*`, `REQ-V*`, `REQ-C*`, `REQ-T*`,
+`REQ-B*`) in proposals, tests, findings, and traceability notes.
 
-## Tech Stack
-- Implementation language: Rust, organized as a Cargo workspace and exposed
-  as the `vampiro` CLI binary.
-- Rust baseline: stable toolchain, rustfmt formatting, Clippy linting, and
-  Cargo-native unit, integration, and documentation tests.
-- Language analysis: tree-sitter or a language-native parser behind
-  front-end plugins.
-- Core model: a language-agnostic graph (CIR) of callable nodes and derived
-  call edges.
-- CLI output: human-readable, JSON, and SARIF.
-- Optional proof backends: Lean, Dafny, and TLA+; proof support must remain
-  independent of the default `check` path.
+Stack: Rust workspace exposing the `vampiro` CLI; stable toolchain, rustfmt,
+Clippy, Cargo-native unit/integration/doc tests; tree-sitter or
+language-native parsers behind front-end plugins; CIR graph of callable nodes
+and derived call edges; human, JSON, and SARIF output; optional Lean, Dafny,
+and TLA+ proof backends that never enter the default `check` path.
 
-## Project Conventions
+Conventions: use the EARS domain vocabulary consistently (node, edge, seam,
+shape, effect channel, resolution, finding, `filtration_distance`, facade,
+implementation cluster, redundancy chain). Built-in vocabularies stay closed;
+project extensions are declared and validated. Unknown shapes, wrappers,
+resolutions, idempotency, and identities stay `unknown`, `opaque`, or
+`ambiguous` — never silently coerced to a successful/default case. A finding
+always has a rule ID, file, line range, severity, and exactly one axis.
 
-### Code Style
-- Format with rustfmt and keep Clippy clean under the lint policy established
-  by the CLI-foundation change.
-- Use domain terms from the EARS specification consistently: node, edge,
-  seam, shape, effect channel, resolution, finding, `filtration_distance`, facade,
-  implementation cluster, and redundancy chain.
-- Keep built-in vocabularies closed and project extensions explicitly
-  declared and validated. Unknown shapes, wrappers, resolutions, idempotency,
-  and identities remain `unknown`, `opaque`, or `ambiguous`; never silently
-  coerce them to a successful/default case.
-- Use stable requirement and rule IDs. A finding always has a rule ID, file,
-  line range, severity, and exactly one axis.
+Architecture: language-specific parsing and idiom recognition live in
+versioned, conformance-tested front-end and resolver plugins; checking logic
+is language-independent and operates on CIR, not source ASTs — a new language
+adds a plugin, never a core branch. Domain/codomain shapes are modeled
+structurally, deliberately coarser than a full type checker; effect channels
+are recursive (`async<result<option<T>>>` retains every layer); legitimate
+morphisms and filtrations are declarative data, and invalid subcategories or
+non-nested filtrations are rejected. Diff-scoped seam analysis is the
+interactive/agent default; full-repository analysis is an incremental mode.
+Property testing and formal proof are distinct evidence — never report a
+property-test result as a prover result.
 
-### Architecture Patterns
-- Keep language-specific parsing and idiom recognition in versioned,
-  conformance-tested front-end and resolver plugins.
-- Keep checking logic language-independent and operate on CIR rather than
-  source ASTs. A new language should add a plugin, not branch the core engine.
-- Model domain/codomain shapes structurally, deliberately coarser than a full
-  type checker.
-- Represent effect channels recursively so combinations such as
-  `async<result<option<T>>>` retain every layer.
-- Define legitimate morphisms and filtrations as declarative data;
-  reject invalid subcategories or non-nested filtrations.
-- Treat diff-scoped seam analysis as the interactive/agent default and full
-  repository analysis as an incremental mode.
-- Keep property testing and formal proof as distinct evidence. Never report a
-  property-test result as a prover result.
+Testing: every behavior starts from an openspec scenario traceable to EARS
+requirement IDs. Maintain a shared, versioned conformance-fixture suite for
+every front-end, effect resolver, visibility table, and write-shape table;
+canonical UTF-8 result bytes and plugin-load manifests must be identical when
+tool, plugin, config, and platform versions are unchanged. Test all output
+formats against the same finding data; use property-based tests for declared
+algebraic laws across every member of an implementation cluster; add prover
+checks only for explicitly tagged obligations. Include negative fixtures for
+unknown/opaque classifications, plugin conflicts, invalid filtrations,
+advisory visibility crossings, fallback mismatches, unsafe retries, and
+unreleased resource paths. Benchmark diff-scoped checks up to 50 seam edges
+with a single-digit-second target.
 
-### Testing Strategy
-- Develop every behavior from an OpenSpec scenario traceable to one or more
-  EARS requirement IDs.
-- Maintain a shared, versioned conformance-fixture suite for every front-end,
-  effect resolver, visibility table, and write-shape table. Canonical UTF-8
-  serialized result and plugin-load manifest bytes must be identical when tool,
-  plugin, configuration, and platform versions are unchanged.
-- Test all supported output formats against the same underlying finding data.
-- Use property-based tests for declared algebraic laws across every member of
-  an implementation cluster; add optional prover checks only for explicitly
-  tagged obligations.
-- Include negative fixtures for unknown/opaque classifications, plugin
-  conflicts, invalid filtrations, advisory visibility crossings, fallback
-  mismatches, unsafe retries, and unreleased resource paths.
-- Benchmark diff-scoped checks with up to 50 seam edges; the target is
-  single-digit seconds.
-
-### Git Workflow
-- Use OpenSpec changes for new capabilities, architecture changes, breaking
-  behavior, and performance work. Do not implement a proposal before approval.
-- Keep commits focused and preserve requirement IDs in change artifacts and
-  test names where practical.
-- Pull-request CI should run diff-scoped `check` in `gate` mode at the
-  configured severity threshold unless configuration declares a validated
-  mapping from `filtration_distance` (mathematical `sev(e)`).
-
-## Domain Context
-Vampiro asks whether each edge is valid in the category in which it claims to
-compose. Its four reporting axes are:
-
-- `composition`: produced and expected structural shapes do not unify,
-  including facade changes across versions.
-- `modularity`: source crosses or leaks a declared visibility/facade boundary.
-- `optionality`: an implementation matches an interface signature but fails
-  its declared algebraic laws.
-- `robustness`: an effect, fallback, retry, or acquire/release obligation is
-  swallowed or threaded inconsistently, or untrusted raw data crosses into the
-  interior without a recognized refinement step.
-
+Reporting axes: `composition` (produced and expected shapes do not unify,
+including facade changes across versions); `modularity` (source crosses or
+leaks a visibility/facade boundary); `optionality` (implementation matches the
+signature but fails its declared laws); `robustness` (an effect, fallback,
+retry, or acquire/release obligation is swallowed or threaded inconsistently,
+or untrusted raw data crosses inward without a recognized refinement step).
 The built-in visibility model is a five-level lattice from `L0 private` to
-`L4 public-stable`, but projects may declare deeper filtrations. Boundary kind
-matters: advisory crossings are source findings; an allegedly enforced
-crossing indicates a plugin defect. Findings are morphisms allowed by the
-ambient category but absent from the declared legitimate subcategory.
-Their `filtration_distance` is separate evidence, not configured severity.
+`L4 public-stable`; projects may declare deeper filtrations. Boundary kind
+matters: advisory crossings are source findings, an allegedly enforced
+crossing is a plugin defect. Findings are morphisms allowed by the ambient
+category but absent from the declared legitimate subcategory;
+`filtration_distance` is separate evidence, not configured severity.
 
-## Important Constraints
-- Static analysis must never execute analyzed source code.
-- Unknown or unsupported input must be visible in output, never silently
-  omitted or treated as valid.
-- Every plugin must pass the shared conformance suite before loading;
-  conflicting plugins must both be rejected.
-- `shape:opaque` nodes are excluded only from composition checks; their edges
-  remain eligible for modularity and robustness analysis.
-- Duplicate findings are identified stably from rule, location, and shape
-  hash.
-- `gate` is the default mode and fails when seam-scoped findings meet the
-  configured threshold; `guidance`/`tiered` are advisory but are DATED
-  downgrades: they require `--advisory-until DATE` (or a config lease), and
-  an expired/missing lease fails closed — the quality-drift detector forcing
-  a renewed, dated, reviewable decision (vampiro-b7g).
-- Prover unavailability is `ProverUnavailable`, not `Disproved` or success.
-- N+1 detection, documentation truth maintenance, and lock-order analysis are
-  explicitly out of scope because they require other extraction models or
-  belong to other tools.
-- Trust provenance is distinct from CIR argument provenance. Unknown, absent,
-  stale, or incomplete refinement evidence never establishes that an invalid
-  state is unreachable.
-- The repository is greenfield. `openspec/specs/` describes built truth, so do
-  not copy aspirational EARS requirements there before implementation; add
-  them through reviewed changes and archive them as capabilities ship.
+Constraints: static analysis must never execute analyzed source; unknown or
+unsupported input must be visible in output, never silently omitted or
+treated as valid; every plugin must pass the shared conformance suite before
+loading, and conflicting plugins are both rejected; `shape:opaque` nodes are
+excluded only from composition checks, their edges stay eligible for
+modularity and robustness; duplicate findings are identified stably from
+rule, location, and shape hash; `guidance` mode never fails solely because of
+findings while `gate` mode fails only when seam-scoped findings meet the
+configured threshold; prover unavailability is `ProverUnavailable`, never
+`Disproved` or success; N+1 detection, documentation truth maintenance, and
+lock-order analysis are out of scope; trust provenance is distinct from CIR
+argument provenance, and unknown, absent, stale, or incomplete refinement
+evidence never establishes that an invalid state is unreachable.
 
-## External Dependencies
-- Git diff/repository metadata for seam detection, incremental extraction, and
-  historical facade snapshots.
-- Per-language tree-sitter grammars or native parser APIs.
-- Property-based testing libraries selected with each implementation plugin.
-- Optional Lean, Dafny, and TLA+ installations or services.
-- CI platforms capable of consuming generated pipeline configuration and SARIF.
+The repository is greenfield: `openspec/specs/` describes built truth. Do not
+copy aspirational EARS requirements there before implementation — add them
+through reviewed changes and archive them as capabilities ship.
