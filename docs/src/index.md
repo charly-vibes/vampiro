@@ -10,6 +10,9 @@ Vampiro is a cross-language Rust CLI (current release: [release status](./releas
 call boundary: **does this edge compose validly in the category it claims to
 compose in?**
 
+Vampiro is part of the [charly-vibes tool
+ecosystem](https://charly-vibes.github.io/dulce-de-leche/ecosystem-map.html).
+
 It detects four classes of seam defect:
 
 | Axis | Question |

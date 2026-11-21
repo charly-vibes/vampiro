@@ -3,6 +3,7 @@
 [Home](./index.md)
 [Project Context](./project-context.md)
 [EARS Specification](./specification/ears.md)
+[Release Status](./release.md)
 
 # Roadmap
 
