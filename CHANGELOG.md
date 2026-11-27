@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.6.2] — 2026-11-27
+
+Maintenance release: no analyzer behavior changes.
+
+### Dependencies
+
+- genesis-vibes 0.6 → 0.13.4 (#51, #57)
+- sha2 0.10.9 → 0.11.1 (#50)
+- proptest 1.11.0 → 1.12.0 (#52)
+- serde_json 1.0.151 → 1.0.154 (#47)
+- clap 4.6.7 → 4.6.9 (#56)
+- clap_complete 4.6.11 → 4.6.12 (#58)
+
+### CI / tooling
+
+- Adopt the DDL test-runner standard: `just test` via testaruda exec
+  (affected-set selection, DDL-85p); CI installs testaruda@0.5.9.
+- `just test` heals stub testaruda stores unconditionally (6554923).
+- Pretender aligned to the 0.10.0 gate; `pretender-baseline.json` committed.
+- Declared-backlog ratchet for `ah check` (63e11ea).
+
+## [0.6.1] — 2026-10-21
+
+CI-only tag: release workflow publishes provenance.json (DDL-9x4). No
+analyzer changes.
+
 ## [0.6.0] — 2026-10-01
 
 ### Changed
